@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "skills": {
+    "asb-carol-dealbreakers": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-carol-dealbreakers/SKILL.md",
+      "computedHash": "c2925d958f61c449af9e70eb8fa582cef5769036aae4ca482064da7299069d4b"
+    },
+    "asb-carol-define": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-carol-define/SKILL.md",
+      "computedHash": "886613833f248793ada8fba4354b5b9376d9dcc75a0fe42b29caec736a6be1cf"
+    },
+    "asb-carol-inciting-events": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-carol-inciting-events/SKILL.md",
+      "computedHash": "02b85b1e7ceab186cc2b07ea11cf2cfabf86ab20f9973ffa767fb581b44f000a"
+    },
+    "asb-carol-keystones": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-carol-keystones/SKILL.md",
+      "computedHash": "28a5cdcbe1da1851052f648952543ddacdfe8bc78c628bac543f54e7a750086e"
+    },
+    "asb-carol-observations": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-carol-observations/SKILL.md",
+      "computedHash": "a6ebafa7c8455175cefe47f634725e2afe63cdcd0af986cf7eebf9a259962f62"
+    },
+    "asb-carol-strengths": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-carol-strengths/SKILL.md",
+      "computedHash": "1f9b72d17b6157ffb86511970c632199789293da9da7b96b52f373ea8b604132"
+    },
+    "asb-interview-debrief": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-interview-debrief/SKILL.md",
+      "computedHash": "1e053f30cb3761ac11c54edfc0ea5f9da31d979abfe5ab660db9340ee9c9120a"
+    },
+    "asb-interview-goals": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-interview-goals/SKILL.md",
+      "computedHash": "64166ce1a7feab0b7cbbf7bc0d8a1ab85ce76f7332e5f77ec016fe238c40ad74"
+    },
+    "asb-interview-hypotheses": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-interview-hypotheses/SKILL.md",
+      "computedHash": "0a507881217fba8c9ed72781b98d75280c3cdc1ae4142a69d013c5a77950c813"
+    },
+    "asb-interview-learning": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-interview-learning/SKILL.md",
+      "computedHash": "3ae475bdf29ebc27979270ea14ecbab7a6421d36a215386d7e55511595b6f425"
+    },
+    "asb-interview-questions": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-interview-questions/SKILL.md",
+      "computedHash": "914eb82ca13dbb4d4c533ecdcabd7e8fdbe6c58bfc3f43dde62679a4e72ca38c"
+    },
+    "asb-interview-report": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-interview-report/SKILL.md",
+      "computedHash": "bdf175139d014a30e06c77246d2697273a79dcc091067e76bfda850abf1f3c0f"
+    },
+    "asb-more-or-less": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-more-or-less/SKILL.md",
+      "computedHash": "88e0090c0e639f0c6555c7c46e1b48ccdfcc19e42fbbae79321c3b18b9e39305"
+    },
+    "asb-needs-stack": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-needs-stack/SKILL.md",
+      "computedHash": "1a26630c066c57643a0258557b850be4ac784f0522ce8d79d442ed207d65fb80"
+    },
+    "asb-positioning": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-positioning/SKILL.md",
+      "computedHash": "ef5b97183ee9348c4990d6fb034b1d0cb5601174f8b7b544a2e80bb7052c315a"
+    },
+    "asb-problem": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-problem/SKILL.md",
+      "computedHash": "d2f72b2a9e8670b998f636fb2cfa0bcf695119d6cd310d6066a6eb0151aee724"
+    },
+    "asb-raise-prices": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-raise-prices/SKILL.md",
+      "computedHash": "632f262af4360f0f36f40aa71590d92d3686446d8682996e896ac60e429a3b9d"
+    },
+    "asb-rude-qa": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-rude-qa/SKILL.md",
+      "computedHash": "de922c32d1e0af635956c12309f0c1ea5f452fe1b6fec8aeca9cb86c2a745a7a"
+    },
+    "asb-voters": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-voters/SKILL.md",
+      "computedHash": "230464a8eb5c397ebb3418321647f261f703066779e095632e1b5f51a8df6c7b"
+    },
+    "asb-who-me": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-who-me/SKILL.md",
+      "computedHash": "8c5bf444839a7cb020e73e5c076827e5b5ef1072271622c8fd30331dbf0f4555"
+    },
+    "asb-willingness-to-pay": {
+      "source": "asmartbear/asb-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/asb-willingness-to-pay/SKILL.md",
+      "computedHash": "07efd20bd004e99e2790ad853fcc2a3aaaa48cb858643db8b310f38d30db490c"
+    }
+  }
+}
