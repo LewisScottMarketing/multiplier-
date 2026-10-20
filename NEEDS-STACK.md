@@ -1,7 +1,13 @@
 # Needs Stack — eduleaders compliance tool
 
-> ⚠️ IN PROGRESS — anchored at N1; walked down: none yet; walked up: none yet;
-> currently crystallizing: N2 (walking down from the anchor). No
+> ⚠️ IN PROGRESS — anchored at N1; walked down: N2 (descent complete — the
+> next level down, e.g. keeping a staff list, would never weigh in a
+> buyer's choice or appear in positioning); walked up: none yet;
+> currently crystallizing: N3 (candidate: walk into an Ofsted inspection
+> confident the safeguarding check of staff records will pass). Stack is
+> for Group 1 (schools running vetting from spreadsheets); Group 2
+> (schools switching from an existing system such as CPOMS or School SCR)
+> are N1 occupants to win from, and may climb to different ends. No
 > ideal-customer definition (CAROL.md), interview findings, or keystones
 > chart exist yet for this product — this stack is built on a confirmed
 > customer sketch instead, caveated as unvetted. If you are resuming,
@@ -22,3 +28,7 @@ ends before bottom means.
     Occupants: you; CPOMS (StaffSafe module); School SCR / MAT SCR; Online SCR; The Access Group (HR suite with SCR module).
     Role: **what you do** — features live here; meet searchers where
     they are.  ← YOU ARE HERE
+
+**N2.** → Track each staff member's vetting checks in a spreadsheet, and chase references and documents by hand for every hire.
+    Occupants: Excel and Google Sheets; email and phone for references; shared drives (e.g. SharePoint); the DBS Update Service portal.
+    Role: advancement — a step you make obsolete; brag about it.
