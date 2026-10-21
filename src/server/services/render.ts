@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { buildContext } from '@shared/derive';
 import { SAMPLE_PROSPECTS } from '@shared/fields';
 import type { Campaign } from '@shared/schema';
@@ -54,6 +55,13 @@ const qs = (params: Record<string, string>) => {
 };
 
 // ── Preview ("see this page as …") ──────────────────────────────────────────
+
+/** The dashboard's "preview as…" choice, as sent in request bodies. */
+export const PreviewSourceSchema = z.union([
+  z.object({ kind: z.literal('sample'), index: z.number().int().min(0).max(10) }),
+  z.object({ kind: z.literal('prospect'), id: z.string().max(40) }),
+  z.object({ kind: z.literal('empty') }),
+]);
 
 export type PreviewSource =
   | { kind: 'sample'; index: number }

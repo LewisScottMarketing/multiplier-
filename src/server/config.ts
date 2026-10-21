@@ -21,6 +21,8 @@ export interface Config {
   anthropicApiKey?: string;
   aiModelSmart: string;
   aiModelFast: string;
+  /** Longest a single AI call may take before the fallback text is used. */
+  aiTimeoutMs: number;
   adminEmail?: string;
   adminPassword?: string;
   /** Directory containing the built dashboard (Vite output). */
@@ -63,8 +65,10 @@ export function loadConfig(env: Env = process.env): Config {
     allowPrivateFetch: bool(env.ALLOW_PRIVATE_FETCH),
     maxUploadBytes: Math.max(1, Number(env.MAX_UPLOAD_MB || 25)) * 1024 * 1024,
     anthropicApiKey: env.ANTHROPIC_API_KEY || undefined,
-    aiModelSmart: env.AI_MODEL_SMART || 'claude-sonnet-5-5',
+    // `smart` runs once per campaign (page polish, persona versions); `fast` runs once per prospect.
+    aiModelSmart: env.AI_MODEL_SMART || 'claude-opus-5-5',
     aiModelFast: env.AI_MODEL_FAST || 'claude-haiku-5-5',
+    aiTimeoutMs: Math.min(Math.max(Number(env.AI_TIMEOUT_MS || 20_000), 2_000), 90_000),
     adminEmail: env.ADMIN_EMAIL || undefined,
     adminPassword: env.ADMIN_PASSWORD || undefined,
     webDir: path.resolve(env.WEB_DIR || 'web/dist'),

@@ -11,6 +11,7 @@ import { extractPalette, renderPageRaster, sampleRunColors, type Raster } from '
 import { isPdf, pdfGate, withTimeout } from '../pdf/runtime';
 import { getAsset, storeImage, type AssetRow } from './assets';
 import { createCampaign, requireCampaign, updateCampaign } from './campaigns';
+import { aiEnabled, polishImport } from './ai';
 import { forgetSource } from './documents';
 
 export interface StoredPdf {
@@ -90,7 +91,7 @@ export interface ImportOutcome {
 }
 
 /** Upload a PDF → a campaign with a landing page built from it and the PDF ready to personalise. */
-export async function importPdfCampaign(app: AppContext, input: { data: Buffer; filename: string; name?: string }): Promise<ImportOutcome> {
+export async function importPdfCampaign(app: AppContext, input: { data: Buffer; filename: string; name?: string; ai?: boolean }): Promise<ImportOutcome> {
   const stored = await storePdf(app, input);
   const { extracted, asset } = stored;
   const first = stored.rasters.slice(0, 3);
@@ -106,8 +107,15 @@ export async function importPdfCampaign(app: AppContext, input: { data: Buffer; 
     },
   });
   const report = [...result.report];
+  let importedPage = result.page as Page;
+  // optional: let Claude tidy weak copy (never overrides text that already reads well; skipped silently without a key)
+  if (input.ai !== false && aiEnabled(app)) {
+    const polished = await polishImport(app, { page: importedPage, filename: input.filename });
+    importedPage = polished.page;
+    report.push(...polished.notes);
+  }
 
-  const headline = result.page.blocks.find((b) => b.type === 'hero');
+  const headline = importedPage.blocks.find((b) => b.type === 'hero');
   const title = headline?.type === 'hero' && headline.headline ? headline.headline : input.filename.replace(/\.pdf$/i, '');
   if (!stored.editable) report.push('This PDF can’t be edited (it may use unusual encryption or structure), so each prospect gets the original file. The landing page is unaffected.');
 
@@ -121,7 +129,7 @@ export async function importPdfCampaign(app: AppContext, input: { data: Buffer; 
 
   const campaign = createCampaign(app, {
     name: (input.name?.trim() || title).slice(0, 120),
-    page: result.page as Page,
+    page: importedPage,
     document,
     source: { type: 'pdf', asset_id: asset.id, filename: input.filename, imported_at: Date.now(), report },
   });

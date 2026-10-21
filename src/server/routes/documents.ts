@@ -8,23 +8,15 @@ import { requireCampaign, updateCampaign } from '../services/campaigns';
 import { buildPdf, previewPage, studioPage } from '../services/documents';
 import { attachPdf, importPdfCampaign, removeAsset } from '../services/importer';
 import { getAsset } from '../services/assets';
-import { parsePreviewSource, previewContext, type PreviewSource } from '../services/render';
+import { parsePreviewSource, previewContext, previewSourceString, PreviewSourceSchema, type PreviewSource } from '../services/render';
 
-const SourceSchema = z.union([
-  z.object({ kind: z.literal('sample'), index: z.number().int().min(0).max(10) }),
-  z.object({ kind: z.literal('prospect'), id: z.string().max(40) }),
-  z.object({ kind: z.literal('empty') }),
-]);
-
-const sourceString = (s: z.infer<typeof SourceSchema>): string => (s.kind === 'empty' ? 'empty' : s.kind === 'sample' ? `sample:${s.index}` : `prospect:${s.id}`);
-
-async function readPdfUpload(c: C): Promise<{ data: Buffer; filename: string; name?: string }> {
+async function readPdfUpload(c: C): Promise<{ data: Buffer; filename: string; name?: string; ai?: boolean }> {
   const form = await c.req.parseBody();
   const file = form.file;
   if (!(file instanceof File)) throw badRequest('Attach a PDF as "file".');
   const max = c.get('app').config.maxUploadBytes;
   if (file.size > max) throw badRequest(`PDFs can be up to ${Math.round(max / 1024 / 1024)} MB.`);
-  return { data: Buffer.from(await file.arrayBuffer()), filename: file.name || 'document.pdf', name: typeof form.name === 'string' ? form.name : undefined };
+  return { data: Buffer.from(await file.arrayBuffer()), filename: file.name || 'document.pdf', name: typeof form.name === 'string' ? form.name : undefined, ai: form.ai === '0' ? false : undefined };
 }
 
 const png = (bytes: Uint8Array | Buffer, extra: Record<string, string> = {}) =>
@@ -110,8 +102,8 @@ export function documentRoutes() {
   r.post('/:id/document/preview', async (c) => {
     const app = c.get('app');
     const { campaign } = withDocument(c);
-    const body = await jsonBody(c, z.object({ document: DocumentSchema, source: SourceSchema.default({ kind: 'sample', index: 0 }), page: z.number().int().min(1).max(500).default(1) }));
-    const src = parsePreviewSource(sourceString(body.source));
+    const body = await jsonBody(c, z.object({ document: DocumentSchema, source: PreviewSourceSchema.default({ kind: 'sample', index: 0 }), page: z.number().int().min(1).max(500).default(1) }));
+    const src = parsePreviewSource(previewSourceString(body.source));
     const { ctx } = previewContext(app, campaign, src);
     const { png: bytes, warnings } = await previewPage(app, campaign, body.document, ctx, body.page, 2);
     return png(bytes, { 'Cache-Control': 'no-store', 'X-Preview-Warnings': Buffer.from(JSON.stringify(warnings)).toString('base64') });

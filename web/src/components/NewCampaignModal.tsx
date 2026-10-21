@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, FileText, FileUp, LayoutTemplate } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { Campaign } from '../types';
+import type { Campaign, SettingsResponse } from '../types';
 import { Alert, Button, Field, Input, Modal, useToast } from '../ui';
 
 type Mode = 'pdf' | 'blank';
@@ -20,6 +21,9 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [result, setResult] = useState<{ campaign: Campaign; report: string[] } | null>(null);
   const [fileName, setFileName] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  const settings = useQuery({ queryKey: ['settings'], queryFn: () => api.get<SettingsResponse>('/settings'), staleTime: 60_000 });
+  const aiOn = !!settings.data?.ai.available;
+  const [polish, setPolish] = useState(true);
 
   const upload = async (file: File) => {
     if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') return setError('Please choose a PDF file.');
@@ -30,6 +34,7 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
       const form = new FormData();
       form.set('file', file);
       if (name.trim()) form.set('name', name.trim());
+      if (aiOn && !polish) form.set('ai', '0');
       const r = await api.upload<{ campaign: Campaign; report: string[] }>('/campaigns/import-pdf', form);
       setResult(r);
       setPhase('done');
@@ -61,7 +66,7 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
             <>
               <div className="row"><FileText size={18} className="muted" /> <b className="truncate">{fileName}</b></div>
               <div className="progress indeterminate"><i /></div>
-              <p className="muted small">Reading the text and layout, picking your brand colour and drafting the page. This usually takes a few seconds.</p>
+              <p className="muted small">Reading the text and layout, picking your brand colour and drafting the page. This usually takes a few seconds{aiOn && polish ? ', a little longer with AI polish' : ''}.</p>
             </>
           ) : (
             <div className="progress indeterminate"><i /></div>
@@ -131,6 +136,12 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
       <div style={{ height: 14 }} />
       {mode === 'pdf' ? (
         <>
+          {aiOn ? (
+            <label className="check" style={{ marginBottom: 12 }}>
+              <input type="checkbox" checked={polish} onChange={(e) => setPolish(e.target.checked)} />
+              <span>Let Claude tidy the copy where the PDF’s wording is weak <span className="muted">(optional; it never rewrites text that already reads well)</span></span>
+            </label>
+          ) : null}
           <div
             className={`dropzone ${over ? 'over' : ''}`}
             onClick={() => input.current?.click()}

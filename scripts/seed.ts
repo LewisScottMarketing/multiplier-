@@ -70,6 +70,9 @@ async function main() {
 
   // a persona-specific block so the demo shows targeting
   const page = structuredClone(campaign.page);
+  // one AI-written line right under the hero (shows its fallback until AI is switched on and a prospect is sent through)
+  const heroAt = page.blocks.findIndex((b) => b.type === 'hero') + 1;
+  page.blocks.splice(heroAt, 0, { id: 'b_ai_opening', type: 'text', body: '{{ai_opening|Here is the playbook we put together for teams like yours.}}', align: 'center', pad: 'sm' } as never);
   const at = page.blocks.findIndex((b) => b.type === 'stats') + 1 || 2;
   page.blocks.splice(
     at,
@@ -99,7 +102,13 @@ async function main() {
   updateCampaign(ctx, campaign.id, {
     page,
     document,
-    settings: { ...campaign.settings, required_fields: ['first_name', 'company'], allow_url_params: true, ai_fields: [], clean_names: true },
+    settings: {
+      ...campaign.settings,
+      required_fields: ['first_name', 'company'],
+      allow_url_params: true,
+      clean_names: true,
+      ai_fields: [{ key: 'opening', label: 'Opening line', prompt: 'Write one warm sentence that opens the page for this person, referring to their role or company in a believable way.', max_chars: 160, fallback: 'Here is the playbook we put together for teams like yours.' }],
+    },
   });
   const live = setCampaignStatus(ctx, campaign.id, 'live');
 

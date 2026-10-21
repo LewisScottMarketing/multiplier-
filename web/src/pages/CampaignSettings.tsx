@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 import type { AiField } from '@shared/schema';
 import { api } from '../api';
 import { useCampaign } from '../campaign';
-import { Alert, Button, CopyBox, Field, Input, Menu, Select, SwitchRow, Textarea, useToast } from '../ui';
+import { PreviewAs, sourceToApi } from '../components/PreviewAs';
+import { Alert, Badge, Button, CopyBox, Field, Input, Menu, Select, SwitchRow, Textarea, useToast } from '../ui';
 import { useQuery } from '@tanstack/react-query';
 import type { SettingsResponse } from '../types';
 
@@ -67,6 +68,18 @@ export function CampaignSettings() {
   const [slug, setSlug] = useState(c.campaign.slug);
   const [savingSlug, setSavingSlug] = useState(false);
   useEffect(() => setSlug(c.campaign.slug), [c.campaign.slug]);
+
+  // "Try it": write one AI field for whoever is being previewed, so the prompt can be tuned before any prospect sees it
+  const [tries, setTries] = useState<Record<number, { busy: boolean; text?: string; fallback?: boolean; warnings?: string[]; error?: string }>>({});
+  const tryField = async (i: number) => {
+    setTries((t) => ({ ...t, [i]: { busy: true } }));
+    try {
+      const r = await api.post<{ text: string; used_fallback: boolean; warnings: Array<{ message: string }> }>(`/campaigns/${c.id}/ai/field-preview`, { field: s.ai_fields[i], source: sourceToApi(c.previewSource) });
+      setTries((t) => ({ ...t, [i]: { busy: false, text: r.text, fallback: r.used_fallback, warnings: r.warnings.map((w) => w.message) } }));
+    } catch (e) {
+      setTries((t) => ({ ...t, [i]: { busy: false, error: e instanceof Error ? e.message : 'Couldn’t try that.' } }));
+    }
+  };
 
   const slugOk = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
   const genericUrl = `${c.detail.public_url}/c/${c.campaign.slug}`;
@@ -199,6 +212,7 @@ export function CampaignSettings() {
             <p className="muted small">No AI fields yet. Use “Add field” for a ready-made starting point.</p>
           ) : (
             <div className="col" style={{ gap: 14 }}>
+              <div className="row small muted">Try fields as <PreviewAs /></div>
               {s.ai_fields.map((f, i) => (
                 <div key={i} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 14 }} className="col">
                   <div className="row">
@@ -218,6 +232,27 @@ export function CampaignSettings() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px', gap: 12 }}>
                     <Field label="Fallback" hint="Shown when AI is off, slow, or has nothing to say."><Input value={f.fallback} onChange={(e) => setAi(i, { fallback: e.target.value })} /></Field>
                     <Field label="Max characters"><Input type="number" min={20} max={1000} value={f.max_chars} onChange={(e) => setAi(i, { max_chars: Math.min(1000, Math.max(20, Number(e.target.value) || 220)) })} /></Field>
+                  </div>
+                  <div className="row" style={{ alignItems: 'flex-start', gap: 12 }}>
+                    <Button size="sm" loading={tries[i]?.busy} disabled={!c.detail.ai_available || !f.prompt.trim()} title={c.detail.ai_available ? 'Write this field once for the person you’re previewing' : 'AI isn’t switched on for this server'} onClick={() => void tryField(i)}>
+                      <Sparkles size={14} /> Try it
+                    </Button>
+                    {tries[i] && !tries[i]!.busy ? (
+                      <div className="grow" style={{ background: 'var(--bg)', borderRadius: 10, padding: '9px 12px', fontSize: 13 }}>
+                        {tries[i]!.error ? (
+                          <span style={{ color: 'var(--bad)' }}>{tries[i]!.error}</span>
+                        ) : (
+                          <>
+                            <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+                              {tries[i]!.fallback ? <Badge tone="warn">Fallback used</Badge> : <Badge tone="ok">AI-written</Badge>}
+                              <span className="muted tiny">{tries[i]!.text?.length ?? 0} characters</span>
+                            </div>
+                            <div>{tries[i]!.text || <span className="muted">Nothing (the field would be empty).</span>}</div>
+                            {tries[i]!.warnings?.map((w, j) => <div key={j} className="tiny" style={{ color: 'var(--warn)', marginTop: 4 }}>{w}</div>)}
+                          </>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}

@@ -116,16 +116,24 @@ export function v1Routes() {
     const app = c.get('app');
     const body = await jsonBody(c, z.object({ campaign: z.string().optional(), rows: z.array(Body).min(1).max(500), options: z.object({ ai: z.boolean().optional() }).optional() }));
     const campaign = resolveCampaign(app, c.get('apiKey'), body.campaign);
-    const results = [];
-    for (const row of body.rows) {
+    // AI copy takes about a second per row, so rows run a few at a time, and once the request has used
+    // its time budget the remaining rows are still given links, just with the fallback text.
+    const deadline = Date.now() + 60_000;
+    type RowResult = Omit<Awaited<ReturnType<typeof personalizeOne>>, 'prospect'> | { ok: false; error: { code: string; message: string; details?: unknown } };
+    const results: RowResult[] = new Array(body.rows.length);
+    const run = async (i: number) => {
       try {
-        const { prospect: _p, warnings, ...rest } = await personalizeOne(app, campaign, row, body.options ?? {});
-        results.push({ ...rest, warnings });
+        const late = Date.now() > deadline && body.options?.ai !== false && campaign.settings.ai_fields.length > 0;
+        const { prospect: _p, warnings, ...rest } = await personalizeOne(app, campaign, body.rows[i]!, { ...(body.options ?? {}), ...(late ? { ai: false } : {}) });
+        if (late) warnings.push({ code: 'ai_skipped', message: 'This request ran out of time for AI copy, so the fallback text is used. Send fewer rows per request, or run the rest again.' });
+        results[i] = { ...rest, warnings };
       } catch (e) {
         const err = e instanceof HttpError ? e : new HttpError(500, 'internal_error', 'Could not process this row');
-        results.push({ ok: false as const, error: { code: err.code, message: err.message, details: err.details } });
+        results[i] = { ok: false as const, error: { code: err.code, message: err.message, details: err.details } };
       }
-    }
+    };
+    const width = campaign.settings.ai_fields.length > 0 && body.options?.ai !== false ? 6 : 1;
+    for (let i = 0; i < body.rows.length; i += width) await Promise.all(Array.from({ length: Math.min(width, body.rows.length - i) }, (_, k) => run(i + k)));
     const ok = results.filter((x) => x.ok).length;
     return c.json({ ok: ok === results.length, processed: results.length, succeeded: ok, failed: results.length - ok, results });
   });

@@ -94,3 +94,44 @@ export function describeRule(rule: Rule | undefined | null): string {
   });
   return parts.join(rule.match === 'any' ? ' or ' : ' and ');
 }
+
+const INVERSE: Partial<Record<Condition['op'], Condition['op']>> = {
+  equals: 'not_equals',
+  not_equals: 'equals',
+  in: 'not_in',
+  not_in: 'in',
+  contains: 'not_contains',
+  not_contains: 'contains',
+  exists: 'not_exists',
+  not_exists: 'exists',
+};
+
+/**
+ * "Everyone except the people `persona` matches", added on top of a block's existing rule, so a
+ * persona-specific version can replace the original for that audience rather than sit beside it.
+ * Only single-condition personas invert cleanly; so do not-yet-targeted blocks and "match all"
+ * rules. Returns null when the result can't be expressed (the caller then leaves the original as is).
+ */
+export function excludingRule(original: Rule | undefined | null, persona: Rule): Rule | null {
+  if (persona.conditions.length !== 1) return null;
+  const c = persona.conditions[0]!;
+  const op = INVERSE[c.op];
+  if (!op) return null;
+  const inverted: Condition = { ...c, op };
+  if (!original || original.conditions.length === 0) return { match: 'all', conditions: [inverted] };
+  if (original.match === 'any' && original.conditions.length > 1) return null;
+  if (original.conditions.length >= 10) return null;
+  return { match: 'all', conditions: [...original.conditions, inverted] };
+}
+
+/**
+ * A persona-specific version of a block must reach the persona AND still respect whatever audience
+ * the original was already limited to. Returns the combined rule, or just the persona's when the
+ * original uses "any" (which can't be intersected without regrouping).
+ */
+export function intersectRule(original: Rule | undefined | null, persona: Rule): Rule {
+  if (!original || original.conditions.length === 0) return persona;
+  if (original.match === 'any' && original.conditions.length > 1) return persona;
+  const conditions = [...original.conditions, ...persona.conditions].slice(0, 10);
+  return { match: 'all', conditions };
+}

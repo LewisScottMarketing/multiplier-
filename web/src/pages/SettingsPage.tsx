@@ -184,14 +184,21 @@ export function SettingsPage({ user }: { user: User }) {
       <div className="stack">
         {/* keyed by a snapshot so the form re-initialises after a save */}
         <WorkspaceForm key={JSON.stringify(s.workspace)} initial={s.workspace} publicHost={new URL(s.urls.public).host} />
-        <Section title="AI copywriting" desc="Powers the AI-written fields in each campaign and smarter PDF-to-page conversion. Entirely optional.">
-          <div className="row">
-            <Sparkles size={18} style={{ color: s.ai.available ? 'var(--brand)' : 'var(--ink-4)' }} />
-            {s.ai.available ? (
-              <span><Badge tone="ok" dot>On</Badge> <span className="muted small" style={{ marginLeft: 6 }}>Using <code>{s.ai.models.smart}</code> for page conversion and <code>{s.ai.models.fast}</code> for per-prospect copy.</span></span>
-            ) : (
-              <span className="muted small"><Badge>Off</Badge> Set <code>ANTHROPIC_API_KEY</code> on the server and restart to turn it on. Everything else works without it.</span>
-            )}
+        <Section title="AI writing" desc="Claude can write a personal line for each prospect, draft a version of a block for a particular audience, and tidy weak copy when you import a PDF. Entirely optional.">
+          <div className="col" style={{ gap: 12 }}>
+            <div className="row" style={{ alignItems: 'flex-start' }}>
+              <Sparkles size={18} style={{ color: s.ai.available ? 'var(--brand)' : 'var(--ink-4)', marginTop: 2, flex: 'none' }} />
+              {!s.ai.available ? (
+                <span className="muted small"><Badge>Off</Badge> Set <code>ANTHROPIC_API_KEY</code> on the server and restart to turn it on. Everything else works without it.</span>
+              ) : s.ai.status === 'degraded' ? (
+                <span className="small"><Badge tone="warn" dot>Paused</Badge> <span className="muted" style={{ marginLeft: 6 }}>{s.ai.message ?? 'The AI service had a problem.'} Pages use your fallback text meanwhile, and it retries automatically.</span></span>
+              ) : (
+                <span><Badge tone="ok" dot>On</Badge> <span className="muted small" style={{ marginLeft: 6 }}>Per-prospect copy uses <code>{s.ai.models.fast}</code>; page versions and PDF polish use <code>{s.ai.models.smart}</code>.</span></span>
+              )}
+            </div>
+            <div className="st-help" style={{ background: 'var(--bg)', borderRadius: 10, padding: '11px 12px', fontSize: 12.5, lineHeight: 1.5 }}>
+              <b>What is sent to Anthropic.</b> For AI fields: each prospect’s name, company, job title and any custom fields you send from Clay, plus a short summary of the page. Email addresses and LinkedIn URLs are never sent. Persona versions and PDF polish send only your own page text.
+            </div>
           </div>
         </Section>
         <Account user={user} />

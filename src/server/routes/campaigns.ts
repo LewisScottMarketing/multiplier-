@@ -17,15 +17,9 @@ import {
 } from '../services/campaigns';
 import { summariseTokens } from '../render/page';
 import { customFieldNames } from '../services/prospects';
-import { parsePreviewSource, renderPreview } from '../services/render';
+import { parsePreviewSource, previewSourceString, PreviewSourceSchema, renderPreview } from '../services/render';
 import { pageUrl } from '../services/links';
 import { aiEnabled } from '../services/ai';
-
-const SourceSchema = z.union([
-  z.object({ kind: z.literal('sample'), index: z.number().int().min(0).max(10) }),
-  z.object({ kind: z.literal('prospect'), id: z.string().max(40) }),
-  z.object({ kind: z.literal('empty') }),
-]);
 
 export function campaignRoutes() {
   const r = new Hono<Env>();
@@ -85,12 +79,12 @@ export function campaignRoutes() {
         page: PageSchema.optional(),
         document: DocumentSchema.nullable().optional(),
         settings: CampaignSettingsSchema.optional(),
-        source: SourceSchema.default({ kind: 'sample', index: 0 }),
+        source: PreviewSourceSchema.default({ kind: 'sample', index: 0 }),
       }),
     );
     const saved = requireCampaign(app, c.req.param('id'));
     const draft = { ...saved, page: body.page ?? saved.page, document: body.document === undefined ? saved.document : body.document, settings: body.settings ?? saved.settings };
-    const src = parsePreviewSource(body.source.kind === 'empty' ? 'empty' : body.source.kind === 'sample' ? `sample:${body.source.index}` : `prospect:${body.source.id}`);
+    const src = parsePreviewSource(previewSourceString(body.source));
     const out = renderPreview(app, draft, src, new URL(app.config.appUrl).host);
     const id = randomToken(12);
     app.previews.put(id, c.get('user').id, out.html, out.headers);

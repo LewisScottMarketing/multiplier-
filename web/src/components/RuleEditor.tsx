@@ -3,23 +3,11 @@ import { evalRule, describeRule } from '@shared/conditions';
 import { DEPARTMENT_LABELS, SENIORITY_GROUPS, SENIORITY_LABELS } from '@shared/derive';
 import { CONDITION_OPS, type Condition, type Rule } from '@shared/schema';
 import { OP_LABELS } from '@shared/conditions';
+import { PERSONAS } from '@shared/personas';
 import { useCampaign } from '../campaign';
 import { Button, Input, Select } from '../ui';
 
-const PRESETS: Array<{ label: string; rule: Rule }> = [
-  { label: 'Marketing', rule: one('department', 'equals', 'marketing') },
-  { label: 'Sales', rule: one('department', 'equals', 'sales') },
-  { label: 'Engineering', rule: one('department', 'equals', 'engineering') },
-  { label: 'Product', rule: one('department', 'equals', 'product') },
-  { label: 'Customer success', rule: one('department', 'equals', 'customer_success') },
-  { label: 'Executives', rule: one('seniority_group', 'equals', 'executive') },
-  { label: 'Leaders', rule: one('seniority_group', 'equals', 'leader') },
-  { label: 'Practitioners', rule: one('seniority_group', 'equals', 'practitioner') },
-];
-
-function one(field: string, op: Condition['op'], value: string): Rule {
-  return { match: 'all', conditions: [{ field, op, value }] };
-}
+const PRESETS: Array<{ label: string; rule: Rule }> = PERSONAS.map((p) => ({ label: p.label, rule: p.rule }));
 
 /** Value choices for fields whose values we know (derived from the job title). */
 function optionsFor(field: string): Array<[string, string]> | null {

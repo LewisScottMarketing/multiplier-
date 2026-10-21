@@ -158,7 +158,7 @@ export interface WorkspaceSettings {
 
 export interface SettingsResponse {
   workspace: WorkspaceSettings;
-  ai: { available: boolean; models: { smart: string; fast: string } };
+  ai: { available: boolean; status: 'off' | 'ok' | 'degraded'; message: string | null; models: { smart: string; fast: string } };
   urls: { app: string; public: string };
   user: User;
   limits: { max_upload_mb: number };

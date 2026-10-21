@@ -1,10 +1,14 @@
-import { Copy, MoveDown, MoveUp, Trash2, Users } from 'lucide-react';
+import { Copy, MoveDown, MoveUp, Sparkles, Trash2, Users } from 'lucide-react';
+import { useState } from 'react';
+import { canVary } from '@shared/block-text';
+import { excludingRule, intersectRule } from '@shared/conditions';
 import { BLOCK_TYPES, newBlockId } from '@shared/blocks';
 import type { Block } from '@shared/schema';
 import { blockAnchor } from './util';
 import { useCampaign } from '../../campaign';
 import { RuleEditor } from '../../components/RuleEditor';
-import { Button, Field, Input, Select, SwitchRow } from '../../ui';
+import { VariantModal } from '../../components/VariantModal';
+import { Button, Field, Input, Select, SwitchRow, useToast } from '../../ui';
 import { blockFields, FieldRenderer } from './blockForms';
 
 function Section({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
@@ -19,6 +23,8 @@ function Section({ title, children, hint }: { title: string; children: React.Rea
 
 export function BlockEditor({ id, onSelect }: { id: string; onSelect: (id: string | null) => void }) {
   const c = useCampaign();
+  const toast = useToast();
+  const [writing, setWriting] = useState(false);
   const idx = c.draft.page.blocks.findIndex((b) => b.id === id);
   const block = c.draft.page.blocks[idx];
   if (!block) return null;
@@ -60,7 +66,36 @@ export function BlockEditor({ id, onSelect }: { id: string; onSelect: (id: strin
       </Section>
 
       <Section title="Personalise" hint="The same page can say different things to different people.">
+        {canVary(block) ? (
+          <div className="col" style={{ gap: 6 }}>
+            <Button onClick={() => setWriting(true)} disabled={!c.detail.ai_available} title={c.detail.ai_available ? undefined : 'Set ANTHROPIC_API_KEY on the server to turn on AI writing'}>
+              <Sparkles size={14} /> Write a version for…
+            </Button>
+            {!c.detail.ai_available ? <div className="hint">AI writing is off. Set <code>ANTHROPIC_API_KEY</code> to have Claude draft versions for marketing, sales, executives and more.</div> : null}
+          </div>
+        ) : null}
         <RuleEditor rule={block.rule} onChange={(r) => patch('rule', r)} />
+        {writing ? (
+          <VariantModal
+            block={block}
+            onClose={() => setWriting(false)}
+            onAdd={(variant, persona) => {
+              const excluded = excludingRule(block.rule, persona.rule);
+              c.setPage((p) => {
+                const i = p.blocks.findIndex((b) => b.id === id);
+                if (i < 0) return p;
+                const blocks = [...p.blocks];
+                // the persona sees the new version instead of the original, and everyone else is unchanged
+                if (excluded) blocks[i] = { ...blocks[i]!, rule: excluded } as Block;
+                blocks.splice(i + 1, 0, { ...variant, rule: intersectRule(block.rule, persona.rule) } as Block);
+                return { ...p, blocks };
+              });
+              setWriting(false);
+              onSelect(variant.id);
+              toast.ok(excluded ? `Added a version for ${persona.label.toLowerCase()}. Everyone else still sees the original.` : `Added a version for ${persona.label.toLowerCase()}. It shows alongside the original, since that block's targeting couldn't be split automatically.`);
+            }}
+          />
+        ) : null}
       </Section>
 
       <Section title="Appearance">

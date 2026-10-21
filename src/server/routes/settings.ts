@@ -4,7 +4,7 @@ import { badRequest, notFound } from '../lib/errors';
 import { isBlockedAddress } from '../lib/safe-fetch';
 import { jsonBody, requireUser, type C, type Env } from '../http';
 import { createApiKey, listApiKeys, revokeApiKey } from '../auth/apikeys';
-import { aiEnabled } from '../services/ai';
+import { aiStatus } from '../services/ai';
 import { requireCampaign } from '../services/campaigns';
 import { getAsset, listAssets, MAX_IMAGE_BYTES, storeImage } from '../services/assets';
 import { getWorkspace, saveWorkspace } from '../services/settings';
@@ -57,7 +57,7 @@ export function settingsRoutes() {
     const app = c.get('app');
     return c.json({
       workspace: getWorkspace(app),
-      ai: { available: aiEnabled(app), models: { smart: app.config.aiModelSmart, fast: app.config.aiModelFast } },
+      ai: { ...aiStatus(app), models: { smart: app.config.aiModelSmart, fast: app.config.aiModelFast } },
       urls: { app: app.config.appUrl, public: app.config.publicUrl },
       user: c.get('user'),
       limits: { max_upload_mb: Math.round(app.config.maxUploadBytes / 1024 / 1024) },
