@@ -36,12 +36,16 @@ export const FONTS: Record<FontKey, FontInfo> = {
 };
 
 const require_ = createRequire(import.meta.url);
+const dirs = new Map<string, string | null>();
 const packageDir = (pkg: string): string | null => {
-  try {
-    return path.dirname(require_.resolve(`@fontsource-variable/${pkg}/package.json`));
-  } catch {
-    return null;
+  if (!dirs.has(pkg)) {
+    try {
+      dirs.set(pkg, path.dirname(require_.resolve(`@fontsource-variable/${pkg}/package.json`)));
+    } catch {
+      dirs.set(pkg, null);
+    }
   }
+  return dirs.get(pkg) ?? null;
 };
 
 const faceCache = new Map<string, string>();
@@ -72,9 +76,14 @@ export function fontFilesDir(family: string): string | null {
   return dir ? path.join(dir, 'files') : null;
 }
 
-/** The file for the Latin subset, which almost every page needs, so it can be fetched early. */
-export const preloadPath = (font: FontKey): string | null =>
-  FONTS[font].pkg ? `/f/${FONTS[font].pkg}/files/${FONTS[font].pkg}-latin-wght-normal.woff2` : null;
+/**
+ * The file for the Latin subset, which almost every page needs, so it can be fetched early. None when the font's files
+ * aren't installed (the page then simply uses its fallback type, rather than asking for a file that isn't there).
+ */
+export const preloadPath = (font: FontKey): string | null => {
+  const pkg = FONTS[font].pkg;
+  return pkg && packageDir(pkg) ? `/f/${pkg}/files/${pkg}-latin-wght-normal.woff2` : null;
+};
 
 /** The distinct web fonts a theme uses (body first), without duplicates. */
 export function fontsUsed(t: Pick<Theme, 'font' | 'heading_font'>): FontKey[] {

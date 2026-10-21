@@ -141,6 +141,22 @@ await step('the personalised page renders, escaped and with a strict CSP', async
   must(r.headers.get('x-robots-tag')?.includes('noindex') || html.includes('noindex'), 'page is indexable');
 });
 
+// A missing typeface doesn't break a page, it just quietly falls back to system type, so nothing else would notice
+// a build or container that forgot to ship the font files.
+await step('the page’s typeface is served from our own server', async () => {
+  const page = await (
+    await fetch(local(link.url), { headers: { 'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) Chrome/126.0 Safari/537.36' } })
+  ).text();
+  const href = page.match(/rel="preload" href="(\/f\/[^"]+\.woff2)"/)?.[1];
+  must(href, 'the page asks for no web font');
+  const r = await fetch(BASE + href);
+  const bytes = Buffer.from(await r.arrayBuffer());
+  must(r.status === 200, `${href} returned ${r.status}`);
+  must(bytes.subarray(0, 4).toString() === 'wOF2' && bytes.length > 5000, `${href} isn’t a font (${bytes.length} bytes)`);
+  must(/immutable/.test(r.headers.get('cache-control') ?? ''), 'fonts are not cached for long');
+  must(!/https?:\/\/(fonts\.|[^"' ]*gstatic)/.test(page), 'the page contacts a third-party font service');
+});
+
 await step('the personalised PDF is a real PDF', async () => {
   const r = await fetch(local(link.pdf_url));
   const bytes = Buffer.from(await r.arrayBuffer());
