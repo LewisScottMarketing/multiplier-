@@ -324,8 +324,8 @@ export function SettingsPage({ user }: { user: User }) {
               <Sparkles size={18} style={{ color: s.ai.available ? 'var(--brand)' : 'var(--ink-4)', marginTop: 2, flex: 'none' }} />
               {!s.ai.available ? (
                 <span className="muted small">
-                  <Badge>Off</Badge> Set <code>ANTHROPIC_API_KEY</code> on the server and restart to turn it on. Everything else works
-                  without it.
+                  <Badge>Off</Badge> Add <code>ANTHROPIC_API_KEY=…</code> to your <code>.env</code> file (or the server’s environment) and
+                  restart to turn it on. Everything else works without it.
                 </span>
               ) : s.ai.status === 'degraded' ? (
                 <span className="small">
@@ -333,7 +333,8 @@ export function SettingsPage({ user }: { user: User }) {
                     Paused
                   </Badge>{' '}
                   <span className="muted" style={{ marginLeft: 6 }}>
-                    {s.ai.message ?? 'The AI service had a problem.'} Pages use your fallback text meanwhile, and it retries automatically.
+                    {s.ai.message ?? 'The AI service had a problem.'} Pages use your fallback text meanwhile. It retries every couple of
+                    minutes, or straight away when you press Try it on a campaign’s AI field.
                   </span>
                 </span>
               ) : (

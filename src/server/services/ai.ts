@@ -41,6 +41,11 @@ export interface AiCall {
   maxTokens: number;
   effort?: 'low' | 'medium' | 'high';
   timeoutMs?: number;
+  /**
+   * A person clicked something and is waiting for this (the "Try it" button, "Write a version for…", an import).
+   * It skips the circuit breaker, so fixing a key or adding credit can be checked straight away, and a success closes it.
+   */
+  interactive?: boolean;
 }
 
 export interface AiBackend {
@@ -50,10 +55,22 @@ export interface AiBackend {
 /** `effort` is rejected by Claude 4.x Sonnet/Haiku and earlier, so only send it where it's supported. */
 const supportsEffort = (model: string) => /^claude-(opus-(4-[5-9]|[5-9])|sonnet-(4-6|[5-9])|haiku-[5-9]|fable|mythos)/.test(model);
 
-class AnthropicBackend implements AiBackend {
+export interface AnthropicBackendOptions {
+  /** Needed when the key isn't tied to one workspace: the API answers 400 without it. */
+  workspaceId?: string;
+  /** For tests. */
+  fetch?: typeof fetch;
+}
+
+export class AnthropicBackend implements AiBackend {
   private client: Anthropic;
-  constructor(apiKey: string) {
-    this.client = new Anthropic({ apiKey, maxRetries: 1 });
+  constructor(apiKey: string, opts: AnthropicBackendOptions = {}) {
+    this.client = new Anthropic({
+      apiKey,
+      maxRetries: 1,
+      ...(opts.workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': opts.workspaceId } } : {}),
+      ...(opts.fetch ? { fetch: opts.fetch } : {}),
+    });
   }
 
   async complete(call: AiCall & { model: string; timeoutMs: number }): Promise<AiResult> {
@@ -91,12 +108,32 @@ function classify(e: unknown): AiResult {
     return { ok: false, reason: 'auth', message: 'The Anthropic API key was rejected.' };
   if (e instanceof Anthropic.RateLimitError)
     return { ok: false, reason: 'rate_limited', message: 'The AI service is rate limiting this workspace.' };
-  if (e instanceof Anthropic.BadRequestError || e instanceof Anthropic.NotFoundError)
+  if (e instanceof Anthropic.BadRequestError || e instanceof Anthropic.NotFoundError) {
+    const said = (e as Error).message;
+    // the two problems a brand-new account runs into first, in words that say what to do
+    if (/credit balance/i.test(said)) {
+      return {
+        ok: false,
+        reason: 'auth',
+        message: 'Your Anthropic account has no credit left. Add some under Settings → Billing in the Claude Console, then try again.',
+      };
+    }
+    if (/workspace/i.test(said)) {
+      return {
+        ok: false,
+        reason: 'config',
+        message:
+          e instanceof Anthropic.NotFoundError
+            ? 'The workspace in ANTHROPIC_WORKSPACE_ID wasn’t found, or this key can’t use it.'
+            : 'This API key isn’t tied to a workspace. In the Claude Console, create the key with a workspace selected (the Default workspace is fine), or set ANTHROPIC_WORKSPACE_ID.',
+      };
+    }
     return {
       ok: false,
       reason: 'config',
-      message: `The AI request was rejected (${(e as Error).message.slice(0, 160)}). Check AI_MODEL_FAST / AI_MODEL_SMART.`,
+      message: `The AI request was rejected (${said.slice(0, 160)}). Check AI_MODEL_FAST / AI_MODEL_SMART.`,
     };
+  }
   if (e instanceof Anthropic.APIError)
     return { ok: false, reason: 'unavailable', message: `The AI service returned an error (${e.status ?? 'unknown'}).` };
   return { ok: false, reason: 'unavailable', message: 'The AI request failed.' };
@@ -122,7 +159,9 @@ function runtime(ctx: AppContext): Runtime {
   let r = runtimes.get(ctx);
   if (!r) {
     r = {
-      backend: ctx.config.anthropicApiKey ? new AnthropicBackend(ctx.config.anthropicApiKey) : null,
+      backend: ctx.config.anthropicApiKey
+        ? new AnthropicBackend(ctx.config.anthropicApiKey, { workspaceId: ctx.config.anthropicWorkspaceId })
+        : null,
       inflight: 0,
       waiters: [],
       failures: 0,
@@ -181,12 +220,16 @@ const release = (r: Runtime) => () => {
 
 function record(ctx: AppContext, r: Runtime, label: string, res: AiResult) {
   if (res.ok) {
+    // a call that worked proves the service is fine, whatever the breaker last thought
     r.failures = 0;
+    r.openUntil = 0;
+    r.lastError = null;
     return;
   }
   ctx.log.warn('ai call failed', { label, reason: res.reason });
   if (res.reason === 'auth' || res.reason === 'config') {
-    r.openUntil = Date.now() + 10 * 60_000;
+    // long enough that a dead key isn't retried for every row, short enough that fixing it is noticed
+    r.openUntil = Date.now() + 2 * 60_000;
     r.lastError = res.message;
   } else if (res.reason === 'timeout' || res.reason === 'rate_limited' || res.reason === 'unavailable') {
     if (++r.failures >= 3) {
@@ -200,7 +243,8 @@ function record(ctx: AppContext, r: Runtime, label: string, res: AiResult) {
 export async function callAi(ctx: AppContext, call: AiCall): Promise<AiResult> {
   const r = runtime(ctx);
   if (!r.backend) return { ok: false, reason: 'unavailable', message: 'AI isn’t switched on for this server.' };
-  if (Date.now() < r.openUntil) return { ok: false, reason: 'unavailable', message: r.lastError ?? 'AI is temporarily unavailable.' };
+  if (!call.interactive && Date.now() < r.openUntil)
+    return { ok: false, reason: 'unavailable', message: r.lastError ?? 'AI is temporarily unavailable.' };
   const done = await acquire(r);
   if (!done) return { ok: false, reason: 'unavailable', message: 'AI is busy right now.' };
   try {
@@ -362,6 +406,7 @@ export async function writeFields(
   campaign: Pick<Campaign, 'name' | 'page'>,
   fields: AiField[],
   facts: Record<string, string>,
+  opts: { interactive?: boolean } = {},
 ): Promise<FieldWriting> {
   if (!fields.length) return { values: {}, warnings: [] };
   const keys = fields.map((f) => f.key);
@@ -388,6 +433,7 @@ Reply with a JSON object that has one string for each key: ${keys.join(', ')}.`;
     // thinking draws from the same budget as the answer, so leave generous room
     maxTokens: Math.min(6000, 2000 + fields.length * 300),
     effort: 'low',
+    interactive: opts.interactive,
   });
   if (!res.ok) return { values: {}, warnings: [failureWarning(res)] };
 
@@ -456,7 +502,7 @@ export async function previewAiField(
   field: AiField,
   context: Ctx,
 ): Promise<{ text: string; used_fallback: boolean; warnings: AiWarning[] }> {
-  const { values, warnings } = await writeFields(ctx, campaign, [field], factsFrom(context));
+  const { values, warnings } = await writeFields(ctx, campaign, [field], factsFrom(context), { interactive: true });
   const text = values[field.key];
   return { text: text ?? aiFieldValue(field, null), used_fallback: !text, warnings };
 }
@@ -538,6 +584,7 @@ Reply with a JSON object that has one string for each id: ${ids.join(', ')}.`;
     maxTokens: Math.min(16000, 6000 + leaves.reduce((n, l) => n + Math.ceil(l.text.length / 2), 0)),
     effort: 'medium',
     timeoutMs: Math.max(ctx.config.aiTimeoutMs, 60_000),
+    interactive: true,
   });
   if (!res.ok) return res;
 
@@ -650,6 +697,7 @@ export async function polishImport(ctx: AppContext, input: { page: Page; filenam
     maxTokens: 6000,
     effort: 'low',
     timeoutMs: Math.max(ctx.config.aiTimeoutMs, 45_000),
+    interactive: true,
   });
   if (!res.ok) return { page: input.page, notes: [`AI polish skipped: ${res.message}`] };
   const data = (res.data && typeof res.data === 'object' ? res.data : {}) as Record<string, unknown>;

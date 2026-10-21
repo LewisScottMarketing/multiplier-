@@ -90,6 +90,8 @@ With AI on and an **AI field** set up (Campaign → Settings → AI-written fiel
 
 If AI is off, slow, or declines, the page uses the field's fallback text and `warnings` says so (`ai_unavailable`, `ai_failed`, `ai_declined`, `ai_empty`). The link is always issued.
 
+A new Anthropic account has low rate limits at first. If rows come back with `ai_failed` and a message about rate limiting, lower Clay's **Rate limiting** setting (say, one request per second) and re-run those rows: lines that were written are kept, so only the missing ones cost anything.
+
 ## Errors and warnings
 
 Errors arrive as `{ "error": { "code", "message" } }` with the matching HTTP status. Clay shows the message in the cell.

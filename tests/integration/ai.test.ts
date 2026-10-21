@@ -165,6 +165,29 @@ describe('per-prospect AI fields', () => {
     expect(s.body.ai.message).toMatch(/key was rejected/);
   });
 
+  it('lets a person re-check straight after fixing the key, and a success closes the breaker', async () => {
+    let fixed = false;
+    const { calls, backend } = fake(() =>
+      fixed ? writes({ opening: 'Works now.' }) : { ok: false, reason: 'auth', message: 'Your Anthropic account has no credit left.' },
+    );
+    setAiBackend(t.ctx, backend);
+    await personalize({ email: 'a@x.co' });
+    expect((await t.json('GET', '/api/settings')).body.ai.status).toBe('degraded');
+
+    fixed = true; // credit added
+    await personalize({ email: 'b@x.co' });
+    expect(calls).toHaveLength(1); // rows from Clay are still held back
+
+    const tried = await t.json('POST', `/api/campaigns/${campaign.id}/ai/field-preview`, { field: AI_FIELD }); // "Try it"
+    expect(tried.status).toBe(200);
+    expect(tried.body.text).toBe('Works now.');
+    expect(calls).toHaveLength(2);
+    expect((await t.json('GET', '/api/settings')).body.ai).toMatchObject({ status: 'ok', message: null });
+
+    await personalize({ email: 'c@x.co' });
+    expect(calls).toHaveLength(3); // back to normal
+  });
+
   it('keeps hostile prospect data out of the instructions', async () => {
     const { calls, backend } = fake(() => writes({ opening: 'Fine.' }));
     setAiBackend(t.ctx, backend);

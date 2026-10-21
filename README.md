@@ -166,7 +166,19 @@ Public pages set no cookies. Each visit sends an anonymous per-visit ID; IP addr
 
 ### Optional AI
 
-Set `ANTHROPIC_API_KEY` and three things appear: **AI fields** (a short personal line per prospect, used as `{{ai_opening}}`), **Write a version for…** on text blocks, and a polish step on PDF import that never overrides copy that already reads well. Per-prospect copy uses `AI_MODEL_FAST` (default `claude-haiku-5-5`); page work uses `AI_MODEL_SMART` (default `claude-opus-5-5`). Failures, timeouts and refusals fall back to your fallback text and show up as `warnings` in the API response. For AI fields, a prospect's name, company, job title and custom fields are sent to Anthropic; email addresses and LinkedIn URLs never are. Try the screens without a key using `npm run dev:fake-ai`.
+Add an Anthropic API key and three things appear: **AI fields** (a short personal line per prospect, used as `{{ai_opening}}`), **Write a version for…** on text blocks, and a polish step on PDF import that never overrides copy that already reads well. It improves the *words*, not the layout or colours. Failures, timeouts and refusals fall back to your fallback text and show up as `warnings` in the API response. For AI fields, a prospect's name, company, job title and custom fields are sent to Anthropic; email addresses and LinkedIn URLs never are. Try the screens without a key using `npm run dev:fake-ai`.
+
+**Getting a key.** In the [Claude Console](https://platform.claude.com), which is separate from (and billed separately to) a Claude.ai chat subscription: add credit under **Settings → Billing → Buy credits**, then go to [**API keys → Create key**](https://platform.claude.com/settings/keys) and choose a workspace for it (the Default one is fine; a key without a workspace also needs `ANTHROPIC_WORKSPACE_ID`). Copy the key (it starts `sk-ant-` and is shown once), then:
+
+```bash
+cp .env.example .env        # once
+# edit .env and put the key after ANTHROPIC_API_KEY=   (no quotes, no spaces)
+npm run demo                # restart it
+```
+
+Settings (the gear in the sidebar) shows whether AI is on. In a campaign, **Settings → AI-written fields** has a **Try it** button that writes a sample line for whoever you're previewing, so you can check the key and the wording before anything goes to a prospect.
+
+**Cost.** Per-prospect copy uses the small, fast model (`AI_MODEL_FAST`, default `claude-haiku-5-5`): about 600 tokens in and a few hundred out per prospect, which at Anthropic's current list prices is a few hundredths of a cent, so a thousand prospects cost well under a dollar. Each prospect's line is cached, so re-running a row is free. Page work (persona versions, import polish) uses the larger model (`AI_MODEL_SMART`, default `claude-opus-5-5`) once per click, for a few cents. You can set a monthly spend limit in the Console.
 
 <p align="center">
   <img src="docs/screenshots/ai-variant.png" alt="Drafting a marketing version of a block" width="49%">
@@ -222,7 +234,8 @@ All configuration is environment variables (a `.env` file in the working directo
 | `COOKIE_SECURE` | on when `APP_URL` is https | |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | – | Create the owner on first boot (handy for containers). |
 | `MAX_UPLOAD_MB` | `25` | Largest PDF. |
-| `ANTHROPIC_API_KEY` | – | Turns AI on. |
+| `ANTHROPIC_API_KEY` | – | Turns AI on. See [Optional AI](#optional-ai) for where to get one. |
+| `ANTHROPIC_WORKSPACE_ID` | – | Only for a key created without a workspace selected. |
 | `AI_MODEL_SMART`, `AI_MODEL_FAST`, `AI_TIMEOUT_MS` | `claude-opus-5-5`, `claude-haiku-5-5`, `20000` | See [Optional AI](#optional-ai). |
 | `ALLOW_PRIVATE_FETCH` | `false` | Let outbound requests (webhooks, logo images) reach private addresses. For local development only. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`. |

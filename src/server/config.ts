@@ -19,6 +19,8 @@ export interface Config {
   allowPrivateFetch: boolean;
   maxUploadBytes: number;
   anthropicApiKey?: string;
+  /** Only for API keys that aren't tied to one workspace in the Claude Console (sent as `anthropic-workspace-id`). */
+  anthropicWorkspaceId?: string;
   aiModelSmart: string;
   aiModelFast: string;
   /** Longest a single AI call may take before the fallback text is used. */
@@ -76,7 +78,8 @@ export function loadConfig(env: Env = process.env): Config {
     cookieSecure: bool(env.COOKIE_SECURE, appUrl.startsWith('https://')),
     allowPrivateFetch: bool(env.ALLOW_PRIVATE_FETCH),
     maxUploadBytes: Math.max(1, Number(env.MAX_UPLOAD_MB || 25)) * 1024 * 1024,
-    anthropicApiKey: env.ANTHROPIC_API_KEY || undefined,
+    anthropicApiKey: env.ANTHROPIC_API_KEY?.trim() || undefined,
+    anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID?.trim() || undefined,
     // `smart` runs once per campaign (page polish, persona versions); `fast` runs once per prospect.
     aiModelSmart: env.AI_MODEL_SMART || 'claude-opus-5-5',
     aiModelFast: env.AI_MODEL_FAST || 'claude-haiku-5-5',

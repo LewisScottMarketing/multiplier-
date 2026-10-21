@@ -329,8 +329,8 @@ export function CampaignSettings() {
           {!c.detail.ai_available ? (
             <div style={{ marginBottom: 14 }}>
               <Alert>
-                AI isn’t switched on for this server. Set <code>ANTHROPIC_API_KEY</code> to enable it. Until then these fields show their
-                fallback text.
+                AI isn’t switched on for this server. Add your Anthropic key to the <code>.env</code> file (<code>ANTHROPIC_API_KEY</code>)
+                and restart to enable it. Until then these fields show their fallback text.
               </Alert>
             </div>
           ) : null}
