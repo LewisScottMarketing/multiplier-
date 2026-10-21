@@ -15,6 +15,8 @@ export interface Config {
   /** Number of reverse proxies in front of the app (0 = none). Used to read the client IP safely. */
   trustProxy: number;
   cookieSecure: boolean;
+  /** Let outbound fetches reach private addresses. Tests and local development only. */
+  allowPrivateFetch: boolean;
   maxUploadBytes: number;
   anthropicApiKey?: string;
   aiModelSmart: string;
@@ -58,6 +60,7 @@ export function loadConfig(env: Env = process.env): Config {
     secret: loadSecret(env.APP_SECRET, dataDir),
     trustProxy: proxyHops(env.TRUST_PROXY),
     cookieSecure: bool(env.COOKIE_SECURE, appUrl.startsWith('https://')),
+    allowPrivateFetch: bool(env.ALLOW_PRIVATE_FETCH),
     maxUploadBytes: Math.max(1, Number(env.MAX_UPLOAD_MB || 25)) * 1024 * 1024,
     anthropicApiKey: env.ANTHROPIC_API_KEY || undefined,
     aiModelSmart: env.AI_MODEL_SMART || 'claude-sonnet-5-5',

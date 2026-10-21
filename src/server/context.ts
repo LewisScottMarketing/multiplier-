@@ -8,19 +8,19 @@ import { Storage } from './lib/storage';
 
 /** Short-lived store for rendered previews so the builder can show them in a real iframe. */
 export class PreviewStore {
-  private items = new Map<string, { html: string; userId: string; expires: number }>();
-  put(id: string, userId: string, html: string, ttlMs = 15 * 60_000) {
+  private items = new Map<string, { html: string; headers: Record<string, string>; userId: string; expires: number }>();
+  put(id: string, userId: string, html: string, headers: Record<string, string>, ttlMs = 15 * 60_000) {
     if (this.items.size > 200) {
       const now = Date.now();
       for (const [k, v] of this.items) if (v.expires < now) this.items.delete(k);
       while (this.items.size > 200) this.items.delete(this.items.keys().next().value as string);
     }
-    this.items.set(id, { html, userId, expires: Date.now() + ttlMs });
+    this.items.set(id, { html, headers, userId, expires: Date.now() + ttlMs });
   }
-  get(id: string, userId: string): string | null {
+  get(id: string, userId: string): { html: string; headers: Record<string, string> } | null {
     const it = this.items.get(id);
     if (!it || it.expires < Date.now() || it.userId !== userId) return null;
-    return it.html;
+    return { html: it.html, headers: it.headers };
   }
 }
 

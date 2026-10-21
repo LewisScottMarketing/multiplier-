@@ -3,6 +3,8 @@ import { createApp } from './app';
 import { createUser, countUsers } from './auth/users';
 import { loadConfig } from './config';
 import { closeContext, createContext } from './context';
+import { purgeExpiredSessions } from './auth/sessions';
+import { startWebhookWorker } from './services/webhooks';
 
 async function main() {
   const config = loadConfig();
@@ -15,12 +17,16 @@ async function main() {
   }
 
   const app = createApp(ctx);
+  const stopWebhooks = startWebhookWorker(ctx);
+  const sessionTimer = setInterval(() => purgeExpiredSessions(ctx), 6 * 3600_000);
+  sessionTimer.unref();
   const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
     ctx.log.info(`Multiplier listening on http://localhost:${info.port}`, { env: config.env, data: config.dataDir });
   });
 
   const shutdown = (signal: string) => {
     ctx.log.info(`${signal} received, shutting down`);
+    stopWebhooks();
     server.close(() => {
       closeContext(ctx);
       process.exit(0);
