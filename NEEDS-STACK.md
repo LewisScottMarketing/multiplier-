@@ -4,9 +4,10 @@
 > next level down, e.g. keeping a staff list, would never weigh in a
 > buyer's choice or appear in positioning); walked up: none yet;
 > walked up: N3 (the promise; KCSiE is a mandatory duty, so N1 is a
-> must-have purchase); currently crystallizing: N4 (candidate: run a
-> school where no child is harmed by an adult we hired, and parents know
-> it). Stack is
+> must-have purchase), N4 (aspiration, near-purpose); currently
+> crystallizing: N5 (candidate purpose level: do the job I went into
+> education for, without the dread of an inspection or an incident
+> hanging over me). Stack is
 > for Group 1 (schools running vetting from spreadsheets); Group 2
 > (schools switching from an existing system such as CPOMS or School SCR)
 > are N1 occupants to win from, and may climb to different ends. No
@@ -25,6 +26,11 @@ settle order; position in the list below carries the stack order, top
 ends before bottom means.
 
 ## The stack
+
+**N4.** → Run a school where no child is harmed by an adult we hired, and parents know it.
+    Occupants: safeguarding training providers; the school's designated safeguarding lead; concern-recording systems such as CPOMS. (Unverified — confirm with the user.)
+    Role: aspiration — show the part you play; never promise it.
+    Why your level still wins for your ideal customer: those cover what happens once staff are in the building; the tool covers who gets in and whether the record of it is right.
 
 **N3.** → Be fully compliant with KCSiE on staff vetting, so Ofsted finds nothing wrong when it checks.
     Occupants: local authority safeguarding audit and support teams; external safeguarding auditors and consultants; a trust's own central compliance team.
