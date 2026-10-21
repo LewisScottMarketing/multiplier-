@@ -185,7 +185,9 @@ npm run demo                # restart it
 
 Settings (the gear in the sidebar) shows whether AI is on. In a campaign, **Settings → AI-written fields** has a **Try it** button that writes a sample line for whoever you're previewing, so you can check the key and the wording before anything goes to a prospect.
 
-**Cost.** Per-prospect copy uses the small, fast model (`AI_MODEL_FAST`, default `claude-haiku-5-5`): about 600 tokens in and a few hundred out per prospect, which at Anthropic's current list prices is a few hundredths of a cent, so a thousand prospects cost well under a dollar. Each prospect's line is cached, so re-running a row is free. Page work (persona versions, import polish) uses the larger model (`AI_MODEL_SMART`, default `claude-opus-5-5`) once per click, for a few cents. You can set a monthly spend limit in the Console.
+**Cost and speed** (measured against the live API). Per-prospect copy uses the small, fast model (`AI_MODEL_FAST`, default `claude-haiku-5-5`): about 1,000 tokens in and under 100 out per prospect, which at Anthropic's list prices when this was written is roughly 15 cents per thousand prospects. A row takes one to three seconds, and a batch from Clay is written several rows at a time (twelve rows took about three seconds). Each prospect's line is cached, so re-running a row is free. Page work (persona versions, import polish) uses the larger model (`AI_MODEL_SMART`, default `claude-opus-5-5`) once per click, for about a cent. You can set a monthly spend limit in the Console.
+
+**Length and language.** Models overshoot a character limit, so each AI field is written to a slightly lower target, stated in words as well as characters. A line that still runs over is sent back once to be shortened, and only if that fails is it trimmed at the last whole sentence or clause, so copy doesn't stop mid-thought. Lines are written in the page's language (**Design → Search & sharing → Page language**), even when a prospect's job title or company is in another.
 
 <p align="center">
   <img src="docs/screenshots/ai-variant.png" alt="Drafting a marketing version of a block" width="49%">

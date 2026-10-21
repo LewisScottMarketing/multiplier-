@@ -213,6 +213,100 @@ describe('per-prospect AI fields', () => {
   });
 });
 
+describe('writing copy to length', () => {
+  const longText = `${'Teams like yours tend to start with the message. '.repeat(3)}`.trim(); // 144 characters, cap is 120
+  const rowFor = (n: number) => ({ email: `p${n}@acme.com`, first_name: 'Jane', company: 'Acme', job_title: 'VP of Marketing' });
+
+  it('asks for a little less than the cap, in words as well as characters, in the page’s language', async () => {
+    const { calls, backend } = fake(() => writes({ opening: 'Short and sweet.' }));
+    setAiBackend(t.ctx, backend);
+    await personalize(rowFor(1));
+    expect(calls).toHaveLength(1);
+    const asked = calls[0]!.user;
+    expect(asked).toMatch(/"max_characters": 96\b/); // 80% of the real cap of 120
+    expect(asked).toMatch(/"aim_for_words": 11\b/);
+    expect(asked).toContain('Page language: English');
+    expect(asked).toContain('Write every text in English');
+    expect(calls[0]!.system).toMatch(/aim_for_words/);
+    expect(calls[0]!.system).toMatch(/even when the prospect's job title, company or country is in another language/);
+  });
+
+  it('names a different page language when the page is written in one', async () => {
+    const got = await t.json('GET', `/api/campaigns/${campaign.id}`);
+    const page = { ...got.body.campaign.page, seo: { ...got.body.campaign.page.seo, lang: 'de' } };
+    await t.json('PUT', `/api/campaigns/${campaign.id}`, { page });
+    const { calls, backend } = fake(() => writes({ opening: 'Kurz.' }));
+    setAiBackend(t.ctx, backend);
+    await personalize(rowFor(2));
+    expect(calls[0]!.user).toContain('Page language: German');
+    expect(calls[0]!.user).toContain('Write every text in German');
+  });
+
+  it('leaves a reply alone when it fits the real cap, even if it is over the softer limit it was given', async () => {
+    const { calls, backend } = fake(() => writes({ opening: 'x'.repeat(110) }));
+    setAiBackend(t.ctx, backend);
+    await personalize(rowFor(3));
+    expect(calls).toHaveLength(1);
+  });
+
+  it('asks once for a shorter version when a reply is over the cap, and uses it', async () => {
+    const shorter = 'Teams like yours tend to start with the message.';
+    const { calls, backend } = fake((call) => writes({ opening: call.label === 'shorten' ? shorter : longText }));
+    setAiBackend(t.ctx, backend);
+    const r = await personalize(rowFor(4));
+    expect(calls.map((c) => c.label)).toEqual(['prospect-fields', 'shorten']);
+    expect(calls[1]).toMatchObject({ tier: 'fast', effort: 'low' });
+    expect(calls[1]!.user).toContain(`"current_characters": ${longText.length}`);
+    expect(calls[1]!.user).toContain('"max_characters": 120');
+    expect(calls[1]!.user).toContain(longText);
+    expect(await pageFor(r.body.url)).toContain(shorter);
+  });
+
+  it('cuts at a sentence rather than mid-way when shortening fails, never ending on a clipped word', async () => {
+    const first = 'Opening sentence that stands on its own and is a decent length of text.'; // 71 characters
+    const long = `${first} And then it carries on for far too long without any pause at all and never reaches a full stop`;
+    const { calls, backend } = fake((call) =>
+      call.label === 'shorten' ? { ok: false, reason: 'timeout', message: 'The AI took too long to answer.' } : writes({ opening: long }),
+    );
+    setAiBackend(t.ctx, backend);
+    const r = await personalize(rowFor(5));
+    expect(r.status).toBe(200);
+    expect(calls).toHaveLength(2);
+    const list = await t.json('GET', `/api/campaigns/${campaign.id}/prospects`);
+    const prospect = await t.json('GET', `/api/prospects/${list.body.prospects[0].id}`);
+    expect(prospect.body.context.ai_opening).toBe(first);
+  });
+
+  it('still honours the cap when the shorter version is not short enough', async () => {
+    const { calls, backend } = fake(() => writes({ opening: `${'word '.repeat(60)}`.trim() }));
+    setAiBackend(t.ctx, backend);
+    await personalize(rowFor(6));
+    expect(calls).toHaveLength(2); // asked once, not in a loop
+    const list = await t.json('GET', `/api/campaigns/${campaign.id}/prospects`);
+    const prospect = await t.json('GET', `/api/prospects/${list.body.prospects[0].id}`);
+    expect(String(prospect.body.context.ai_opening).length).toBeLessThanOrEqual(AI_FIELD.max_chars);
+  });
+
+  it('only sends the fields that are over the cap back for shortening', async () => {
+    await t.json('PUT', `/api/campaigns/${campaign.id}`, {
+      settings: {
+        required_fields: [],
+        allow_url_params: false,
+        clean_names: true,
+        ai_fields: [AI_FIELD, { ...AI_FIELD, key: 'closing', label: 'Closing' }],
+      },
+    });
+    const { calls, backend } = fake((call) =>
+      call.label === 'shorten' ? writes({ closing: 'Brief.' }) : writes({ opening: 'Fits easily.', closing: longText }),
+    );
+    setAiBackend(t.ctx, backend);
+    await personalize(rowFor(7));
+    expect(calls).toHaveLength(2);
+    expect(Object.keys((calls[1]!.schema as { properties: object }).properties)).toEqual(['closing']);
+    expect(calls[1]!.user).not.toContain('Fits easily.');
+  });
+});
+
 describe('batch personalisation with AI copy', () => {
   it('writes copy for rows a few at a time and returns results in the order sent', async () => {
     let live = 0;
@@ -330,6 +424,23 @@ describe('POST /campaigns/:id/ai/variant', () => {
     const down = await t.json('POST', `/api/campaigns/${campaign.id}/ai/variant`, { block, persona });
     expect(down.status).toBe(502);
     expect(down.body.error.message).toMatch(/reach the AI/);
+  });
+
+  it('says so, without calling the AI, when a block holds nothing but merge fields', async () => {
+    const { calls, backend } = fake(() => writes({ t0: 'anything' }));
+    setAiBackend(t.ctx, backend);
+    const onlyFields = newBlock('text', { id: 'src2', heading: undefined, body: '{{ai_opening|Default line}}' });
+    const r = await t.json('POST', `/api/campaigns/${campaign.id}/ai/variant`, { block: onlyFields, persona });
+    expect(r.status).toBe(422);
+    expect(r.body.error.message).toMatch(/only holds merge fields/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('tells the model not to add outcomes the block does not state', async () => {
+    const { calls, backend } = fake(() => writes({ t0: 'Why marketers like it', t1: 'Marketers reply when the message fits.' }));
+    setAiBackend(t.ctx, backend);
+    await t.json('POST', `/api/campaigns/${campaign.id}/ai/variant`, { block, persona });
+    expect(calls[0]!.system).toMatch(/Don't tack on a new outcome or benefit/);
   });
 
   it('reports a suggestion that changed nothing instead of pretending it worked', async () => {

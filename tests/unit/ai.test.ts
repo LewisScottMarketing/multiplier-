@@ -4,7 +4,18 @@ import { excludingRule, intersectRule } from '../../src/shared/conditions';
 import { canVary, textLeaves, withLeaves } from '../../src/shared/block-text';
 import { PERSONAS } from '../../src/shared/personas';
 import { PageSchema } from '../../src/shared/schema';
-import { applyPolish, campaignBrief, cleanCopy, factsFrom, fitTo, stripUnknownTokens } from '../../src/server/services/ai';
+import {
+  applyPolish,
+  campaignBrief,
+  cleanCopy,
+  factsFrom,
+  fitTo,
+  languageName,
+  stripUnknownTokens,
+  softLimit,
+  tidyCopy,
+  wordBudget,
+} from '../../src/server/services/ai';
 
 describe('cleanCopy', () => {
   it('turns model output into safe plain text', () => {
@@ -27,6 +38,41 @@ describe('cleanCopy', () => {
     expect(cut.length).toBeLessThanOrEqual(31);
     expect(cut.endsWith('…')).toBe(true);
     expect(fitTo('short', 30)).toBe('short');
+  });
+
+  it('ends a long single sentence where its first clause ends, rather than clipping it', () => {
+    const run = 'Engineering leaders often end up owning outbound tooling they never planned to run, so getting it right takes a while';
+    expect(fitTo(run, 100)).toBe('Engineering leaders often end up owning outbound tooling they never planned to run.');
+    expect(fitTo('Leading sales development means keeping volume high — and keeping every message sounding personal', 70)).toBe(
+      'Leading sales development means keeping volume high.',
+    );
+    // a clause too early to be worth keeping falls through to the word boundary
+    expect(fitTo('Yes, and then there is a very long tail of words that simply keeps going', 60)).toMatch(/…$/);
+    // a short complete first sentence beats a long one that stops in the middle
+    expect(
+      fitTo(
+        'As CTO at NimbusDB, you want tooling engineering can trust. This playbook shows how teams keep cold outreach accurate and fast without adding load to engineering',
+        120,
+      ),
+    ).toBe('As CTO at NimbusDB, you want tooling engineering can trust.');
+  });
+});
+
+describe('softLimit', () => {
+  it('asks the writer for a little less than the real cap', () => {
+    expect(softLimit(180)).toBe(144);
+    expect(softLimit(100)).toBe(80);
+    expect(softLimit(20)).toBe(20);
+    for (const n of [20, 60, 220, 1000]) expect(softLimit(n)).toBeLessThanOrEqual(n);
+  });
+});
+
+describe('wordBudget', () => {
+  it('turns a character limit into a number of words that leaves room to spare', () => {
+    expect(wordBudget(100)).toBe(11);
+    expect(wordBudget(220)).toBe(25);
+    expect(wordBudget(20)).toBe(4);
+    for (const n of [60, 100, 160, 220, 400, 1000]) expect(wordBudget(n) * 6.2).toBeLessThan(n);
   });
 });
 
@@ -80,6 +126,15 @@ describe('campaignBrief', () => {
     expect(brief).toContain('Sub-headline: Hi there, read on.');
     expect(brief).toContain('Sections: Why it works');
     expect(brief).not.toContain('{{');
+  });
+
+  it('says in words which language the page is in, so copy is not written in the prospect’s', () => {
+    const brief = (lang?: string) => campaignBrief({ name: 'Q4', page: PageSchema.parse({ seo: lang ? { lang } : {}, blocks: [] }) });
+    expect(brief()).toContain('Page language: English');
+    expect(brief('de')).toContain('Page language: German');
+    expect(brief('pt-BR')).toContain('Page language: Brazilian Portuguese');
+    expect(languageName('')).toBe('English');
+    expect(languageName('zz-not-a-tag!!')).toBe('zz-not-a-tag!!');
   });
 });
 

@@ -10,6 +10,16 @@ import { Button, ColorField, Field, Input, Segmented, Select, SwitchRow } from '
 import { ButtonEditor } from './blockForms';
 import { StyleGallery } from './StyleGallery';
 
+/** The languages offered for the page; whatever a page already has is added to the list when it isn't one of these. */
+const LANGUAGES = ['en', 'de', 'fr', 'es', 'it', 'pt', 'nl', 'sv', 'da', 'nb', 'fi', 'pl', 'cs', 'tr', 'ja', 'zh', 'ko'];
+const languageName = (code: string): string => {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+};
+
 function Group({ title, children, open: initial = false }: { title: string; children: ReactNode; open?: boolean }) {
   const [open, setOpen] = useState(initial);
   return (
@@ -257,6 +267,15 @@ export function DesignPanel() {
           onChange={(v) => set('seo', { og_image: v })}
           hint="Defaults to the PDF cover when there is one."
         />
+        <Field label="Page language" hint="Sets the page's language tag, and the language AI-written copy is written in.">
+          <Select small value={seo.lang} onChange={(e) => set('seo', { lang: e.target.value })}>
+            {(LANGUAGES.includes(seo.lang) ? LANGUAGES : [seo.lang, ...LANGUAGES]).map((code) => (
+              <option key={code} value={code}>
+                {languageName(code)}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <SwitchRow
           label="Hide from search engines"
           hint="Recommended: personalised pages contain personal details."

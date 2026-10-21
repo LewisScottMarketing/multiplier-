@@ -263,9 +263,9 @@ export async function callAi(ctx: AppContext, call: AiCall): Promise<AiResult> {
 // ── Text hygiene ────────────────────────────────────────────────────────────
 
 /** The model's text becomes page copy. Keep it plain: no markup, links, merge tokens or list marks. */
-export function cleanCopy(raw: unknown, max: number): string {
+export function tidyCopy(raw: unknown): string {
   if (typeof raw !== 'string') return '';
-  const s = raw
+  return raw
     .replace(/<[^>]*>/g, ' ')
     .replace(/https?:\/\/\S+|www\.\S+/gi, '')
     .replace(/[{}`*]/g, '')
@@ -275,16 +275,39 @@ export function cleanCopy(raw: unknown, max: number): string {
     .replace(/^[#>\-•\s]+/, '')
     .replace(/^["“”‘’']+|["“”‘’']+$/g, '')
     .trim();
-  return fitTo(s, max);
 }
 
-/** Cut at the last full sentence that fits, else at a word, rather than mid-word. */
+/** Tidied, and cut to fit as a last resort (see `fitTo`). */
+export const cleanCopy = (raw: unknown, max: number): string => fitTo(tidyCopy(raw), max);
+
+/**
+ * Models hold to a word count far better than to a character count (asked for 100 characters, Haiku wrote 150 to 230),
+ * so every limit is also given as a number of words to aim for, with some room to spare.
+ */
+export const wordBudget = (maxChars: number): number => Math.max(4, Math.floor((maxChars * 0.7) / 6));
+
+/**
+ * Replies overshoot a stated limit by a fifth or so, so the writer is given a slightly lower one than the real cap.
+ * Most replies then fit first time, and the rest are shortened once rather than cut.
+ */
+export const softLimit = (maxChars: number): number => Math.max(20, Math.floor(maxChars * 0.8));
+
+/**
+ * Cut at the last full sentence that fits; failing that at the last clause ("…, so this playbook…" becomes a sentence
+ * that ends where the first clause does); failing that at a word, with an ellipsis. Never mid-word.
+ */
 export function fitTo(s: string, max: number): string {
   if (s.length <= max) return s;
   const cut = s.slice(0, max);
   const ends = [...cut.matchAll(/[.!?](?=\s|$)/g)];
   const last = ends[ends.length - 1];
   if (last && last.index! + 1 >= max * 0.5) return cut.slice(0, last.index! + 1);
+  // a clause ends at a comma, semicolon or dash that is followed by more text, which is what got cut
+  const clauses = [...cut.matchAll(/[,;:]\s|\s[—–-]\s/g)];
+  const clause = clauses[clauses.length - 1];
+  if (clause && clause.index! >= max * 0.55) return `${cut.slice(0, clause.index!).trimEnd()}.`;
+  // a short but complete first sentence beats a long one that stops in the middle
+  if (last && last.index! + 1 >= Math.max(30, max * 0.25)) return cut.slice(0, last.index! + 1);
   const space = cut.lastIndexOf(' ');
   return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[,;:\s-]+$/, '')}…`;
 }
@@ -330,13 +353,23 @@ export function factsFrom(ctx: Ctx): Record<string, string> {
   return out;
 }
 
+/** "en" → "English", so the model is told in words which language the page is written in. */
+export function languageName(code: string | undefined): string {
+  const tag = (code ?? '').trim() || 'en';
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(tag) ?? tag;
+  } catch {
+    return tag;
+  }
+}
+
 /** What the page is about, in a few lines, with merge tokens resolved to their fallbacks. */
 export function campaignBrief(campaign: Pick<Campaign, 'name' | 'page'>): string {
   const plain = (t: string | undefined) =>
     renderTemplate(t ?? '', {})
       .replace(/\s+/g, ' ')
       .trim();
-  const lines: string[] = [`Campaign: ${campaign.name}`];
+  const lines: string[] = [`Campaign: ${campaign.name}`, `Page language: ${languageName(campaign.page.seo.lang)}`];
   const hero = campaign.page.blocks.find((b) => b.type === 'hero');
   if (hero?.type === 'hero') {
     if (plain(hero.headline)) lines.push(`Headline: ${plain(hero.headline)}`);
@@ -371,8 +404,18 @@ Rules:
 - Don't use the prospect's name unless the instruction asks for it.
 - If the data is too thin to say anything specific, write a natural, general line that still fits the instruction, or an empty string if nothing sensible fits.
 - Plain text only: no markdown, no HTML, no links, no quotation marks around the whole text.
-- Each text must stay under its character limit.
-- Write in the language the campaign is written in.`;
+- Every text has a hard limit in characters (max_characters) and a length to aim for in words (aim_for_words). Write to the word target and stay well inside the limit, because a text over the limit is thrown away. A short limit means one short, plain sentence that is complete, never a long sentence squeezed in.
+- Write in the page's language (given in <campaign>), even when the prospect's job title, company or country is in another language. Keep a job title in its original wording if you mention it.`;
+
+const SHORTEN_SYSTEM = `You shorten pieces of landing-page copy so that each one fits a character limit.
+
+You receive <texts>: JSON with, for each key, the current text and its length, the max_characters it must fit in and the number of words to aim for. Every text is currently too long.
+
+Rules:
+- Keep the meaning, the facts and the tone. Never add anything that isn't in the current text.
+- The result must be complete and read naturally: finish the sentence, don't cut it off. Drop the least important clause rather than clipping words.
+- Plain text only. No markdown, no emoji, no exclamation marks.
+- Write in the language of the text.`;
 
 function fieldSchema(keys: string[]) {
   return {
@@ -419,10 +462,10 @@ ${safeJson(facts)}
 </prospect_data>
 
 <fields>
-${safeJson(fields.map((f) => ({ key: f.key, instruction: f.prompt || `Write a short personalised line for "${f.label || f.key}".`, max_characters: f.max_chars })))}
+${safeJson(fields.map((f) => ({ key: f.key, instruction: f.prompt || `Write a short personalised line for "${f.label || f.key}".`, max_characters: softLimit(f.max_chars), aim_for_words: wordBudget(softLimit(f.max_chars)) })))}
 </fields>
 
-Reply with a JSON object that has one string for each key: ${keys.join(', ')}.`;
+Reply with a JSON object that has one string for each key: ${keys.join(', ')}. Write every text in ${languageName(campaign.page.seo.lang)}, whatever language the prospect's details are in.`;
 
   const res = await callAi(ctx, {
     tier: 'fast',
@@ -438,9 +481,34 @@ Reply with a JSON object that has one string for each key: ${keys.join(', ')}.`;
   if (!res.ok) return { values: {}, warnings: [failureWarning(res)] };
 
   const data = (res.data && typeof res.data === 'object' ? res.data : {}) as Record<string, unknown>;
+  const texts: Record<string, string> = {};
+  for (const f of fields) texts[f.key] = tidyCopy(data[f.key]);
+
+  // Even with a word target a reply sometimes runs long. Cutting it would leave a clipped sentence in front of a
+  // prospect, so ask once for a shorter version of just those, and only cut as a last resort.
+  const tooLong = fields.filter((f) => texts[f.key]!.length > f.max_chars);
+  if (tooLong.length) {
+    const again = await callAi(ctx, {
+      tier: 'fast',
+      label: 'shorten',
+      system: SHORTEN_SYSTEM,
+      user: `<texts>\n${safeJson(Object.fromEntries(tooLong.map((f) => [f.key, { text: texts[f.key], current_characters: texts[f.key]!.length, max_characters: f.max_chars, aim_for_words: wordBudget(f.max_chars) }])))}\n</texts>\n\nReply with a JSON object that has one string for each key: ${tooLong.map((f) => f.key).join(', ')}.`,
+      schema: fieldSchema(tooLong.map((f) => f.key)),
+      maxTokens: Math.min(4000, 1500 + tooLong.length * 300),
+      effort: 'low',
+      interactive: opts.interactive,
+    });
+    if (again.ok && again.data && typeof again.data === 'object') {
+      for (const f of tooLong) {
+        const shorter = tidyCopy((again.data as Record<string, unknown>)[f.key]);
+        if (shorter) texts[f.key] = shorter;
+      }
+    }
+  }
+
   const values: Record<string, string> = {};
   for (const f of fields) {
-    const text = cleanCopy(data[f.key], f.max_chars);
+    const text = fitTo(texts[f.key]!, f.max_chars);
     if (text) values[f.key] = text;
   }
   return { values, warnings: [] };
@@ -518,7 +586,7 @@ You receive:
 
 Rules:
 - Keep the same structure, the same facts and the same offer. Change emphasis, examples, vocabulary and order of priority to suit the audience.
-- Never invent claims, numbers, customers or results that aren't already in the block.
+- Never invent claims, numbers, customers or results that aren't already in the block. Don't tack on a new outcome or benefit either ("…so lead quality goes up", "…and better pipeline as a result") unless the block already says it.
 - Keep every merge token such as {{first_name|there}} or {{company_short|your company}} exactly as written. Move them if the sentence needs it, but don't change their field names or fallbacks, and don't invent new ones.
 - Keep roughly the same length as the original for every piece, never longer than the stated limit.
 - Keep any formatting marks (for example **bold** or line breaks) the original uses.
@@ -559,6 +627,9 @@ export async function suggestVariant(
   if (!canVary(block)) return { ok: false, reason: 'config', message: 'This kind of block can’t be rewritten automatically.' };
   const leaves = textLeaves(block);
   if (!leaves.length) return { ok: false, reason: 'config', message: 'There’s no text in this block yet.' };
+  // a block made only of merge fields (an AI opening line, say) has no wording to adapt
+  if (leaves.every((l) => l.text.replace(/\{\{[^}]*\}\}/g, '').replace(/[\s.,;:!?-]/g, '').length < 3))
+    return { ok: false, reason: 'config', message: 'This block only holds merge fields, so there’s no wording to adapt.' };
 
   const ids = leaves.map((_, i) => `t${i}`);
   const user = `<campaign>
