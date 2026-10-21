@@ -4,10 +4,8 @@
 > next level down, e.g. keeping a staff list, would never weigh in a
 > buyer's choice or appear in positioning); walked up: none yet;
 > walked up: N3 (the promise; KCSiE is a mandatory duty, so N1 is a
-> must-have purchase), N4 (aspiration, near-purpose); currently
-> crystallizing: N5 (candidate purpose level: do the job I went into
-> education for, without the dread of an inspection or an incident
-> hanging over me). Stack is
+> must-have purchase), N4 (aspiration, near-purpose), N5 (purpose level);
+> walk complete; closing press / role check / finalization remaining. Stack is
 > for Group 1 (schools running vetting from spreadsheets); Group 2
 > (schools switching from an existing system such as CPOMS or School SCR)
 > are N1 occupants to win from, and may climb to different ends. No
@@ -26,6 +24,8 @@ settle order; position in the list below carries the stack order, top
 ends before bottom means.
 
 ## The stack
+
+**N5.** ★ Do the job I went into education for, knowing I did everything I needed to keep children safe, so I can switch off at the end of the day without dreading an inspection or an incident. — *purpose level: no product satisfies this directly; material for higher-purpose stories, never for promises.*
 
 **N4.** → Run a school where no child is harmed by an adult we hired, and parents know it.
     Occupants: safeguarding training providers; the school's designated safeguarding lead; concern-recording systems such as CPOMS. (Unverified — confirm with the user.)
