@@ -4,6 +4,7 @@ import type { Campaign, DocumentConfig } from '@shared/schema';
 import { renderTemplate, type Ctx } from '@shared/template';
 import type { AppContext } from '../context';
 import { notFound, unprocessable } from '../lib/errors';
+import { probeImage, withinPixelBudget } from '../lib/image-probe';
 import { safeRequest } from '../lib/safe-fetch';
 import { renderPdf, resolveInstructions, type ImageLoader, type Instruction } from '../pdf/apply';
 import { extractSinglePage, type PageInfo } from '../pdf/extract';
@@ -38,13 +39,10 @@ export function forgetSource(assetId: string) {
 const MAX_LOGO_PX = 1200;
 const imageMemo = new Map<string, { at: number; img: Awaited<ReturnType<ImageLoader>> }>();
 
-function sniffImage(b: Buffer): boolean {
-  return (
-    (b.length > 8 && b[0] === 0x89 && b[1] === 0x50) || // PNG
-    (b.length > 3 && b[0] === 0xff && b[1] === 0xd8) || // JPEG
-    (b.length > 6 && b.subarray(0, 3).toString('latin1') === 'GIF') ||
-    (b.length > 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP')
-  );
+/** A decodable PNG/JPEG/GIF/WebP whose declared size is sane. Logo URLs come from prospect data, so nothing is trusted. */
+function usableImage(b: Buffer): boolean {
+  const probe = probeImage(b);
+  return !!probe && withinPixelBudget(probe);
 }
 
 export function makeImageLoader(app: AppContext): ImageLoader {
@@ -64,9 +62,9 @@ export function makeImageLoader(app: AppContext): ImageLoader {
           httpsOnly: !app.config.allowPrivateFetch,
           headers: { accept: 'image/png,image/jpeg,image/webp,image/gif' },
         });
-        raw = res.status === 200 && sniffImage(res.body) ? res.body : null;
+        raw = res.status === 200 ? res.body : null;
       }
-      if (!raw) return null;
+      if (!raw || !usableImage(raw)) return null;
       const img = await loadImage(raw);
       const scale = Math.min(1, MAX_LOGO_PX / Math.max(img.width, img.height));
       const w = Math.max(1, Math.round(img.width * scale));
@@ -166,6 +164,8 @@ export async function personalizedPdf(app: AppContext, campaign: Campaign, ctx: 
 }
 
 const COVER_SCALE = 1.4;
+/** Anonymous (URL-parameter) covers are kept in memory only, like anonymous PDFs. */
+const anonCovers = new Map<string, Uint8Array>();
 
 export async function personalizedCover(app: AppContext, campaign: Campaign, ctx: Ctx, owner: string | null): Promise<Uint8Array> {
   const built = await buildPdf(app, campaign, ctx, owner);
@@ -173,16 +173,24 @@ export async function personalizedCover(app: AppContext, campaign: Campaign, ctx
   if (key) {
     const cached = await app.storage.get(key);
     if (cached) return cached;
+  } else {
+    const cached = anonCovers.get(built.hash);
+    if (cached) return cached;
   }
   return once(`cover:${built.hash}`, async () => {
     const r = await pdfGate.run(() => withTimeout(renderPageRaster(built.bytes, 1, COVER_SCALE), 20_000, 'Rendering the cover'));
     if (key) await app.storage.put(key, r.png);
+    else {
+      if (anonCovers.size >= 20) anonCovers.delete(anonCovers.keys().next().value as string);
+      anonCovers.set(built.hash, r.png);
+    }
     return r.png;
   });
 }
 
 /** A rendered page of the personalised PDF, for the studio's "preview as" view. */
 export async function previewPage(app: AppContext, campaign: Campaign, doc: DocumentConfig, ctx: Ctx, pageNo: number, scale = 2): Promise<{ png: Buffer; warnings: string[] }> {
+  if (!Number.isInteger(pageNo) || pageNo < 1 || pageNo > doc.page_count) throw unprocessable('That page doesn’t exist.');
   const built = await buildPdf(app, { id: campaign.id, document: doc }, ctx, null, doc);
   const r = await pdfGate.run(() => withTimeout(renderPageRaster(built.bytes, pageNo, scale), 20_000, 'Rendering the preview'));
   return { png: r.png, warnings: built.warnings };
@@ -209,7 +217,8 @@ export async function studioPage(app: AppContext, doc: DocumentConfig, pageNo: n
       withTimeout(Promise.all([extractSinglePage(bytes, pageNo), renderPageRaster(bytes, pageNo, scale)]), 30_000, 'Reading the page'),
     );
     sampleRunColors(raster, info.runs);
-    const page: StudioPage = { ...info, scale };
+    // very large pages are rendered at a smaller scale; the studio positions everything by this number
+    const page: StudioPage = { ...info, scale: raster.scale };
     await Promise.all([app.storage.put(jsonKey, JSON.stringify(page)), app.storage.put(pngKey, raster.png)]);
     return { page, png: raster.png };
   });

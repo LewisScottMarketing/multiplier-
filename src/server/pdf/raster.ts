@@ -1,5 +1,10 @@
+import { unprocessable } from '../lib/errors';
 import type { Run } from './extract';
-import { hexToRgb, openPdf, rgbToHex } from './runtime';
+import { hexToRgb, MAX_PAGE_POINTS, openPdf, rgbToHex } from './runtime';
+
+/** A page is drawn smaller rather than allocating more than this (RGBA, so 4 bytes a pixel). */
+const MAX_RASTER_PIXELS = 16_000_000;
+const MAX_RASTER_EDGE = 8000;
 
 export interface Raster {
   png: Buffer;
@@ -19,14 +24,19 @@ export async function renderPageRaster(bytes: Uint8Array, pageNo: number, scale:
   try {
     if (pageNo < 1 || pageNo > doc.numPages) throw new RangeError('No such page');
     const page = await doc.getPage(pageNo);
-    const viewport = page.getViewport({ scale });
+    const base = page.getViewport({ scale: 1 });
+    if (base.width < 1 || base.height < 1) throw unprocessable('This PDF has a page with no size, so it can’t be shown.');
+    if (base.width > MAX_PAGE_POINTS || base.height > MAX_PAGE_POINTS) throw unprocessable('This PDF has a page larger than the 200-inch maximum PDF allows.');
+    // posters and oversized pages are drawn at a smaller scale so a hostile file can't exhaust memory
+    const fit = Math.min(scale, Math.sqrt(MAX_RASTER_PIXELS / (base.width * base.height)), MAX_RASTER_EDGE / Math.max(base.width, base.height));
+    const viewport = page.getViewport({ scale: fit });
     const factory = (doc as unknown as { canvasFactory: CanvasFactory }).canvasFactory;
     const { canvas, context } = factory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
     await (page.render as unknown as (o: unknown) => { promise: Promise<void> })({ canvasContext: context, viewport, canvas }).promise;
     const rgba = context.getImageData(0, 0, Math.ceil(viewport.width), Math.ceil(viewport.height)).data;
     const png = canvas.toBuffer('image/png');
     page.cleanup();
-    return { png, width: Math.ceil(viewport.width), height: Math.ceil(viewport.height), scale, rgba };
+    return { png, width: Math.ceil(viewport.width), height: Math.ceil(viewport.height), scale: fit, rgba };
   } finally {
     await close();
   }

@@ -26,11 +26,20 @@ const hostname = z
   .toLowerCase()
   .regex(/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/, 'Enter a domain like go.yourbrand.com');
 
+/** Headers that frame the request itself; letting a setting override them can only break (or confuse) the delivery. */
+const RESERVED_HEADERS = new Set(['host', 'content-length', 'content-type', 'transfer-encoding', 'connection', 'keep-alive', 'upgrade', 'te', 'trailer', 'expect', 'proxy-authorization', 'proxy-connection']);
+
 const WebhookBody = z.object({
   name: z.string().trim().min(1).max(80),
   kind: z.enum(['clay', 'slack', 'generic']),
   url: z.string().trim().url().max(2000),
-  auth_header: z.string().trim().max(80).regex(/^[A-Za-z0-9-]*$/, 'Header names can only contain letters, numbers and dashes').nullish(),
+  auth_header: z
+    .string()
+    .trim()
+    .max(80)
+    .regex(/^[A-Za-z0-9-]*$/, 'Header names can only contain letters, numbers and dashes')
+    .refine((h) => !RESERVED_HEADERS.has(h.toLowerCase()), 'That header is set by the connection itself. Choose another name.')
+    .nullish(),
   auth_value: z.string().max(500).nullish(),
   events: z.array(z.enum([...EVENT_NAMES, '*'])).max(10).optional(),
   campaign_id: z.string().max(40).nullish(),

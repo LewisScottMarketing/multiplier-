@@ -28,7 +28,7 @@ describe('POST /api/v1/personalize (what Clay calls)', () => {
       department: 'marketing',
       headline: 'Pipeline plan for Acme, Inc.',
     });
-    expect(res.body.url).toMatch(/^http:\/\/go\.test\/p\/[A-Za-z0-9]{10}$/);
+    expect(res.body.url).toMatch(/^http:\/\/go\.test\/p\/[A-Za-z0-9]{12}$/);
     expect(res.body.pdf_url).toBeNull(); // no PDF attached to this campaign
     expect(res.body.id).toMatch(/^prs_/);
   });

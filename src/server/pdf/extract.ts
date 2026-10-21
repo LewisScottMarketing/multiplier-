@@ -1,4 +1,4 @@
-import { openPdf, pdfjs, type PdfDoc } from './runtime';
+import { MAX_PDF_IMAGE_PIXELS, openPdf, pdfjs, type PdfDoc } from './runtime';
 
 /**
  * Text, image and link extraction. All coordinates are PDF points with the origin at the TOP-left
@@ -299,7 +299,7 @@ export async function extractImagePng(bytes: Uint8Array, ref: string): Promise<{
         fn === js.OPS.paintImageXObject
           ? await new Promise<Img>((res) => (page.objs as unknown as { get(id: string, cb: (v: Img) => void): void }).get(args[0] as string, res))
           : (args[0] as Img);
-      if (!img?.data || !img.width || !img.height) return null;
+      if (!img?.data || !img.width || !img.height || img.width * img.height > MAX_PDF_IMAGE_PIXELS) return null;
       const rgba = new Uint8ClampedArray(img.width * img.height * 4);
       const kind = img.kind ?? 2;
       if (kind === 3) rgba.set(img.data); // RGBA_32BPP

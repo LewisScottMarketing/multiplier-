@@ -354,6 +354,7 @@ export function deleteProspect(ctx: AppContext, id: string): void {
   ctx.db.transaction(() => {
     ctx.db.run('DELETE FROM events WHERE prospect_id = ?', id);
     ctx.db.run('DELETE FROM submissions WHERE prospect_id = ?', id);
+    ctx.db.run('DELETE FROM webhook_deliveries WHERE prospect_id = ?', id); // copies of their data sent to Clay, Slack, …
     ctx.db.run('DELETE FROM prospects WHERE id = ?', id);
   });
   void ctx.storage.deletePrefix(`campaigns/${p.campaign_id}/generated/${id}`).catch(() => undefined);

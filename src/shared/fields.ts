@@ -26,8 +26,8 @@ export const STANDARD_FIELDS: FieldInfo[] = [
   { key: 'seniority_group', label: 'Seniority group', example: 'executive', group: 'segment', hint: 'executive, leader or practitioner' },
   { key: 'department', label: 'Department', example: 'marketing', group: 'segment', hint: 'sales, marketing, product, engineering, design, data, operations, finance, hr, it, customer_success, legal, executive, other' },
   { key: 'department_label', label: 'Department (name)', example: 'Marketing', group: 'segment' },
-  { key: 'page_url', label: 'Personalised page URL', example: 'https://go.example.com/p/k3x9Qm2aWd', group: 'links' },
-  { key: 'pdf_url', label: 'Personalised PDF URL', example: 'https://go.example.com/p/k3x9Qm2aWd.pdf', group: 'links' },
+  { key: 'page_url', label: 'Personalised page URL', example: 'https://go.example.com/p/k3x9Qm2aWdPz', group: 'links' },
+  { key: 'pdf_url', label: 'Personalised PDF URL', example: 'https://go.example.com/p/k3x9Qm2aWdPz.pdf', group: 'links' },
   { key: 'today', label: 'Today’s date', example: '21 October 2026', group: 'links' },
 ];
 

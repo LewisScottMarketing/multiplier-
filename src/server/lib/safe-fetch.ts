@@ -29,7 +29,7 @@ for (const [net4, prefix] of [
   ['240.0.0.0', 4],
 ] as const) blocked.addSubnet(net4, prefix, 'ipv4');
 for (const [net6, prefix] of [
-  ['::', 128],
+  ['::', 96], // unspecified, loopback and the deprecated IPv4-compatible range
   ['::1', 128],
   ['fc00::', 7],
   ['fe80::', 10],
@@ -86,13 +86,14 @@ function pinnedLookup(allowPrivate: boolean): net.LookupFunction {
 function once(url: URL, opts: SafeRequestOptions): Promise<SafeResponse> {
   return new Promise((resolve, reject) => {
     const lib = url.protocol === 'https:' ? https : http;
+    const limit = opts.timeoutMs ?? 10_000;
     const req = lib.request(
       url,
       {
         method: opts.method ?? 'GET',
         headers: { 'user-agent': 'Multiplier/1.0', accept: '*/*', ...opts.headers },
         lookup: pinnedLookup(!!opts.allowPrivate),
-        timeout: opts.timeoutMs ?? 10_000,
+        timeout: limit, // idle time between bytes
       },
       (res) => {
         const max = opts.maxBytes ?? 5 * 1024 * 1024;
@@ -110,6 +111,10 @@ function once(url: URL, opts: SafeRequestOptions): Promise<SafeResponse> {
         res.on('error', reject);
       },
     );
+    // The idle timeout above doesn't stop a server that trickles one byte at a time, so the whole
+    // exchange also gets a hard deadline.
+    const deadline = setTimeout(() => req.destroy(new Error('Request timed out')), limit * 2);
+    req.on('close', () => clearTimeout(deadline));
     req.on('timeout', () => req.destroy(new Error('Request timed out')));
     req.on('error', reject);
     if (opts.body !== undefined) req.write(opts.body);

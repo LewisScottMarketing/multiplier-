@@ -6,7 +6,7 @@ import type { Campaign } from '@shared/schema';
 import type { AppContext } from '../context';
 import { badRequest, HttpError, notFound } from '../lib/errors';
 import { safeJoin, sendFile } from '../lib/static';
-import { rateLimit, type C, type Env } from '../http';
+import { rateLimit, requestHost, type C, type Env } from '../http';
 import { interFontDir } from '../render/css';
 import { getCampaign, getCampaignBySlug } from '../services/campaigns';
 import { personalizedCover, personalizedPdf } from '../services/documents';
@@ -17,7 +17,19 @@ import { renderGenericPage, renderProspectPage } from '../services/render';
 import { isBlockedAddress } from '../lib/safe-fetch';
 import { getWorkspace } from '../services/settings';
 
-const hostOf = (c: C) => (c.req.header('x-forwarded-host') ?? c.req.header('host') ?? 'localhost').split(',')[0].trim();
+const hostOf = (c: C) => requestHost(c) || 'localhost';
+
+/**
+ * Anonymous PDFs and covers are built from URL parameters, so every distinct URL can cost a render.
+ * Cap how fast one address can ask for them (the 2-slot PDF gate bounds the damage either way).
+ */
+function limitBuilds(c: C) {
+  const r = c.get('app').limiter.hit(`anon-build:${c.get('ip')}`, 60, 60_000);
+  if (!r.ok) {
+    c.header('Retry-After', String(r.retryAfterSec));
+    throw new HttpError(429, 'rate_limited', 'Too many requests, please slow down');
+  }
+}
 
 /** A deliberately bland 404: it must not reveal whether a token ever existed. */
 function gone(c: C) {
@@ -175,7 +187,10 @@ export function publicRoutes() {
     const dest = safeUrl(renderUrl(button.action.url ?? '', contextFor(app, campaign, prospect)));
     if (!dest) return gone(c);
     const ua = c.req.header('user-agent') ?? '';
-    recordEvent(app, { campaignId: campaign.id, prospectId: prospect.id, type: 'click', props: { block: blockId, slot, label: button.label, host: safeHost(dest) }, isBot: isBotUa(ua), ip: c.get('ip'), ua });
+    // a HEAD probe (link checkers do this) must not count as a click
+    if (c.req.method !== 'HEAD') {
+      recordEvent(app, { campaignId: campaign.id, prospectId: prospect.id, type: 'click', props: { block: blockId, slot, label: button.label, host: safeHost(dest) }, isBot: isBotUa(ua), ip: c.get('ip'), ua });
+    }
     return c.redirect(dest, 302);
   });
 
@@ -207,8 +222,17 @@ export function publicRoutes() {
     const params = Object.fromEntries(Object.entries(c.req.query()).slice(0, 30)) as Record<string, string>;
     if (isPdf) {
       if (!campaign.document) return gone(c);
+      limitBuilds(c);
       const { bytes, filename } = await personalizedPdf(app, campaign, anonymousContext(campaign, params), null);
-      return new Response(Buffer.from(bytes), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `${c.req.query('dl') ? 'attachment' : 'inline'}; filename="${filename.replace(/[^\w.\- ()]+/g, '_')}"`, 'Cache-Control': 'public, max-age=300' } });
+      return new Response(Buffer.from(bytes), {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `${c.req.query('dl') ? 'attachment' : 'inline'}; filename="${filename.replace(/[^\w.\- ()]+/g, '_')}"`,
+          'Cache-Control': 'public, max-age=300',
+          'X-Robots-Tag': 'noindex, nofollow',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
     }
     const out = renderGenericPage(app, campaign, params, hostOf(c));
     return new Response(out.html, { headers: out.headers });
@@ -217,9 +241,10 @@ export function publicRoutes() {
   r.get('/c/:slug/cover.png', async (c) => {
     const campaign = genericCampaign(c, c.req.param('slug'));
     if (!campaign?.document) return gone(c);
+    limitBuilds(c);
     const params = Object.fromEntries(Object.entries(c.req.query()).slice(0, 30)) as Record<string, string>;
     const png = await personalizedCover(c.get('app'), campaign, anonymousContext(campaign, params), null);
-    return new Response(Buffer.from(png), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300' } });
+    return new Response(Buffer.from(png), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300', 'X-Content-Type-Options': 'nosniff' } });
   });
 
   r.post('/c/:slug/submit', rateLimit('submit-anon', 10, 10 * 60_000), async (c) => {

@@ -3,6 +3,7 @@ import { createCanvas, loadImage } from '@napi-rs/canvas';
 import type { AppContext } from '../context';
 import { badRequest, notFound } from '../lib/errors';
 import { newId } from '../lib/ids';
+import { MAX_IMAGE_PIXELS, probeImage, withinPixelBudget } from '../lib/image-probe';
 
 export interface AssetRow {
   id: string;
@@ -20,23 +21,19 @@ export interface AssetRow {
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_DIM = 2400;
 
-function sniff(buf: Buffer): 'png' | 'jpeg' | 'gif' | 'webp' | null {
-  if (buf.length < 12) return null;
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png';
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpeg';
-  if (buf.subarray(0, 4).toString('latin1') === 'GIF8') return 'gif';
-  if (buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP') return 'webp';
-  return null;
-}
-
 /**
  * Accepts PNG/JPEG/GIF/WebP only (no SVG: it can carry script). The image is decoded and re-encoded,
- * which strips EXIF/GPS data, flattens polyglot files, and caps the pixel size.
+ * which strips EXIF/GPS data, flattens polyglot files, and caps the pixel size. The size is read from
+ * the header first, so a tiny file that declares billions of pixels never reaches the decoder.
  */
 export async function storeImage(app: AppContext, input: { data: Buffer; filename: string; campaignId?: string | null }): Promise<AssetRow> {
   if (input.data.length > MAX_IMAGE_BYTES) throw badRequest('Images can be up to 8 MB.');
-  const kind = sniff(input.data);
-  if (!kind) throw badRequest('Upload a PNG, JPEG, GIF or WebP image.');
+  const probe = probeImage(input.data);
+  if (!probe) throw badRequest('Upload a PNG, JPEG, GIF or WebP image.');
+  if (!withinPixelBudget(probe)) {
+    throw badRequest(`That image is ${probe.width} × ${probe.height} pixels, which is too large to process. Resize it to under ${MAX_IMAGE_PIXELS / 1_000_000} megapixels and try again.`);
+  }
+  const kind = probe.format;
   let img;
   try {
     img = await loadImage(input.data);

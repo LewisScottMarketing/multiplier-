@@ -18,25 +18,41 @@ export function pdfjs(): Promise<PdfJs> {
 const root = () => path.dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'));
 
 export const MAX_PAGES = 100;
+/** Largest embedded image (in pixels) that is decoded; also the cap for rendered pages. */
+export const MAX_PDF_IMAGE_PIXELS = 40_000_000;
+/** PDF's own upper limit for a page edge is 14,400 points (200 inches). */
+export const MAX_PAGE_POINTS = 14_400;
 
 export class Semaphore {
   private waiting: Array<() => void> = [];
   private active = 0;
-  constructor(private max: number) {}
+  /** `maxQueue` bounds how many callers may wait; beyond it they are turned away instead of piling up. */
+  constructor(
+    private max: number,
+    private maxQueue = Infinity,
+  ) {}
   async run<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.active >= this.max) await new Promise<void>((r) => this.waiting.push(r));
-    this.active++;
+    if (this.active >= this.max) {
+      if (this.waiting.length >= this.maxQueue) throw new HttpError(503, 'busy', 'The server is busy building documents. Try again in a moment.');
+      // a finishing job hands its slot straight to the next waiter, so `active` never dips and a
+      // newcomer can't jump the queue between the two
+      await new Promise<void>((r) => this.waiting.push(r));
+    } else this.active++;
     try {
       return await fn();
     } finally {
-      this.active--;
-      this.waiting.shift()?.();
+      const next = this.waiting.shift();
+      if (next) next();
+      else this.active--;
     }
+  }
+  get pending() {
+    return this.waiting.length;
   }
 }
 
 /** One heavy PDF job at a time per CPU-ish slot keeps the event loop responsive for page views. */
-export const pdfGate = new Semaphore(2);
+export const pdfGate = new Semaphore(2, 40);
 
 export function withTimeout<T>(p: Promise<T>, ms: number, what: string, onTimeout?: () => void): Promise<T> {
   let timer: NodeJS.Timeout;
@@ -64,6 +80,8 @@ export async function openPdf(bytes: Uint8Array): Promise<{ doc: PdfDoc; close: 
     cMapPacked: true,
     fontExtraProperties: true,
     useSystemFonts: false,
+    // skip embedded images that declare an absurd size instead of allocating for them
+    maxImageSize: MAX_PDF_IMAGE_PIXELS,
     verbosity: 0,
   });
   let doc: PdfDoc;

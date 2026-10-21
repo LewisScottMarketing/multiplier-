@@ -238,6 +238,7 @@ export async function deleteCampaign(ctx: AppContext, id: string): Promise<void>
   ctx.db.transaction(() => {
     ctx.db.run('DELETE FROM events WHERE campaign_id = ?', id);
     ctx.db.run('DELETE FROM submissions WHERE campaign_id = ?', id);
+    ctx.db.run('DELETE FROM webhook_deliveries WHERE campaign_id = ?', id);
     ctx.db.run('DELETE FROM webhooks WHERE campaign_id = ?', id);
     ctx.db.run('DELETE FROM assets WHERE campaign_id = ?', id);
     ctx.db.run('UPDATE api_keys SET revoked_at = COALESCE(revoked_at, ?) WHERE campaign_id = ?', Date.now(), id);

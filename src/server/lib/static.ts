@@ -38,7 +38,7 @@ export function safeJoin(root: string, rel: string): string | null {
   return full === root || full.startsWith(root + path.sep) ? full : null;
 }
 
-export async function sendFile(c: Context, file: string, opts: { immutable?: boolean } = {}): Promise<Response | null> {
+export async function sendFile(c: Context, file: string, opts: { immutable?: boolean; headers?: Record<string, string> } = {}): Promise<Response | null> {
   let stat: fs.Stats;
   try {
     stat = await fs.promises.stat(file);
@@ -52,6 +52,7 @@ export async function sendFile(c: Context, file: string, opts: { immutable?: boo
     ETag: etag,
     'Cache-Control': opts.immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
     'X-Content-Type-Options': 'nosniff',
+    ...opts.headers,
   };
   if (c.req.header('if-none-match') === etag) return new Response(null, { status: 304, headers });
   headers['Content-Length'] = String(stat.size);

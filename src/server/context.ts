@@ -4,6 +4,7 @@ import { Db } from './db/database';
 import { migrate } from './db/migrations';
 import { createLogger, silentLogger, type Logger } from './lib/log';
 import { RateLimiter } from './lib/ratelimit';
+import { installRegexGuard } from './lib/safe-regex';
 import { Storage } from './lib/storage';
 
 /** Short-lived store for rendered previews so the builder can show them in a real iframe. */
@@ -38,11 +39,13 @@ export interface AppContext {
 export function createContext(config: Config, opts: { dbFile?: string; quiet?: boolean } = {}): AppContext {
   const db = new Db(opts.dbFile ?? path.join(config.dataDir, 'multiplier.db'));
   migrate(db);
+  const log = opts.quiet ? silentLogger : createLogger(config.logLevel, config.env === 'production');
+  installRegexGuard(log);
   return {
     config,
     db,
     storage: new Storage(path.join(config.dataDir, 'files')),
-    log: opts.quiet ? silentLogger : createLogger(config.logLevel, config.env === 'production'),
+    log,
     limiter: new RateLimiter(),
     previews: new PreviewStore(),
     background: new Set(),

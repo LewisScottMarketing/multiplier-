@@ -56,9 +56,9 @@ Body (type `/` inside each pair of quotes and pick the column; keep the quotes):
   "ok": true,
   "status": "created",
   "id": "prs_8d3kq2x0t1",
-  "url": "https://go.yourbrand.com/p/k3x9Qm2aWd",
-  "pdf_url": "https://go.yourbrand.com/p/k3x9Qm2aWd.pdf",
-  "cover_url": "https://go.yourbrand.com/p/k3x9Qm2aWd/cover.png",
+  "url": "https://go.yourbrand.com/p/k3x9Qm2aWdPz",
+  "pdf_url": "https://go.yourbrand.com/p/k3x9Qm2aWdPz.pdf",
+  "cover_url": "https://go.yourbrand.com/p/k3x9Qm2aWdPz/cover.png",
   "headline": "The 2026 Outbound Pipeline Playbook",
   "first_name": "Jane",
   "seniority": "vp",
@@ -137,7 +137,7 @@ Each event is one row:
   "prospect_id": "prs_…", "external_id": "clay_1021",
   "email": "jane@northwind.com", "first_name": "Jane", "last_name": "Doe",
   "company": "Northwind Traders", "job_title": "VP of Marketing",
-  "page_url": "https://go.yourbrand.com/p/k3x9Qm2aWd", "pdf_url": "https://go.yourbrand.com/p/k3x9Qm2aWd.pdf",
+  "page_url": "https://go.yourbrand.com/p/k3x9Qm2aWdPz", "pdf_url": "https://go.yourbrand.com/p/k3x9Qm2aWdPz.pdf",
   "stage": "opened", "views": 1, "clicks": 0, "downloads": 0, "submissions": 0,
   "engaged_seconds": 0, "score": 10, "seniority": "vp", "department": "marketing"
 }

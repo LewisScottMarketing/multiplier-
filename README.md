@@ -168,9 +168,9 @@ curl -X POST https://app.example.com/api/v1/personalize \
 ```json
 {
   "ok": true, "status": "created", "id": "prs_…",
-  "url": "https://go.example.com/p/k3x9Qm2aWd",
-  "pdf_url": "https://go.example.com/p/k3x9Qm2aWd.pdf",
-  "cover_url": "https://go.example.com/p/k3x9Qm2aWd/cover.png",
+  "url": "https://go.example.com/p/k3x9Qm2aWdPz",
+  "pdf_url": "https://go.example.com/p/k3x9Qm2aWdPz.pdf",
+  "cover_url": "https://go.example.com/p/k3x9Qm2aWdPz/cover.png",
   "headline": "The 2026 Outbound Pipeline Playbook",
   "seniority": "vp", "department": "marketing",
   "warnings": []
@@ -206,11 +206,11 @@ All configuration is environment variables (a `.env` file in the working directo
 Built for the fact that prospect data is untrusted and the links go to strangers.
 
 - **No injection through data.** Values are HTML-escaped at render time; custom HTML blocks are sanitised after merge; every public page gets a per-response CSP nonce and `frame-ancestors 'none'`; links are limited to safe schemes.
-- **Private, unguessable links** (`/p/<10 random chars>`), `noindex`, no cookies; unknown tokens are rate limited.
-- **Dashboard** uses scrypt password hashes, hashed server-side sessions in an `HttpOnly` `SameSite` cookie, same-origin checks on writes and login throttling. The dashboard and API answer only on the app host; custom domains serve personalised pages and nothing else.
+- **Private, unguessable links** (`/p/<12 random chars>`), `noindex`, no cookies; unknown tokens are rate limited.
+- **Dashboard** uses scrypt password hashes, hashed server-side sessions in an `HttpOnly` `SameSite` cookie, same-origin checks on writes and login throttling, and a strict Content-Security-Policy (no inline script, no `eval`). The dashboard and API answer only on the app host; custom domains serve personalised pages and nothing else. **Complete first-run setup right after starting a new instance** (or set `ADMIN_EMAIL`/`ADMIN_PASSWORD`).
 - **API keys** are stored hashed and can be revoked or limited to one campaign. Webhook secrets and auth headers are encrypted at rest.
 - **Outbound requests** (webhooks, logo images) refuse private and link-local addresses, revalidate after redirects and have size and time limits.
-- **Uploads** are checked by content, size-limited and processed in bounded, time-boxed jobs; uploaded images are re-encoded (stripping metadata). CSV exports neutralise formula injection.
+- **Uploads** are checked by content and size, image dimensions are checked before decoding, and PDFs are processed in a bounded, time-boxed queue; uploaded images are re-encoded (stripping metadata). CSV exports neutralise formula injection.
 - **AI** receives only what's listed under [Optional AI](#optional-ai), and its output is treated as untrusted text.
 
 See [SECURITY.md](SECURITY.md) for the details and how to report a problem. Multiplier doesn't send email: you stay responsible for lawful outreach (consent, opt-out, data-protection rules) wherever your prospects are.
@@ -219,7 +219,7 @@ See [SECURITY.md](SECURITY.md) for the details and how to report a problem. Mult
 
 ```bash
 npm run dev            # API (watch) + dashboard (Vite, proxied)
-npm test               # 260+ unit and integration tests
+npm test               # 290+ unit and integration tests
 npm run typecheck
 npm run build          # dashboard + server bundle in dist/
 npm run smoke -- http://localhost:3000   # end-to-end check of a running server (needs a fresh instance)

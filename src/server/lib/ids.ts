@@ -17,9 +17,9 @@ export function newId(prefix: IdPrefix): string {
   return `${prefix}_${randomString(16, ID_ALPHABET)}`;
 }
 
-/** Public, unguessable token used in personalised URLs (57^10 ≈ 2^58 possibilities). */
+/** Public, unguessable token used in personalised URLs (54^12 ≈ 2^69 possibilities). */
 export function newToken(): string {
-  return randomString(10, TOKEN_ALPHABET);
+  return randomString(12, TOKEN_ALPHABET);
 }
 
 export function newBlockId(): string {

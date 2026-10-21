@@ -176,12 +176,15 @@ const SLACK_TEXT: Record<string, (who: string, c: Campaign, props: Record<string
   'meeting.booked': (w, c) => `📅 ${w} booked a meeting from “${c.name}”`,
 };
 
+/** Slack reads <…> as links and mentions (<!channel>), so text that came from a prospect's profile must not carry any. */
+export const slackSafe = (s: unknown): string => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 function buildPayload(ctx: AppContext, kind: WebhookKind, event: string, campaign: Campaign, p: Prospect, props: Record<string, unknown>, deliveryId: string) {
   if (kind === 'clay') return flatPayload(ctx, event, campaign, p, props);
   if (kind === 'slack') {
-    const who = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'A prospect';
-    const at = p.company ? ` (${p.company})` : '';
-    const text = (SLACK_TEXT[event] ?? ((w: string) => `${event}: ${w}`))(who + at, campaign, props);
+    const who = slackSafe([p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'A prospect');
+    const at = p.company ? ` (${slackSafe(p.company)})` : '';
+    const text = (SLACK_TEXT[event] ?? ((w: string) => `${event}: ${w}`))(who + at, { ...campaign, name: slackSafe(campaign.name) }, { ...props, label: props.label ? slackSafe(props.label) : undefined });
     return { text: `${text}\n<${pageUrl(ctx, campaign, p.token)}|Open their page>` };
   }
   return {
@@ -207,7 +210,7 @@ export function emitEvent(ctx: AppContext, event: string, campaign: Campaign, pr
       const id = newId('dlv');
       const payload = buildPayload(ctx, h.kind, event, campaign, prospect, props, id);
       ctx.db.run(
-        'INSERT INTO webhook_deliveries (id, webhook_id, event, payload, status, attempts, next_attempt_at, created_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)',
+        'INSERT INTO webhook_deliveries (id, webhook_id, event, payload, status, attempts, next_attempt_at, created_at, prospect_id, campaign_id) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)',
         id,
         h.id,
         event,
@@ -215,6 +218,8 @@ export function emitEvent(ctx: AppContext, event: string, campaign: Campaign, pr
         'pending',
         Date.now(),
         Date.now(),
+        prospect.id,
+        campaign.id,
       );
       queued++;
     }
@@ -303,11 +308,33 @@ export async function sendTest(ctx: AppContext, webhookId: string, campaign: Cam
   return send(ctx, hook, { id, webhook_id: hook.id, event: 'page.first_viewed', payload: JSON.stringify(payload), attempts: 0 });
 }
 
+/**
+ * Delivery rows hold a copy of what was sent, which includes personal data. Keep them long enough to debug
+ * a destination (two weeks if delivered, a month if they never got through) and no longer.
+ */
+export function pruneDeliveries(ctx: AppContext, now = Date.now()): number {
+  const day = 86_400_000;
+  return ctx.db.run(
+    `DELETE FROM webhook_deliveries WHERE (status = 'delivered' AND created_at < ?) OR (status = 'failed' AND created_at < ?)`,
+    now - 14 * day,
+    now - 30 * day,
+  ).changes;
+}
+
 export function startWebhookWorker(ctx: AppContext, everyMs = 5000): () => void {
   let running = false;
+  let lastPrune = 0;
   const timer = setInterval(() => {
     if (running) return;
     running = true;
+    if (Date.now() - lastPrune > 3600_000) {
+      lastPrune = Date.now();
+      try {
+        pruneDeliveries(ctx);
+      } catch (err) {
+        ctx.log.error('could not prune webhook deliveries', { err });
+      }
+    }
     processDeliveries(ctx)
       .catch((err) => ctx.log.error('webhook worker failed', { err }))
       .finally(() => (running = false));

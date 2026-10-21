@@ -153,12 +153,13 @@ export function toStr(v: unknown): string {
   return '';
 }
 
+/** Own properties only: `{{constructor}}` must read as "no such field", not as something off Object.prototype. */
 export function lookup(ctx: Ctx, key: string): string {
-  if (key in ctx) return toStr(ctx[key]);
+  if (Object.hasOwn(ctx, key)) return toStr(ctx[key]);
   if (key.includes('.')) {
     let cur: unknown = ctx;
     for (const part of key.split('.')) {
-      if (cur && typeof cur === 'object' && part in (cur as Ctx)) cur = (cur as Ctx)[part];
+      if (cur && typeof cur === 'object' && Object.hasOwn(cur, part)) cur = (cur as Ctx)[part];
       else return '';
     }
     return toStr(cur);
@@ -243,7 +244,8 @@ export function safeUrl(url: string, opts: { allowRelative?: boolean; schemes?: 
   const compact = u.replace(/[\u0000-\u001f\u007f\s]+/g, '');
   const m = compact.match(/^([a-zA-Z][a-zA-Z0-9+.-]*:)/);
   if (m) return (opts.schemes ?? SAFE_SCHEMES).has(m[1].toLowerCase()) ? u : '';
-  if (compact.startsWith('//')) return '';
+  // "//host" and "/\host" both mean "another site" to a browser
+  if (/^[\\/]{2}/.test(compact)) return '';
   if (compact.startsWith('#') || compact.startsWith('/') || compact.startsWith('?')) return opts.allowRelative === false ? '' : u;
   // bare domain such as "acme.com/demo"
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+([/?#]|$)/i.test(compact) ? `https://${u}` : '';

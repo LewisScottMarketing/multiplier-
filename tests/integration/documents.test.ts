@@ -86,8 +86,8 @@ describe('personalised PDFs for prospects', () => {
   it('serves each prospect their own PDF, edited in place, and records the download', async () => {
     const { id, key } = await liveCampaign();
     const a = await personalize(key, id, { email: 'jane@acme.com', first_name: 'Jane', last_name: 'Doe', company: 'Acme, Inc.' });
-    expect(a.body.pdf_url).toMatch(/\/p\/[A-Za-z0-9]{10}\.pdf$/);
-    expect(a.body.cover_url).toMatch(/\/p\/[A-Za-z0-9]{10}\/cover\.png$/);
+    expect(a.body.pdf_url).toMatch(/\/p\/[A-Za-z0-9]{12}\.pdf$/);
+    expect(a.body.cover_url).toMatch(/\/p\/[A-Za-z0-9]{12}\/cover\.png$/);
     const token = new URL(a.body.url).pathname.split('/').pop()!;
 
     const res = await t.req('GET', `/p/${token}.pdf`, undefined, publicHeaders());

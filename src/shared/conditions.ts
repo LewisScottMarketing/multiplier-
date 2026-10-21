@@ -7,6 +7,17 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, MAX_VALUE);
 }
 
+/**
+ * How a `matches` pattern is run. The default is a plain `re.test`. The server swaps in a guarded
+ * runner (see server/lib/safe-regex.ts) because a pattern is owner-written but the text it is tested
+ * against comes from prospect data, and a badly written pattern can otherwise take minutes.
+ */
+export type RegexTester = (re: RegExp, input: string) => boolean;
+let testRegex: RegexTester = (re, input) => re.test(input);
+export const setRegexTester = (fn: RegexTester): void => {
+  testRegex = fn;
+};
+
 const regexCache = new Map<string, RegExp | null>();
 function compile(pattern: string): RegExp | null {
   if (regexCache.has(pattern)) return regexCache.get(pattern)!;
@@ -47,7 +58,7 @@ export function evalCondition(c: Condition, ctx: Ctx): boolean {
       return !list(c.value).includes(left);
     case 'matches': {
       const re = compile(c.value ?? '');
-      return re ? re.test(left) : false;
+      return re ? testRegex(re, left) : false;
     }
     case 'exists':
       return left !== '';

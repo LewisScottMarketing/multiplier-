@@ -45,7 +45,7 @@ export function videoEmbed(rawUrl: string): VideoEmbed | null {
   if (host === 'loom.com' && ['share', 'embed'].includes(seg[0]) && seg[1] && ID.test(seg[1])) {
     return { provider: 'loom', src: `https://www.loom.com/embed/${seg[1]}` };
   }
-  if (host.endsWith('wistia.com') || host.endsWith('wistia.net')) {
+  if (['wistia.com', 'wistia.net'].some((d) => host === d || host.endsWith(`.${d}`))) {
     const i = seg.indexOf('medias');
     const id = i >= 0 ? seg[i + 1] : seg[seg.indexOf('iframe') + 1];
     if (id && ID.test(id)) return { provider: 'wistia', src: `https://fast.wistia.net/embed/iframe/${id}` };

@@ -101,7 +101,7 @@ await step('POST /api/v1/personalize returns links (what Clay calls)', async () 
   const r = await api('POST', '/api/v1/personalize', { campaign: campaign.id, first_name: 'Jane', last_name: 'Doe', email: 'jane@northwind.example', company: 'Northwind Traders', job_title: 'VP of Marketing' }, { authorization: `Bearer ${key}` });
   must(r.res.status === 200, `personalize returned ${r.res.status}: ${r.text.slice(0, 300)}`);
   link = r.json;
-  must(/\/p\/[A-Za-z0-9]{10}$/.test(link.url), `odd url ${link.url}`);
+  must(/\/p\/[A-Za-z0-9]{12}$/.test(link.url), `odd url ${link.url}`);
   must(link.pdf_url?.endsWith('.pdf') && link.cover_url?.endsWith('/cover.png'), 'missing pdf/cover links');
   must(link.department === 'marketing' && link.seniority === 'vp', 'job title not understood');
   const again = await api('POST', '/api/v1/personalize', { campaign: campaign.id, email: 'jane@northwind.example' }, { authorization: `Bearer ${key}` });

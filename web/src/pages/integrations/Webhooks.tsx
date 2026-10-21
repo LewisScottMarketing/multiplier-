@@ -272,7 +272,7 @@ export function Webhooks({ campaigns }: { campaigns: CampaignSummary[] }) {
       <details style={{ marginTop: 16 }}>
         <summary className="small muted" style={{ cursor: 'pointer' }}>What a Clay row looks like</summary>
         <div style={{ marginTop: 10 }}>
-          <CodeBlock text={JSON.stringify({ event: 'page.first_viewed', occurred_at: '2026-10-21T09:14:03.000Z', email: 'jane@northwind.com', first_name: 'Jane', company: 'Northwind Traders', job_title: 'VP of Marketing', page_url: 'https://go.example.com/p/k3x9Qm2aWd', stage: 'opened', views: 1, clicks: 0, downloads: 0, score: 10, seniority: 'vp', department: 'marketing' }, null, 2)} />
+          <CodeBlock text={JSON.stringify({ event: 'page.first_viewed', occurred_at: '2026-10-21T09:14:03.000Z', email: 'jane@northwind.com', first_name: 'Jane', company: 'Northwind Traders', job_title: 'VP of Marketing', page_url: 'https://go.example.com/p/k3x9Qm2aWdPz', stage: 'opened', views: 1, clicks: 0, downloads: 0, score: 10, seniority: 'vp', department: 'marketing' }, null, 2)} />
           <p className="hint" style={{ marginTop: 6 }}>Flat keys, so every one maps straight to a Clay column.</p>
         </div>
       </details>

@@ -42,6 +42,15 @@ export function clientIp(c: C, app: AppContext): string {
   }
 }
 
+/**
+ * The host the browser asked for. X-Forwarded-Host is only believed when a trusted proxy sits in
+ * front of us (TRUST_PROXY); otherwise any client could name itself as any host.
+ */
+export function requestHost(c: C): string {
+  const forwarded = c.get('app').config.trustProxy > 0 ? c.req.header('x-forwarded-host') : undefined;
+  return (forwarded ?? c.req.header('host') ?? '').split(',')[0].trim().toLowerCase();
+}
+
 export const baseMiddleware =
   (app: AppContext): MiddlewareHandler<Env> =>
   async (c, next) => {
@@ -49,12 +58,17 @@ export const baseMiddleware =
     c.set('ip', clientIp(c, app));
     c.set('reqId', crypto.randomUUID().slice(0, 8));
     const started = Date.now();
+    // browsers that have seen us over https keep using https (ignored on plain http, so safe for local runs)
+    if (app.config.appUrl.startsWith('https://')) c.header('Strict-Transport-Security', 'max-age=15552000');
     await next();
-    const path = c.req.path.replace(/^(\/[prt]\/)([A-Za-z0-9]{3})[A-Za-z0-9.]+/, '$1$2…');
+    const path = redactPath(c.req.path);
     if (!path.startsWith('/assets/') && path !== '/api/health') {
       app.log.debug(`${c.req.method} ${path} ${c.res.status} ${Date.now() - started}ms`, { id: c.get('reqId') });
     }
   };
+
+/** A prospect's link token is a credential, so logs keep only its first three characters. */
+export const redactPath = (p: string): string => p.replace(/^(\/(?:p|t|r|tc)\/)([A-Za-z0-9_-]{3})[A-Za-z0-9_.-]+/, '$1$2…');
 
 // ── Error handling ──────────────────────────────────────────────────────────
 
@@ -74,7 +88,7 @@ export const errorHandler = (app: AppContext) => (err: Error, c: C) => {
   if (typeof status === 'number' && status >= 400 && status < 500) {
     return c.json({ error: { code: 'bad_request', message: err.message } }, status as 400);
   }
-  app.log.error('unhandled error', { err, path: c.req.path, id: c.get('reqId') });
+  app.log.error('unhandled error', { err, path: redactPath(c.req.path), id: c.get('reqId') });
   return c.json({ error: { code: 'internal_error', message: 'Something went wrong' } }, 500);
 };
 
@@ -108,8 +122,8 @@ function assertSameOrigin(c: C) {
     } catch {
       throw forbidden('Bad Origin header');
     }
-    const own = c.req.header('x-forwarded-host') ?? c.req.header('host');
-    if (own && host !== own) throw forbidden('Cross-site request blocked');
+    const own = requestHost(c);
+    if (own && host.toLowerCase() !== own) throw forbidden('Cross-site request blocked');
   }
 }
 

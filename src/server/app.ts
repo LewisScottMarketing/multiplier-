@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AppContext } from './context';
-import { baseMiddleware, dashboardHeaders, errorHandler, type Env } from './http';
+import { baseMiddleware, dashboardHeaders, errorHandler, requestHost, type Env } from './http';
 import { safeJoin, sendFile } from './lib/static';
 import { analyticsRoutes } from './routes/analytics';
 import { authRoutes } from './routes/auth';
@@ -16,6 +16,33 @@ import { publicRoutes } from './routes/public';
 import { settingsRoutes } from './routes/settings';
 import { v1Routes } from './routes/v1';
 import { getWorkspace } from './services/settings';
+
+/**
+ * The dashboard is a same-origin single-page app: it loads its own script and styles, talks to its own
+ * API and shows previews in same-origin frames, and nothing else. Locking that down means an injected
+ * tag could neither run nor phone home. (Inline `style` attributes are used by the UI; scripts never.)
+ */
+export const SHELL_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "style-src-attr 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "frame-src 'self'",
+  "frame-ancestors 'self'",
+  "form-action 'self'",
+  "base-uri 'none'",
+  "object-src 'none'",
+].join('; ');
+
+const SHELL_HEADERS = {
+  'Content-Security-Policy': SHELL_CSP,
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+};
 
 export function createApp(ctx: AppContext) {
   const app = new Hono<Env>();
@@ -33,9 +60,9 @@ export function createApp(ctx: AppContext) {
     // the reverse proxy's certificate check arrives under the proxy's own internal hostname; the route
     // itself only answers callers on the internal network
     if (c.req.path === '/internal/tls-check') return next();
-    const host = (c.req.header('x-forwarded-host') ?? c.req.header('host') ?? '').split(',')[0].trim();
+    const host = requestHost(c);
     if (!host || host === appHost) return next();
-    const allowed = host === new URL(ctx.config.publicUrl).host || getWorkspace(ctx).domains.includes(host.split(':')[0].toLowerCase());
+    const allowed = host === new URL(ctx.config.publicUrl).host || getWorkspace(ctx).domains.includes(host.split(':')[0]);
     if (allowed && publicPrefixes.some((p) => c.req.path.startsWith(p))) return next();
     return c.text('Not found', 404);
   });
@@ -75,7 +102,7 @@ export function createApp(ctx: AppContext) {
     if (rel && !rel.startsWith('api/')) {
       const file = safeJoin(webDir, rel);
       if (file) {
-        const res = await sendFile(c, file, { immutable: rel.startsWith('assets/') });
+        const res = await sendFile(c, file, { immutable: rel.startsWith('assets/'), headers: file.endsWith('.html') ? SHELL_HEADERS : undefined });
         if (res) return res;
       }
     }
@@ -85,7 +112,7 @@ export function createApp(ctx: AppContext) {
     if (!fs.existsSync(index)) {
       return c.text('Dashboard not built. Run `npm run build`, or use `npm run dev` and open http://localhost:5173.', 503);
     }
-    const res = await sendFile(c, index);
+    const res = await sendFile(c, index, { headers: SHELL_HEADERS });
     return res ?? c.notFound();
   });
 

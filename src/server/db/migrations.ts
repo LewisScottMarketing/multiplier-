@@ -156,6 +156,17 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX deliveries_due ON webhook_deliveries(status, next_attempt_at);
   `,
+
+  /* 2 — delivery rows remember whose data they carry, so erasing a person or a campaign erases the copies too */ `
+  ALTER TABLE webhook_deliveries ADD COLUMN prospect_id TEXT;
+  ALTER TABLE webhook_deliveries ADD COLUMN campaign_id TEXT;
+  UPDATE webhook_deliveries SET
+    prospect_id = COALESCE(json_extract(payload, '$.prospect_id'), json_extract(payload, '$.prospect.id')),
+    campaign_id = COALESCE(json_extract(payload, '$.campaign_id'), json_extract(payload, '$.campaign.id'));
+  CREATE INDEX deliveries_prospect ON webhook_deliveries(prospect_id);
+  CREATE INDEX deliveries_campaign ON webhook_deliveries(campaign_id);
+  CREATE INDEX deliveries_created ON webhook_deliveries(created_at);
+  `,
 ];
 
 export function migrate(db: Db): void {

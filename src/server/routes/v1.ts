@@ -128,12 +128,17 @@ export function v1Routes() {
         if (late) warnings.push({ code: 'ai_skipped', message: 'This request ran out of time for AI copy, so the fallback text is used. Send fewer rows per request, or run the rest again.' });
         results[i] = { ...rest, warnings };
       } catch (e) {
+        if (!(e instanceof HttpError)) app.log.error('batch row failed', { err: e, row: i });
         const err = e instanceof HttpError ? e : new HttpError(500, 'internal_error', 'Could not process this row');
         results[i] = { ok: false as const, error: { code: err.code, message: err.message, details: err.details } };
       }
     };
     const width = campaign.settings.ai_fields.length > 0 && body.options?.ai !== false ? 6 : 1;
-    for (let i = 0; i < body.rows.length; i += width) await Promise.all(Array.from({ length: Math.min(width, body.rows.length - i) }, (_, k) => run(i + k)));
+    for (let i = 0; i < body.rows.length; i += width) {
+      await Promise.all(Array.from({ length: Math.min(width, body.rows.length - i) }, (_, k) => run(i + k)));
+      // rows without AI finish synchronously; give page views and other requests a turn between them
+      await new Promise<void>((r) => setImmediate(r));
+    }
     const ok = results.filter((x) => x.ok).length;
     return c.json({ ok: ok === results.length, processed: results.length, succeeded: ok, failed: results.length - ok, results });
   });

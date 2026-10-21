@@ -11,6 +11,12 @@ import { z } from 'zod';
  */
 
 const text = (max: number) => z.string().max(max);
+/** Ids end up in HTML attributes and in tracked-link paths (`<block>.<slot>`), so keep them plain. */
+const ident = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[A-Za-z0-9_-]+$/, 'letters, digits, dashes and underscores');
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a 6-digit hex colour like #4f46e5');
 
 // ── Rules ("only show this when …") ─────────────────────────────────────────
@@ -73,7 +79,7 @@ export type ImageRef = z.infer<typeof ImageSchema>;
 // ── Blocks ──────────────────────────────────────────────────────────────────
 
 const blockBase = {
-  id: text(40).min(1),
+  id: ident,
   /** Name used by "scroll to" buttons and #links. */
   anchor: text(60).optional(),
   hidden: z.boolean().optional(),
@@ -354,7 +360,7 @@ export const RectSchema = z.object({
 export type Rect = z.infer<typeof RectSchema>;
 
 const fieldBase = {
-  id: text(40).min(1),
+  id: ident,
   /** 1-based page number. */
   page: z.number().int().min(1).max(500),
   rect: RectSchema,

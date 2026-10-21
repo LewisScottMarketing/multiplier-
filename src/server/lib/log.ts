@@ -12,7 +12,7 @@ export function createLogger(level: LogLevel = 'info', json = false): Logger {
   const emit = (lvl: LogLevel, msg: string, fields?: Record<string, unknown>) => {
     if (ORDER[lvl] < ORDER[level]) return;
     const out = lvl === 'error' || lvl === 'warn' ? console.error : console.log;
-    if (json) out(JSON.stringify({ t: new Date().toISOString(), level: lvl, msg, ...fields }));
+    if (json) out(safeStringify({ t: new Date().toISOString(), level: lvl, msg, ...fields }));
     else out(`${new Date().toISOString().slice(11, 19)} ${lvl.toUpperCase().padEnd(5)} ${msg}${fields ? ' ' + safeStringify(fields) : ''}`);
   };
   return {

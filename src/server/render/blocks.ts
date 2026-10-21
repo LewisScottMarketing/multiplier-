@@ -222,7 +222,7 @@ function cta(b: BlockOf<'cta'>, r: R): string {
 function form(b: BlockOf<'form'>, r: R): string {
   const fields = b.fields
     .map((f) => {
-      const id = `f-${b.id}-${f.key}`;
+      const id = esc(`f-${b.id}-${f.key}`);
       const label = r.inline(f.label);
       const req = f.required ? ' required' : '';
       const ph = f.placeholder ? ` placeholder="${esc(r.plain(f.placeholder))}"` : '';
