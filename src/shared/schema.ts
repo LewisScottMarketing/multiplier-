@@ -363,9 +363,17 @@ const fieldBase = {
 };
 
 export const PdfFontSchema = z.object({
-  family: z.enum(['auto', 'sans', 'serif', 'mono']).default('auto'),
+  /** `auto` means "match the original text"; it is resolved when the field is created. */
+  family: z.enum(['auto', 'inter', 'helvetica', 'serif', 'mono']).default('auto'),
   bold: z.boolean().default(false),
   italic: z.boolean().default(false),
+});
+
+/** Paints over the original content first. `rect` defaults to the field's own box. */
+export const MaskSchema = z.object({
+  color: hex,
+  pad: z.number().min(0).max(20).default(1),
+  rect: RectSchema.optional(),
 });
 
 export const PdfTextField = z.object({
@@ -381,7 +389,7 @@ export const PdfTextField = z.object({
   fit: z.enum(['shrink', 'wrap', 'none']).default('shrink'),
   line_height: z.number().min(0.8).max(3).default(1.25),
   /** Paint over whatever is under the box first (used when replacing existing text). */
-  mask: z.object({ color: hex, pad: z.number().min(0).max(20).default(1) }).nullable().default(null),
+  mask: MaskSchema.nullable().default(null),
   /** The original PDF text this field replaces (display only). */
   source_text: text(500).optional(),
 });
@@ -392,7 +400,7 @@ export const PdfImageField = z.object({
   /** Asset id, https URL or token such as {{logo_url}}. Skipped when it resolves to nothing. */
   src: text(2000).default(''),
   fit: z.enum(['contain', 'cover']).default('contain'),
-  mask: z.object({ color: hex, pad: z.number().min(0).max(20).default(1) }).nullable().default(null),
+  mask: MaskSchema.nullable().default(null),
 });
 
 export const PdfQrField = z.object({

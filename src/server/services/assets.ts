@@ -88,3 +88,18 @@ export const listAssets = (app: AppContext, kind: 'image' | 'pdf', campaignId?: 
     `SELECT * FROM assets WHERE kind = ? ${campaignId ? 'AND (campaign_id = ? OR campaign_id IS NULL)' : ''} ORDER BY created_at DESC LIMIT 200`,
     ...(campaignId ? [kind, campaignId] : [kind]),
   );
+
+/** Give a duplicated campaign its own copy of a PDF so deleting one never breaks the other. */
+export async function cloneAsset(app: AppContext, assetId: string, campaignId: string): Promise<AssetRow> {
+  const src = requireAsset(app, assetId);
+  const data = await app.storage.get(src.storage_key);
+  if (!data) throw notFound('Asset file');
+  const id = newId('ast');
+  const key = `assets/${id}${src.storage_key.slice(src.storage_key.lastIndexOf('.'))}`;
+  await app.storage.put(key, data);
+  app.db.run(
+    'INSERT INTO assets (id, kind, filename, mime, size, sha256, storage_key, meta, campaign_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    id, src.kind, src.filename, src.mime, src.size, src.sha256, key, src.meta, campaignId, Date.now(),
+  );
+  return getAsset(app, id)!;
+}

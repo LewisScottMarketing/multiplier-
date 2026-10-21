@@ -120,7 +120,7 @@ const HONORIFICS = /^(?:dr|mr|mrs|ms|miss|mx|prof|professor|sir|dame|rev|hon)\.?
 const CREDENTIALS = /,?\s+\(?(?:ph\.?d|mba|cpa|cfa|pmp|md|dds|esq|jr|sr|ii|iii|iv|cissp|csm|msc|bsc|bba|ma|ba|phr|shrm-?[a-z]*|pe)\)?\.?$/i;
 const PRONOUNS = /\s*\((?:he|she|they|him|her|them|xe|ze)\/[a-z/]+\)\s*/gi;
 // emoji & pictographs; keep letters/marks/numbers/space/basic punctuation
-const EMOJI = /[\p{Extended_Pictographic}‍️]/gu;
+const EMOJI = new RegExp(`[\\p{Extended_Pictographic}${String.fromCodePoint(0x200d, 0xfe0f)}]`, 'gu');
 
 function isMonocase(s: string): boolean {
   const letters = s.replace(/[^\p{L}]/gu, '');

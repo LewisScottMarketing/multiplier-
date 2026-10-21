@@ -66,7 +66,7 @@ export function campaignRoutes() {
     return c.json({ ok: true });
   });
 
-  r.post('/:id/duplicate', (c) => c.json({ campaign: duplicateCampaign(c.get('app'), c.req.param('id')) }, 201));
+  r.post('/:id/duplicate', async (c) => c.json({ campaign: await duplicateCampaign(c.get('app'), c.req.param('id')) }, 201));
 
   r.post('/:id/status', async (c) => {
     const { status } = await jsonBody(c, z.object({ status: z.enum(CAMPAIGN_STATUSES) }));

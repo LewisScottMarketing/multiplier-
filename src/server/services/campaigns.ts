@@ -15,6 +15,7 @@ import type { AppContext } from '../context';
 import { parseJson } from '../db/database';
 import { conflict, notFound } from '../lib/errors';
 import { newId } from '../lib/ids';
+import { cloneAsset } from './assets';
 
 interface CampaignRow {
   id: string;
@@ -68,7 +69,7 @@ export const slugify = (s: string): string =>
   s
     .toLowerCase()
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'campaign';
@@ -215,16 +216,20 @@ export function setCampaignStatus(ctx: AppContext, id: string, status: CampaignS
   return requireCampaign(ctx, id);
 }
 
-export function duplicateCampaign(ctx: AppContext, id: string): Campaign {
+export async function duplicateCampaign(ctx: AppContext, id: string): Promise<Campaign> {
   const src = requireCampaign(ctx, id);
-  // fresh block ids are not needed: ids only have to be unique within one page
-  return createCampaign(ctx, {
+  const copy = createCampaign(ctx, {
     name: `${src.name} (copy)`,
     page: src.page,
-    document: src.document,
+    document: null,
     settings: src.settings,
     source: src.source,
   });
+  if (src.document) {
+    const asset = await cloneAsset(ctx, src.document.asset_id, copy.id);
+    return updateCampaign(ctx, copy.id, { document: { ...src.document, asset_id: asset.id } });
+  }
+  return copy;
 }
 
 export async function deleteCampaign(ctx: AppContext, id: string): Promise<void> {

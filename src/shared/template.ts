@@ -250,16 +250,26 @@ export function safeUrl(url: string, opts: { allowRelative?: boolean; schemes?: 
 }
 
 /**
- * Render a URL template. A template that is exactly one token is taken as a whole URL
- * (`{{website}}`); otherwise every substituted value is percent-encoded so it can sit safely
- * in a path or query string (`https://cal.com/me?name={{full_name}}`).
+ * Render a URL template.
+ *  - A template that is exactly one token is a whole URL (`{{website}}`).
+ *  - A token at the very START that resolves to an absolute URL is inserted as-is, so
+ *    `{{page_url}}?src=pdf` works. It is still scheme-checked afterwards.
+ *  - Every other substituted value is percent-encoded so it can sit safely in a path or query
+ *    (`https://cal.com/me?name={{full_name}}`, `https://{{domain}}/x`).
  */
 export function renderUrl(tpl: string, ctx: Ctx, opts: RenderOptions = {}): string {
-  const segs = parseTemplate(tpl.trim());
-  const only = segs.length === 1 && segs[0].kind === 'token';
-  const rendered = renderTemplate(tpl.trim(), ctx, {
-    onToken: opts.onToken,
-    escape: only ? (s) => s : encodeURIComponent,
+  const trimmed = tpl.trim();
+  const segs = parseTemplate(trimmed);
+  let out = '';
+  segs.forEach((seg, i) => {
+    if (seg.kind === 'text') {
+      out += seg.value;
+      return;
+    }
+    const r = evalToken(seg, ctx);
+    opts.onToken?.(r);
+    const asWhole = (segs.length === 1 || i === 0) && /^(https?:\/\/|mailto:|tel:)/i.test(r.value);
+    out += asWhole ? r.value : encodeURIComponent(r.value);
   });
-  return safeUrl(rendered);
+  return safeUrl(out);
 }

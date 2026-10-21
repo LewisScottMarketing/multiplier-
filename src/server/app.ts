@@ -7,6 +7,7 @@ import { baseMiddleware, dashboardHeaders, errorHandler, type Env } from './http
 import { safeJoin, sendFile } from './lib/static';
 import { authRoutes } from './routes/auth';
 import { campaignRoutes } from './routes/campaigns';
+import { documentRoutes } from './routes/documents';
 import { previewRoutes } from './routes/preview';
 import { prospectRoutes } from './routes/prospects';
 import { publicRoutes } from './routes/public';
@@ -35,10 +36,11 @@ export function createApp(ctx: AppContext) {
   });
 
   // ── Public pages (no auth; every response is tightly scoped) ──────────────
-  const pub = new Hono<Env>();
-  pub.use('*', bodyLimit({ maxSize: 64 * 1024, onError: () => { throw Object.assign(new Error('Request too large'), { status: 413 }); } }));
-  pub.route('/', publicRoutes());
-  app.route('/', pub);
+  // Public endpoints accept tiny bodies (beacons, forms). Scope the limit to THEIR paths only: a
+  // catch-all here would also cap dashboard uploads.
+  const tiny = bodyLimit({ maxSize: 64 * 1024, onError: () => { throw Object.assign(new Error('Request too large'), { status: 413 }); } });
+  for (const prefix of ['/p/*', '/t/*', '/tc/*', '/r/*', '/c/*']) app.use(prefix, tiny);
+  app.route('/', publicRoutes());
   app.route('/', previewRoutes());
 
   // ── Machine API (API key auth) ────────────────────────────────────────────
@@ -53,6 +55,7 @@ export function createApp(ctx: AppContext) {
   const apiLimit = Math.max(ctx.config.maxUploadBytes + 1024 * 1024, 12 * 1024 * 1024);
   api.use('*', bodyLimit({ maxSize: apiLimit, onError: () => { throw Object.assign(new Error('Request too large'), { status: 413 }); } }));
   api.route('/auth', authRoutes());
+  api.route('/campaigns', documentRoutes()); // /import-pdf must be matched before /:id
   api.route('/campaigns', campaignRoutes());
   api.route('/', prospectRoutes());
   api.route('/', settingsRoutes());

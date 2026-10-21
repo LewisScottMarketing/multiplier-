@@ -93,7 +93,7 @@ export function publicRoutes() {
 
     if (isPdf) {
       if (!campaign.document) return gone(c);
-      const { bytes, filename } = await personalizedPdf(app, campaign, contextFor(app, campaign, prospect), `${prospect.id}:${prospect.updated_at}`);
+      const { bytes, filename } = await personalizedPdf(app, campaign, contextFor(app, campaign, prospect), prospect.id);
       if (c.req.method !== 'HEAD') {
         recordEvent(app, { campaignId: campaign.id, prospectId: prospect.id, type: 'download', props: { disposition: c.req.query('dl') ? 'attachment' : 'inline' }, isBot: isBotUa(ua), ip: c.get('ip'), ua });
       }
@@ -120,7 +120,7 @@ export function publicRoutes() {
     const app = c.get('app');
     const found = lookup(c, app, c.req.param('token'));
     if (!found || !found.campaign.document) return gone(c);
-    const png = await personalizedCover(app, found.campaign, contextFor(app, found.campaign, found.prospect), `${found.prospect.id}:${found.prospect.updated_at}`);
+    const png = await personalizedCover(app, found.campaign, contextFor(app, found.campaign, found.prospect), found.prospect.id);
     return new Response(Buffer.from(png), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' } });
   });
 

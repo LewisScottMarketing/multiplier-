@@ -128,6 +128,12 @@ describe('renderUrl', () => {
   it('treats a lone token as a complete URL', () => {
     expect(renderUrl('{{website}}', { website: 'https://acme.com/a?b=c' })).toBe('https://acme.com/a?b=c');
   });
+  it('keeps a leading URL token intact when more text follows it', () => {
+    expect(renderUrl('{{page_url}}?src=pdf', { page_url: 'https://go.test/p/abc' })).toBe('https://go.test/p/abc?src=pdf');
+    expect(renderUrl('{{page_url}}?n={{name}}', { page_url: 'https://go.test/p/abc', name: 'A B' })).toBe('https://go.test/p/abc?n=A%20B');
+    // only the FIRST token gets this treatment
+    expect(renderUrl('https://x.com/?u={{page_url}}', { page_url: 'https://go.test/p/abc' })).toBe('https://x.com/?u=https%3A%2F%2Fgo.test%2Fp%2Fabc');
+  });
   it('refuses a token that resolves to a dangerous scheme', () => {
     expect(renderUrl('{{website}}', { website: 'javascript:alert(1)' })).toBe('');
   });

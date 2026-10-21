@@ -22,8 +22,9 @@ export interface RichOptions {
   onToken?: (r: TokenResult) => void;
 }
 
-const OPEN = '';
-const CLOSE = '';
+// private-use code points: never appear in real text, so they can safely stand in for tokens
+const OPEN = String.fromCharCode(0xe000);
+const CLOSE = String.fromCharCode(0xe001);
 const PLACEHOLDER_RE = new RegExp(`${OPEN}(\\d+)${CLOSE}`, 'g');
 
 interface Protected {

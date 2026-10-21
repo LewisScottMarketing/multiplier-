@@ -54,7 +54,7 @@ describe('rich text', () => {
   });
 
   it('cannot be fooled by forged placeholder characters in the template', () => {
-    const html = renderInline('a 0 b', { first_name: 'X' });
+    const html = renderInline(`a ${String.fromCharCode(0xe000)}0${String.fromCharCode(0xe001)} b`, { first_name: 'X' });
     expect(html).not.toContain('X');
   });
 });

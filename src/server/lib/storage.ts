@@ -48,6 +48,16 @@ export class Storage {
     await fs.promises.rm(this.resolve(key), { force: true });
   }
 
+  /** File names directly inside a "directory" (empty if it doesn't exist). */
+  async list(prefix: string): Promise<string[]> {
+    try {
+      return await fs.promises.readdir(this.resolve(prefix));
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw e;
+    }
+  }
+
   /** Deletes every file whose key starts with `prefix/` (a "directory"). */
   async deletePrefix(prefix: string): Promise<void> {
     await fs.promises.rm(this.resolve(prefix), { recursive: true, force: true });
