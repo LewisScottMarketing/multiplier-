@@ -1,11 +1,9 @@
-import { AlertTriangle, ExternalLink, Monitor, RefreshCw, Smartphone, Tablet, UserRound } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Monitor, RefreshCw, Smartphone, Tablet } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { SAMPLE_PROSPECTS } from '@shared/fields';
-import { api, qs } from '../../api';
-import { useCampaign, type PreviewSource } from '../../campaign';
-import { personName } from '../../lib/format';
-import type { ProspectItem } from '../../types';
-import { Button, Input, Menu, Modal, Segmented, Spinner } from '../../ui';
+import { api } from '../../api';
+import { useCampaign } from '../../campaign';
+import { PreviewAs, sourceToApi } from '../../components/PreviewAs';
+import { Button, Segmented, Spinner } from '../../ui';
 
 type Device = 'desktop' | 'tablet' | 'mobile';
 const WIDTH: Record<Device, string> = { desktop: '100%', tablet: '820px', mobile: '390px' };
@@ -15,37 +13,6 @@ interface PreviewResult {
   blocks: string[];
   tokens: { missing: string[]; fallbacks: string[] };
   context: Record<string, unknown>;
-}
-
-export const sourceToApi = (s: PreviewSource) => (s.kind === 'prospect' ? { kind: 'prospect' as const, id: s.id } : s);
-
-function sourceLabel(s: PreviewSource): string {
-  if (s.kind === 'sample') return personName(SAMPLE_PROSPECTS[s.index] ?? SAMPLE_PROSPECTS[0]!);
-  if (s.kind === 'prospect') return s.label;
-  return 'No data (fallbacks)';
-}
-
-function ProspectPicker({ onPick, onClose }: { onPick: (p: ProspectItem) => void; onClose: () => void }) {
-  const c = useCampaign();
-  const [q, setQ] = useState('');
-  const [rows, setRows] = useState<ProspectItem[] | null>(null);
-  useEffect(() => {
-    const t = setTimeout(() => api.get<{ prospects: ProspectItem[] }>(`/campaigns/${c.id}/prospects${qs({ q, limit: 20 })}`).then((r) => setRows(r.prospects)), 200);
-    return () => clearTimeout(t);
-  }, [q, c.id]);
-  return (
-    <Modal title="Preview as a real prospect" onClose={onClose}>
-      <Input autoFocus placeholder="Search by name, company or email" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="col" style={{ gap: 2, marginTop: 12 }}>
-        {rows === null ? <div className="viz-empty"><Spinner /></div> : !rows.length ? <div className="viz-empty">No prospects yet. Send one through from Clay or add one on the Audience tab.</div> : rows.map((p) => (
-          <button key={p.id} className="btn ghost" style={{ justifyContent: 'flex-start', height: 'auto', padding: '8px 10px' }} onClick={() => onPick(p)}>
-            <UserRound size={15} />
-            <span style={{ textAlign: 'left' }}><b>{personName(p)}</b><br /><span className="muted small">{[p.job_title, p.company].filter(Boolean).join(' · ') || p.email}</span></span>
-          </button>
-        ))}
-      </div>
-    </Modal>
-  );
 }
 
 export function Preview({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string) => void }) {
@@ -61,7 +28,6 @@ export function Preview({ selectedId, onSelect }: { selectedId: string | null; o
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
-  const [picking, setPicking] = useState(false);
   const [nonce, setNonce] = useState(0);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
@@ -134,28 +100,7 @@ export function Preview({ selectedId, onSelect }: { selectedId: string | null; o
   return (
     <div className="pv">
       <div className="pv-bar">
-        <Menu
-          align="left"
-          trigger={(_o, toggle) => (
-            <Button size="sm" onClick={toggle}>
-              <UserRound size={14} /> Preview as <b>{sourceLabel(c.previewSource)}</b>
-            </Button>
-          )}
-        >
-          {(close) => (
-            <>
-              <div className="tiny muted" style={{ padding: '6px 10px', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 650 }}>Sample people</div>
-              {SAMPLE_PROSPECTS.map((p, i) => (
-                <button key={i} onClick={() => { c.setPreviewSource({ kind: 'sample', index: i }); close(); }}>
-                  <span><b>{personName(p)}</b><br /><span className="muted tiny">{p.job_title} · {p.company}</span></span>
-                </button>
-              ))}
-              <hr />
-              <button onClick={() => { c.setPreviewSource({ kind: 'empty' }); close(); }}>No data — see the fallbacks</button>
-              <button onClick={() => { setPicking(true); close(); }}>A real prospect…</button>
-            </>
-          )}
-        </Menu>
+        <PreviewAs />
         {persona ? <span className="sample-pill" title="Segment derived from the job title">{persona}</span> : <span className="muted small">No job title → no segment</span>}
         {missing.length ? (
           <span className="badge warn" title={`Empty with no fallback: ${missing.join(', ')}`}><AlertTriangle size={11} /> {missing.length} empty field{missing.length === 1 ? '' : 's'}</span>
@@ -189,7 +134,6 @@ export function Preview({ selectedId, onSelect }: { selectedId: string | null; o
           ))}
         </div>
       </div>
-      {picking ? <ProspectPicker onClose={() => setPicking(false)} onPick={(p) => { c.setPreviewSource({ kind: 'prospect', id: p.id, label: personName(p) }); setPicking(false); }} /> : null}
     </div>
   );
 }

@@ -29,7 +29,9 @@ const shot = async (name, fn) => {
   }
 };
 
-await shot('login', async () => { await page.goto(`${BASE}/`); await page.waitForSelector('form'); });
+await page.goto(`${BASE}/`);
+await page.waitForSelector('form');
+await shot('login', async () => undefined);
 await page.fill('input[type=email]', EMAIL);
 await page.fill('input[type=password]', PASSWORD);
 await page.click('button[type=submit]');
@@ -42,10 +44,15 @@ await shot('builder', async () => { await page.goto(`${BASE}/campaigns/${campaig
 await shot('builder-block', async () => { await page.click('.bl-row:nth-child(2)'); await page.waitForTimeout(1500); });
 await shot('builder-design', async () => { await page.click('text=Design'); await page.waitForTimeout(600); });
 await shot('builder-mobile', async () => { await page.click('text=Blocks'); await page.click('[title="Phone"]'); await page.waitForTimeout(1800); });
-await shot('pdf', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/pdf`); await page.waitForTimeout(2500); });
+await shot('pdf', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/pdf`); await page.waitForSelector('.pdf-page'); await page.waitForTimeout(1800); });
+await shot('pdf-field', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/pdf`); await page.waitForSelector('.pdf-field'); await page.waitForTimeout(800); await page.locator('.pdf-field.t-text').first().click(); await page.waitForTimeout(700); });
+await shot('pdf-preview', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/pdf`); await page.waitForSelector('.pdf-page'); await page.locator('.st-bar button', { hasText: 'Preview' }).first().click(); await page.waitForSelector('.pdf-preview', { timeout: 20000 }); await page.waitForTimeout(1500); });
 await shot('audience', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/audience`); await page.waitForSelector('table'); });
+await shot('audience-drawer', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/audience`); await page.waitForSelector('tbody tr.click'); await page.locator('tbody tr.click').nth(5).click(); await page.waitForSelector('.drawer'); await page.waitForTimeout(900); });
+await shot('audience-import', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/audience`); await page.waitForSelector('table'); await page.locator('button', { hasText: 'Import CSV' }).click(); await page.waitForSelector('.modal'); });
 await shot('analytics', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/analytics`); await page.waitForSelector('.viz-card'); await page.waitForTimeout(800); });
 await shot('campaign-settings', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/settings`); await page.waitForTimeout(800); });
 await shot('integrations', async () => { await page.goto(`${BASE}/integrations`); await page.waitForTimeout(1000); });
+await shot('integrations-webhooks', async () => { await page.goto(`${BASE}/integrations`); await page.waitForTimeout(800); await page.locator('text=Send engagement back').scrollIntoViewIfNeeded(); await page.evaluate(() => document.querySelector('.main').scrollBy(0, 560)); });
 await shot('settings', async () => { await page.goto(`${BASE}/settings`); await page.waitForTimeout(800); });
 await browser.close();

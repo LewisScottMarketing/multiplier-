@@ -8,6 +8,10 @@ import { createApiKey } from '../src/server/auth/apikeys';
 import { countUsers, createUser } from '../src/server/auth/users';
 import { loadConfig } from '../src/server/config';
 import { closeContext, createContext } from '../src/server/context';
+import { newBlockId } from '../src/shared/blocks';
+import type { PdfField } from '../src/shared/schema';
+import { fieldFromRun } from '../src/server/pdf/fields';
+import { studioPage } from '../src/server/services/documents';
 import { importPdfCampaign } from '../src/server/services/importer';
 import { setCampaignStatus, updateCampaign } from '../src/server/services/campaigns';
 import { recordEvent } from '../src/server/services/events';
@@ -81,8 +85,20 @@ async function main() {
       rule: { match: 'all', conditions: [{ field: 'department', op: 'in', value: 'sales, executive' }] }, bg: 'alt',
     },
   );
+
+  // the PDF: the cover says "Prepared for [Company Name]", so swap that for the prospect's company and
+  // add a QR code that leads back to their page
+  const document = structuredClone(campaign.document!);
+  const cover = (await studioPage(ctx, document, 1)).page;
+  const prepared = cover.runs.find((r) => /Prepared for/.test(r.text));
+  const extra: PdfField[] = [];
+  if (prepared) extra.push(fieldFromRun(cover, prepared, { template: 'Prepared for {{company_short|your team}}' }));
+  extra.push({ id: `f_${newBlockId()}`, type: 'qr', page: 1, rect: { x: cover.width - 118, y: cover.height - 124, w: 72, h: 72 }, url: '{{page_url}}', color: '#0f172a', background: '#ffffff', label: 'QR to their page' });
+  document.fields.push(...extra);
+
   updateCampaign(ctx, campaign.id, {
     page,
+    document,
     settings: { ...campaign.settings, required_fields: ['first_name', 'company'], allow_url_params: true, ai_fields: [], clean_names: true },
   });
   const live = setCampaignStatus(ctx, campaign.id, 'live');

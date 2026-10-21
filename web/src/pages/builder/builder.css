@@ -12,7 +12,6 @@
 .bl-row.sel { border-color: var(--brand); background: var(--brand-50); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
 .bl-grip { border: 0; background: none; color: var(--ink-4); cursor: grab; padding: 4px 2px; display: grid; place-items: center; touch-action: none; }
 .bl-grip:hover { color: var(--ink-2); }
-.bl-ico { width: 28px; height: 28px; border-radius: 8px; background: var(--bg); display: grid; place-items: center; color: var(--ink-2); flex: none; }
 .bl-row.sel .bl-ico { background: var(--panel); color: var(--brand-600); }
 .bl-title { font-size: 13px; font-weight: 620; display: flex; align-items: center; gap: 6px; }
 .bl-title .badge { height: 17px; font-size: 10.5px; padding: 0 6px; }
@@ -30,10 +29,12 @@
 .be-toggle:hover h4 { color: var(--ink); }
 
 .pv { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-.pv-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; }
+.pv-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex: none; min-width: 0; }
+.pv-bar .sample-pill { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .pv-stage { flex: 1; min-height: 0; overflow: auto; padding: 18px; display: flex; justify-content: center; background: #e9ebf3; }
 .pv-frame { position: relative; background: #fff; border-radius: 10px; box-shadow: var(--shadow-2); height: 100%; min-height: 480px; max-width: 100%; transition: width .2s; overflow: hidden; flex: none; }
 .pv-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; transition: opacity .12s; }
 
-@media (max-width: 1280px) { .builder { grid-template-columns: 280px minmax(0, 1fr) 330px; } }
+@media (max-width: 1500px) { .builder { grid-template-columns: 288px minmax(0, 1fr) 348px; } }
+@media (max-width: 1280px) { .builder { grid-template-columns: 264px minmax(0, 1fr) 320px; } }
 @media (max-width: 1060px) { .builder { grid-template-columns: 260px minmax(0, 1fr); } .b-right { position: fixed; right: 0; top: 112px; bottom: 0; width: 340px; z-index: 40; box-shadow: var(--shadow-2); } }

@@ -1,19 +1,39 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Copy, Eye, EyeOff, GripVertical, Plus, Trash2, Users } from 'lucide-react';
-import * as Lucide from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { AlignLeft, BadgeCheck, BarChart3, CalendarDays, CircleHelp, Code, Copy, Eye, EyeOff, FileDown, GripVertical, Image as ImageIcon, LayoutGrid, ListChecks, ListOrdered, MessageSquareHeart, Minus, MousePointerClick, PanelTop, PlayCircle, Plus, Quote, Square, TextCursorInput, Trash2, Users, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { BLOCK_TYPES, newBlock, newBlockId } from '@shared/blocks';
 import { describeRule } from '@shared/conditions';
 import type { Block, BlockType } from '@shared/schema';
+import { api } from '../../api';
 import { useCampaign } from '../../campaign';
+import type { SettingsResponse } from '../../types';
 import { Button, Modal } from '../../ui';
 
-const iconFor = (name: string) => {
-  const pascal = name.split('-').map((p) => p[0]!.toUpperCase() + p.slice(1)).join('');
-  return ((Lucide as unknown as Record<string, Lucide.LucideIcon>)[pascal] ?? Lucide.Square) as Lucide.LucideIcon;
+// Explicit map (rather than `import *`) so the bundler can drop every icon we don't use.
+const BLOCK_ICONS: Record<string, LucideIcon> = {
+  'panel-top': PanelTop,
+  'message-square-heart': MessageSquareHeart,
+  'align-left': AlignLeft,
+  'layout-grid': LayoutGrid,
+  'list-checks': ListChecks,
+  'list-ordered': ListOrdered,
+  image: ImageIcon,
+  'play-circle': PlayCircle,
+  'bar-chart-3': BarChart3,
+  quote: Quote,
+  'badge-check': BadgeCheck,
+  'mouse-pointer-click': MousePointerClick,
+  'text-cursor-input': TextCursorInput,
+  'calendar-days': CalendarDays,
+  'file-down': FileDown,
+  'circle-help': CircleHelp,
+  code: Code,
+  minus: Minus,
 };
+const iconFor = (name: string): LucideIcon => BLOCK_ICONS[name] ?? Square;
 
 export function blockSummary(b: Block): string {
   const s = (v: unknown) => String(v ?? '').replace(/\{\{[^}]*\}\}/g, '…').replace(/\s+/g, ' ').trim();
@@ -103,6 +123,7 @@ export function BlockList({ selectedId, onSelect }: { selectedId: string | null;
   const c = useCampaign();
   const blocks = c.draft.page.blocks;
   const [adding, setAdding] = useState(false);
+  const sender = useQuery({ queryKey: ['settings'], queryFn: () => api.get<SettingsResponse>('/settings'), staleTime: 60_000 }).data?.workspace.sender;
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const onDragEnd = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return;
@@ -113,7 +134,11 @@ export function BlockList({ selectedId, onSelect }: { selectedId: string | null;
     });
   };
   const add = (type: BlockType) => {
-    const block = newBlock(type);
+    let block = newBlock(type);
+    // a new personal note starts out signed by the workspace's sender
+    if (block.type === 'note' && sender?.name) {
+      block = { ...block, from_name: sender.name, from_role: sender.role || undefined, avatar: /^ast_/.test(sender.avatar) ? { src: sender.avatar, alt: sender.name } : undefined };
+    }
     c.setPage((p) => {
       const at = selectedId ? p.blocks.findIndex((b) => b.id === selectedId) : -1;
       const i = at >= 0 ? at + 1 : p.blocks.length;

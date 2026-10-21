@@ -30,6 +30,7 @@ export function TokenField({
   mono,
   small,
   noTokens,
+  autoFocus,
 }: {
   label?: ReactNode;
   hint?: ReactNode;
@@ -41,6 +42,7 @@ export function TokenField({
   mono?: boolean;
   small?: boolean;
   noTokens?: boolean;
+  autoFocus?: boolean;
 }) {
   const c = useCampaign();
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
@@ -90,6 +92,7 @@ export function TokenField({
     ref,
     value,
     placeholder,
+    autoFocus,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
     style: mono ? { fontFamily: 'var(--mono)', fontSize: 12.5 } : undefined,
   };

@@ -121,7 +121,7 @@ strong{font-weight:650}
 
 /* hero */
 .hero .badge{display:inline-flex;align-items:center;gap:8px;background:var(--soft);color:var(--brand);border-radius:999px;padding:.38em .95em;font-size:.88rem;font-weight:600;margin-bottom:1.4rem}
-.bg-brand .hero .badge,.bg-dark .hero .badge{color:var(--text)}
+.bg-brand .badge,.bg-dark .badge{color:var(--text)}
 .hero-grid{display:grid;grid-template-columns:1.08fr .92fr;gap:56px;align-items:center}
 .hero.align-center .hero-grid{grid-template-columns:1fr;text-align:center}
 .hero-media img{width:100%;border-radius:var(--radius);box-shadow:0 30px 60px -20px rgba(15,23,42,.35),0 0 0 1px rgba(15,23,42,.06)}

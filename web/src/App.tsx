@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderKanban, LayoutDashboard, LogOut, Plug, Settings as SettingsIcon } from 'lucide-react';
 import { lazy, Suspense } from 'react';
-import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useMatch } from 'react-router-dom';
 import { api, ApiError } from './api';
 import { Audience } from './pages/Audience';
 import { CampaignLayout } from './pages/CampaignLayout';
@@ -26,25 +26,27 @@ function Shell({ user }: { user: User }) {
     qc.clear();
     qc.setQueryData(['me'], null);
   };
+  // inside a campaign the editor needs the width, so the app menu folds down to icons
+  const compact = !!useMatch('/campaigns/:id/*');
   return (
-    <div className="app">
+    <div className={`app ${compact ? 'compact' : ''}`}>
       <aside className="sidebar">
-        <NavLink to="/" className="logo">
+        <NavLink to="/" className="logo" title="Multiplier">
           <LogoMark />
-          Multiplier
+          <span className="label">Multiplier</span>
         </NavLink>
-        <NavLink to="/" end className="nav-link">
-          <LayoutDashboard size={17} /> Overview
+        <NavLink to="/" end className="nav-link" title="Overview">
+          <LayoutDashboard size={17} /> <span className="label">Overview</span>
         </NavLink>
-        <NavLink to="/campaigns" className="nav-link">
-          <FolderKanban size={17} /> Campaigns
+        <NavLink to="/campaigns" className="nav-link" title="Campaigns">
+          <FolderKanban size={17} /> <span className="label">Campaigns</span>
         </NavLink>
         <div className="nav-section">Connect</div>
-        <NavLink to="/integrations" className="nav-link">
-          <Plug size={17} /> Clay &amp; integrations
+        <NavLink to="/integrations" className="nav-link" title="Clay & integrations">
+          <Plug size={17} /> <span className="label">Clay &amp; integrations</span>
         </NavLink>
-        <NavLink to="/settings" className="nav-link">
-          <SettingsIcon size={17} /> Settings
+        <NavLink to="/settings" className="nav-link" title="Settings">
+          <SettingsIcon size={17} /> <span className="label">Settings</span>
         </NavLink>
         <div className="sidebar-foot">
           <Menu
