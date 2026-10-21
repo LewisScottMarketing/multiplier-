@@ -5,6 +5,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { AppContext } from './context';
 import { baseMiddleware, dashboardHeaders, errorHandler, type Env } from './http';
 import { safeJoin, sendFile } from './lib/static';
+import { analyticsRoutes } from './routes/analytics';
 import { authRoutes } from './routes/auth';
 import { campaignRoutes } from './routes/campaigns';
 import { documentRoutes } from './routes/documents';
@@ -57,6 +58,7 @@ export function createApp(ctx: AppContext) {
   api.route('/auth', authRoutes());
   api.route('/campaigns', documentRoutes()); // /import-pdf must be matched before /:id
   api.route('/campaigns', campaignRoutes());
+  api.route('/', analyticsRoutes());
   api.route('/', prospectRoutes());
   api.route('/', settingsRoutes());
   app.route('/api', api);

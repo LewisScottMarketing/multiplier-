@@ -27,6 +27,8 @@ export interface EventInput {
   sessionId?: string | null;
   ip?: string;
   ua?: string;
+  /** Override the timestamp (seeding and imports only). */
+  at?: number;
 }
 
 const score = (p: { views: number; clicks: number; downloads: number; submissions: number; engaged_seconds: number }) =>
@@ -42,7 +44,7 @@ const score = (p: { views: number; clicks: number; downloads: number; submission
 
 /** Stores the event and keeps the prospect's counters in step. Returns true if it was newly recorded. */
 export function recordEvent(ctx: AppContext, e: EventInput): boolean {
-  const now = Date.now();
+  const now = e.at ?? Date.now();
   const bot = e.isBot ? 1 : 0;
   const ua = e.ua?.slice(0, 250) ?? null;
   const ipHash = e.ip ? hashIp(ctx, e.ip) : null;

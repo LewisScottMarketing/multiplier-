@@ -1,0 +1,72 @@
+/* Chart tokens: the validated reference palette (blue/orange categorical pair, blue ordinal ramp) */
+.viz {
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --ramp-1: #86b6ef;
+  --ramp-2: #3987e5;
+  --ramp-3: #1c5cab;
+  --ramp-4: #0d366b;
+  --v-surface: #ffffff;
+  --v-ink: #0b0b0b;
+  --v-ink-2: #52514e;
+  --v-muted: #898781;
+  --v-grid: #e1e0d9;
+  --v-axis: #c3c2b7;
+  --v-track: #eef4fc;
+  position: relative;
+  font-variant-numeric: normal;
+}
+.viz-card { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 18px 20px 20px; }
+.viz-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.viz-head h3 { font-size: 14.5px; font-weight: 650; }
+.viz-head p { color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
+.viz-body { transition: opacity .15s; }
+.viz-body.stale { opacity: 0.55; }
+
+/* stat tile: label, value (proportional figures), sub-line, optional sparkline */
+.tile { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 16px 18px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tile .lbl { font-size: 12.5px; color: var(--ink-3); font-weight: 560; }
+.tile .val { font-size: 30px; font-weight: 680; letter-spacing: -0.03em; line-height: 1.15; color: var(--ink); }
+.tile .sub { font-size: 12.5px; color: var(--ink-3); }
+.tile .spark { margin-top: 8px; height: 28px; }
+.tile.hero .val { font-size: 52px; }
+
+/* time series */
+.ts { width: 100%; display: block; touch-action: pan-y; }
+.ts:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; border-radius: 4px; }
+.ts text { font-family: var(--font); fill: var(--v-muted); font-size: 11.5px; }
+.ts .grid { stroke: var(--v-grid); stroke-width: 1; }
+.ts .axis { stroke: var(--v-axis); stroke-width: 1; }
+.ts .line { fill: none; stroke: var(--s1); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ts .area { fill: var(--s1); opacity: 0.1; }
+.ts .cross { stroke: var(--v-axis); stroke-width: 1; }
+.ts .dot { fill: var(--s1); stroke: var(--v-surface); stroke-width: 2; }
+.viz-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--panel); border-radius: 9px; box-shadow: var(--shadow-2); padding: 8px 11px; font-size: 12.5px; white-space: nowrap; min-width: 120px; }
+.viz-tip .v { font-size: 15px; font-weight: 700; color: var(--v-ink); display: flex; align-items: center; gap: 7px; }
+.viz-tip .v i { width: 12px; height: 3px; border-radius: 2px; background: var(--s1); display: inline-block; }
+.viz-tip .d { color: var(--v-ink-2); margin-top: 1px; }
+
+/* horizontal bars: thin, rounded data-end, square baseline */
+.hbars { display: flex; flex-direction: column; gap: 14px; }
+.hbar { display: grid; grid-template-columns: minmax(90px, 0.9fr) 2.4fr; align-items: center; gap: 12px; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
+.hbar:hover, .hbar:focus-visible { background: #f4f6fb; }
+.hbar .name { font-size: 13px; color: var(--v-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar .plot { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hbar .bar { height: 12px; border-radius: 0 4px 4px 0; background: var(--s1); min-width: 2px; transition: filter .12s; }
+.hbar:hover .bar { filter: brightness(1.12); }
+.hbar .num { font-size: 13px; font-weight: 650; color: var(--v-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hbar .num small { font-weight: 500; color: var(--v-muted); margin-left: 4px; }
+.funnel .hbar { grid-template-columns: 110px 1fr; }
+.funnel .bar { height: 22px; }
+.stacked { display: flex; gap: 2px; height: 12px; }
+.stacked > i { display: block; height: 100%; min-width: 3px; }
+.stacked > i:first-child { border-radius: 4px 0 0 4px; }
+.stacked > i:last-child { border-radius: 0 4px 4px 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--v-ink-2); margin-top: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.viz-empty { padding: 28px 8px; text-align: center; color: var(--ink-3); font-size: 13px; }
+table.viz-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.viz-table th, .viz-table td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+.viz-table th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 650; }
+.viz-table td:not(:first-child), .viz-table th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }

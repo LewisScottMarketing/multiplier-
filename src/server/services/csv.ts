@@ -27,7 +27,7 @@ export const MAX_IMPORT_ROWS = 5000;
 export function parseCsv(buf: Buffer): ParsedCsv {
   let records: Array<Record<string, string>>;
   try {
-    records = parse(buf, { columns: (h: string[]) => h.map((x) => x.trim()), skip_empty_lines: true, bom: true, relax_column_count: true, trim: true, max_record_size: 100_000 });
+    records = parse(buf, { columns: (h: string[]) => h.map((x) => x.trim()), skip_empty_lines: true, skip_records_with_empty_values: true, bom: true, relax_column_count: true, relax_quotes: true, trim: true, max_record_size: 100_000 });
   } catch (e) {
     throw badRequest(`Couldn’t read that CSV: ${(e as Error).message}`);
   }
