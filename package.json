@@ -15,6 +15,7 @@
     "build:web": "vite build --config web/vite.config.ts",
     "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server/index.js && esbuild scripts/seed.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/seed.js",
     "start": "node --disable-warning=ExperimentalWarning dist/server/index.js",
+    "demo": "node scripts/demo.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p web/tsconfig.json",

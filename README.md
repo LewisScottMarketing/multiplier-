@@ -43,19 +43,45 @@ flowchart LR
 
 ## Quick start
 
-You need **Node 22.13 or newer**.
+You need **Node 22.13 or newer** (the current LTS from [nodejs.org](https://nodejs.org) is fine).
 
 ```bash
 git clone <this repo> && cd multiplier-
 npm install
-cp .env.example .env        # optional for local use
-npm run seed                # optional: a demo workspace with 28 prospects and activity
-npm run dev                 # API on :3000, dashboard on http://localhost:5173
+npm run demo
 ```
 
-Open <http://localhost:5173>. On a fresh database you'll be asked to create your account; after `npm run seed` sign in with `demo@multiplier.local` / `multiplier-demo`.
+`npm run demo` builds the app (the first time only), loads a demo workspace with 28 prospects and activity (also only the first time), starts everything on <http://localhost:3000> (or the next free port) and opens your browser. Sign in with `demo@multiplier.local` / `multiplier-demo`, then open **Outbound Playbook — Q4**. Leave the terminal window open; **Ctrl+C** stops it.
+
+No git? On the repository page choose **Code → Download ZIP**, unzip it, and open a terminal inside the folder.
+
+To start with an empty workspace instead (you'll be asked to create your account), use the [production build](#production-build) below, which doesn't load demo data.
 
 Then: **New campaign → drop a PDF → publish.** The Integrations screen walks through connecting Clay.
+
+<details>
+<summary>It didn't work?</summary>
+
+| You see | Do this |
+|---|---|
+| `node` or `npm` "is not recognized" / "command not found" | Close the terminal, open a **new** one (a terminal only notices a fresh install when it starts), and try `node -v`. It should print `v22.13` or higher. |
+| `node -v` prints something older | Install the current LTS from nodejs.org, then open a new terminal. |
+| Windows: "running scripts is disabled on this system" | Use **Command Prompt** instead of PowerShell, or run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once in PowerShell. |
+| "Could not read package.json" or "no such file" | The terminal isn't inside the project folder. `cd` into the folder that contains `package.json`. |
+| "Run npm install first" | Run `npm install` and wait for it to finish, then `npm run demo`. |
+| The browser shows "can't reach this page" | The terminal must stay open and show the "Multiplier is running" box. Use the address printed there, which can be `:3001` if `:3000` was taken. |
+| Anything else | Copy the last 20 lines of the terminal into an issue or a message to whoever is helping. |
+
+</details>
+
+### Developing
+
+```bash
+npm run seed                # optional: the demo workspace, if you haven't run `npm run demo`
+npm run dev                 # API on :3000, dashboard on http://localhost:5173 (open this one)
+```
+
+After `npm run seed`, sign in with `demo@multiplier.local` / `multiplier-demo`. On an empty database you'll be asked to create your account.
 
 ### Production build
 
@@ -218,6 +244,7 @@ See [SECURITY.md](SECURITY.md) for the details and how to report a problem. Mult
 ## Development
 
 ```bash
+npm run demo           # build if needed, load demo data once, start, open the browser
 npm run dev            # API (watch) + dashboard (Vite, proxied)
 npm test               # 290+ unit and integration tests
 npm run typecheck

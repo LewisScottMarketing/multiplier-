@@ -134,7 +134,10 @@ export function createApp(ctx: AppContext) {
     if (c.req.path.startsWith('/api/')) return c.json({ error: { code: 'not_found', message: 'Not found' } }, 404);
     const index = path.join(webDir, 'index.html');
     if (!fs.existsSync(index)) {
-      return c.text('Dashboard not built. Run `npm run build`, or use `npm run dev` and open http://localhost:5173.', 503);
+      return c.text(
+        'The dashboard hasn’t been built here. If you started the app with `npm run dev`, open http://localhost:5173 instead. Otherwise run `npm run demo` (or `npm run build`), then reload.',
+        503,
+      );
     }
     const res = await sendFile(c, index, { headers: SHELL_HEADERS });
     return res ?? c.notFound();
