@@ -1,0 +1,9 @@
+.scratch/
+node_modules/
+dist/
+.data/
+*.log
+.env
+.DS_Store
+coverage/
+test-results/
