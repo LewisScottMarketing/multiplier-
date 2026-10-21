@@ -168,7 +168,7 @@ Public pages set no cookies. Each visit sends an anonymous per-visit ID; IP addr
 
 Add an Anthropic API key and three things appear: **AI fields** (a short personal line per prospect, used as `{{ai_opening}}`), **Write a version for…** on text blocks, and a polish step on PDF import that never overrides copy that already reads well. It improves the *words*, not the layout or colours. Failures, timeouts and refusals fall back to your fallback text and show up as `warnings` in the API response. For AI fields, a prospect's name, company, job title and custom fields are sent to Anthropic; email addresses and LinkedIn URLs never are. Try the screens without a key using `npm run dev:fake-ai`.
 
-**Getting a key.** In the [Claude Console](https://platform.claude.com), which is separate from (and billed separately to) a Claude.ai chat subscription: add credit under **Settings → Billing → Buy credits**, then go to [**API keys → Create key**](https://platform.claude.com/settings/keys) and choose a workspace for it (the Default one is fine; a key without a workspace also needs `ANTHROPIC_WORKSPACE_ID`). Copy the key (it starts `sk-ant-` and is shown once), then:
+**Getting a key.** In the [Claude Console](https://platform.claude.com) (the API has its own account and balance, separate from the Claude.ai chat app; some plans include a monthly API credit, which the Billing page shows): add credit under **Settings → Billing → Buy credits**, then go to [**API keys → Create key**](https://platform.claude.com/settings/keys) and choose a workspace for it (the Default one is fine; a key without a workspace also needs `ANTHROPIC_WORKSPACE_ID`). Copy the key (it starts `sk-ant-` and is shown once), then:
 
 ```bash
 cp .env.example .env        # once
