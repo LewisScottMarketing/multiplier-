@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createApiKey } from '../src/server/auth/apikeys';
 import { countUsers, createUser } from '../src/server/auth/users';
-import { loadConfig } from '../src/server/config';
+import { loadConfig, loadDotEnv } from '../src/server/config';
 import { closeContext, createContext } from '../src/server/context';
 import { newBlockId } from '../src/shared/blocks';
 import type { PdfField } from '../src/shared/schema';
@@ -56,6 +56,7 @@ let seedState = 42;
 const rnd = () => ((seedState = (seedState * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
 async function main() {
+  loadDotEnv();
   const config = loadConfig();
   const ctx = createContext(config);
   if (countUsers(ctx) === 0) {

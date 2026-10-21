@@ -43,6 +43,18 @@ function proxyHops(v: string | undefined): number {
 
 const stripSlash = (u: string) => u.replace(/\/+$/, '');
 
+/**
+ * Read `.env` from the working directory into process.env for local runs. Variables that are already
+ * set (a container's environment, your shell) always win. Entrypoints call this; tests don't.
+ */
+export function loadDotEnv(file = '.env'): void {
+  try {
+    process.loadEnvFile(file);
+  } catch {
+    /* no .env file, which is fine */
+  }
+}
+
 export function loadConfig(env: Env = process.env): Config {
   const nodeEnv = (env.NODE_ENV as Config['env']) || 'development';
   const port = Number(env.PORT || 3000);

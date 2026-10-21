@@ -1,12 +1,13 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app';
 import { createUser, countUsers } from './auth/users';
-import { loadConfig } from './config';
+import { loadConfig, loadDotEnv } from './config';
 import { closeContext, createContext } from './context';
 import { purgeExpiredSessions } from './auth/sessions';
 import { startWebhookWorker } from './services/webhooks';
 
 async function main() {
+  loadDotEnv();
   const config = loadConfig();
   const ctx = createContext(config);
 

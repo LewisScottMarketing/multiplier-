@@ -8,7 +8,7 @@
  */
 import { serve } from '@hono/node-server';
 import { createApp } from '../src/server/app';
-import { loadConfig } from '../src/server/config';
+import { loadConfig, loadDotEnv } from '../src/server/config';
 import { createContext } from '../src/server/context';
 import { setAiBackend, type AiBackend, type AiResult } from '../src/server/services/ai';
 import { startWebhookWorker } from '../src/server/services/webhooks';
@@ -43,6 +43,7 @@ const backend: AiBackend = {
   },
 };
 
+loadDotEnv();
 const config = loadConfig();
 const ctx = createContext(config);
 setAiBackend(ctx, backend);

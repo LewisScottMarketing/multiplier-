@@ -107,7 +107,7 @@ function WebhookModal({ hook, campaigns, onClose, onSaved }: { hook?: WebhookInf
           </div>
         ) : null}
         {kind === 'clay' ? (
-          <Alert>In Clay, create a table with a <b>Webhook</b> source (<i>Import → Webhook</i>) and paste its URL below. If you turn on authentication for it, add the token too. Then send a test event so Clay learns the columns.</Alert>
+          <Alert>In Clay, create a table with a <b>Webhook</b> source (<i>Import → Webhook</i>) and paste its URL below. If Clay shows an auth token for it, add the header name and token below. Then send a test event so Clay learns the columns.</Alert>
         ) : null}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
           <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={KIND[kind].label} /></Field>
@@ -115,7 +115,7 @@ function WebhookModal({ hook, campaigns, onClose, onSaved }: { hook?: WebhookInf
         </div>
         {kind !== 'slack' ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
-            <Field label="Auth header" hint={kind === 'clay' ? 'Clay’s default.' : 'Optional.'}><Input value={authHeader} onChange={(e) => setAuthHeader(e.target.value)} placeholder="x-clay-webhook-auth" style={{ fontFamily: 'var(--mono)' }} /></Field>
+            <Field label="Auth header" hint={kind === 'clay' ? 'The name your Clay webhook shows.' : 'Optional.'}><Input value={authHeader} onChange={(e) => setAuthHeader(e.target.value)} placeholder="x-clay-webhook-auth" style={{ fontFamily: 'var(--mono)' }} /></Field>
             <Field label="Auth value" hint={hook?.has_auth_value ? 'Leave empty to keep the saved value.' : 'Stored encrypted.'}>
               <Input type="password" value={authValue} onChange={(e) => setAuthValue(e.target.value)} placeholder={hook?.has_auth_value ? '••••••••' : ''} autoComplete="off" />
             </Field>

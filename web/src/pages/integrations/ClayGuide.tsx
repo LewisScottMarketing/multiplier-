@@ -63,7 +63,7 @@ export function ClayGuide({ campaigns, settings, newKey, onNewKey }: { campaigns
             Add one HTTP API column to your Clay table. For every row it asks Multiplier for that person’s personalised page (and PDF) and gets the link back, ready for your sequence.
           </p>
         </div>
-        <a className="btn sm" href="https://docs.clay.com/en/articles/9427417-http-api-integration" target="_blank" rel="noreferrer noopener">Clay’s HTTP API docs <ArrowUpRight size={13} /></a>
+        <a className="btn sm" href="https://university.clay.com/docs/http-api-integration-overview" target="_blank" rel="noreferrer noopener">Clay’s HTTP API guide <ArrowUpRight size={13} /></a>
       </div>
 
       <div style={{ marginTop: 8 }}>
@@ -72,7 +72,7 @@ export function ClayGuide({ campaigns, settings, newKey, onNewKey }: { campaigns
         </Step>
 
         <Step n={2} title="Add an HTTP API column in Clay">
-          <p className="muted small">In your Clay table choose <b>Add column → Add enrichment → HTTP API</b>, then fill it in like this.</p>
+          <p className="muted small">In your Clay table click <b>Add enrichment</b>, choose <b>HTTP API</b>, open the <b>Configure</b> tab and fill it in like this.</p>
           {campaigns.length === 0 ? (
             <Alert tone="warn">Create a campaign first. Clay needs one to point at.</Alert>
           ) : (
@@ -85,29 +85,28 @@ export function ClayGuide({ campaigns, settings, newKey, onNewKey }: { campaigns
             </div>
           )}
           <dl className="kv" style={{ gridTemplateColumns: '150px 1fr', alignItems: 'center', rowGap: 10 }}>
-            <dt>Method</dt>
+            <dt>HTTP method</dt>
             <dd><b>POST</b></dd>
             <dt>Endpoint URL</dt>
             <dd><CopyBox text={endpoint} /></dd>
-            <dt>Header</dt>
+            <dt>Header account</dt>
             <dd>
               <div className="col" style={{ gap: 6 }}>
+                <span className="small">Click <b>Select header account → + Add account</b> and add one header under <b>API Request Headers</b>:</span>
                 <CopyBox text={`Authorization: Bearer ${key}`} />
-                <span className="hint">In Clay you can save this as an account so every column reuses it.</span>
+                <span className="hint">Saving it as an account keeps the key out of the column itself. Clay sets <code>Content-Type</code> for you.</span>
               </div>
             </dd>
-            <dt>Header</dt>
-            <dd><CopyBox text="Content-Type: application/json" /></dd>
           </dl>
           <div>
             <div className="label" style={{ marginBottom: 6 }}>Body</div>
             <CodeBlock text={body} />
             <p className="hint" style={{ marginTop: 6 }}>
-              Inside each pair of quotes type <b>/</b> and pick the Clay column. Don’t type the column name yourself. Anything extra you send (<code>industry</code>, <code>pain_point</code>, a recent news item…) becomes a merge field like <code>{'{{industry}}'}</code>.
+              Inside each pair of quotes type <b>/</b> and pick the Clay column; keep the quotes around it. Anything extra you send (<code>industry</code>, <code>pain_point</code>, a recent news item…) becomes a merge field like <code>{'{{industry}}'}</code>.
             </p>
           </div>
           <div>
-            <div className="label" style={{ marginBottom: 8 }}>Use these “field paths to return”</div>
+            <div className="label" style={{ marginBottom: 8 }}>Put these in “Field paths to return”</div>
             <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
               {RETURNS.filter((r) => !r.when || campaign?.has_document || r.path === 'url').map((r, i) => (
                 <div key={r.path} className="row" style={{ padding: '9px 12px', borderTop: i ? '1px solid var(--line)' : 0, alignItems: 'flex-start' }}>
@@ -116,7 +115,7 @@ export function ClayGuide({ campaigns, settings, newKey, onNewKey }: { campaigns
                 </div>
               ))}
             </div>
-            <p className="hint" style={{ marginTop: 6 }}>Return <code>url</code> from the column, then add more columns for the others if you need them.</p>
+            <p className="hint" style={{ marginTop: 6 }}>Return <code>url</code> from the column, then add more columns for the others if you need them. Under <b>Rate limiting</b>, 10 requests per 1000 ms is a good start (a key allows 600 a minute), and use <b>Test</b> on a single row first.</p>
           </div>
         </Step>
 
