@@ -3,7 +3,12 @@ import type { Block, BlockType } from './schema';
 export function newBlockId(): string {
   const bytes = new Uint8Array(6);
   globalThis.crypto.getRandomValues(bytes);
-  return 'b_' + Array.from(bytes, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 8);
+  return (
+    'b_' +
+    Array.from(bytes, (b) => b.toString(36).padStart(2, '0'))
+      .join('')
+      .slice(0, 8)
+  );
 }
 
 export interface BlockMeta {
@@ -17,7 +22,13 @@ export interface BlockMeta {
 
 export const BLOCK_TYPES: BlockMeta[] = [
   { type: 'hero', label: 'Hero', description: 'Headline, sub-headline and buttons', icon: 'panel-top', group: 'Hero & intro' },
-  { type: 'note', label: 'Personal note', description: 'A short message from you, with your photo', icon: 'message-square-heart', group: 'Hero & intro' },
+  {
+    type: 'note',
+    label: 'Personal note',
+    description: 'A short message from you, with your photo',
+    icon: 'message-square-heart',
+    group: 'Hero & intro',
+  },
   { type: 'text', label: 'Text', description: 'A heading and a few paragraphs', icon: 'align-left', group: 'Content' },
   { type: 'features', label: 'Feature grid', description: 'Icons with short descriptions', icon: 'layout-grid', group: 'Content' },
   { type: 'checklist', label: 'Checklist', description: 'Bulleted or numbered list', icon: 'list-checks', group: 'Content' },
@@ -30,7 +41,13 @@ export const BLOCK_TYPES: BlockMeta[] = [
   { type: 'cta', label: 'Call to action', description: 'A banner with a button', icon: 'mouse-pointer-click', group: 'Convert' },
   { type: 'form', label: 'Lead form', description: 'Capture details or a reply', icon: 'text-cursor-input', group: 'Convert' },
   { type: 'calendar', label: 'Meeting booker', description: 'Embed Calendly, Cal.com or HubSpot', icon: 'calendar-days', group: 'Convert' },
-  { type: 'document', label: 'PDF download', description: 'Preview and download their personalised PDF', icon: 'file-down', group: 'Convert' },
+  {
+    type: 'document',
+    label: 'PDF download',
+    description: 'Preview and download their personalised PDF',
+    icon: 'file-down',
+    group: 'Convert',
+  },
   { type: 'faq', label: 'FAQ', description: 'Questions and answers', icon: 'circle-help', group: 'Content' },
   { type: 'html', label: 'Custom HTML', description: 'Safe, sanitised HTML', icon: 'code', group: 'Advanced' },
   { type: 'divider', label: 'Divider', description: 'A thin line between sections', icon: 'minus', group: 'Advanced' },
@@ -58,7 +75,8 @@ export function newBlock(type: BlockType, overrides: Partial<Block> = {}): Block
           id,
           from_name: 'Your name',
           from_role: 'Your role',
-          message: 'Hi {{first_name|there}} — I put this together for you after looking at {{company|your business}}. Have a skim and tell me what you think.',
+          message:
+            'Hi {{first_name|there}} — I put this together for you after looking at {{company|your business}}. Have a skim and tell me what you think.',
         };
       case 'text':
         return { type, id, heading: 'Section heading', body: 'Write something specific and useful for {{company|your team}}.' };
@@ -98,7 +116,14 @@ export function newBlock(type: BlockType, overrides: Partial<Block> = {}): Block
           ],
         };
       case 'testimonial':
-        return { type, id, quote: '“Quote from a happy customer that is relevant to {{company|this audience}}.”', name: 'Customer name', role: 'Title', company: 'Company' };
+        return {
+          type,
+          id,
+          quote: '“Quote from a happy customer that is relevant to {{company|this audience}}.”',
+          name: 'Customer name',
+          role: 'Title',
+          company: 'Company',
+        };
       case 'logos':
         return { type, id, heading: 'Trusted by teams at', grayscale: true, items: [] };
       case 'image':
@@ -132,7 +157,14 @@ export function newBlock(type: BlockType, overrides: Partial<Block> = {}): Block
       case 'calendar':
         return { type, id, heading: 'Pick a time', url: '', height: 700 };
       case 'document':
-        return { type, id, heading: 'Your copy', text: 'We prepared a version of this guide for {{company|your team}}.', button_label: 'Download your copy', show_preview: true };
+        return {
+          type,
+          id,
+          heading: 'Your copy',
+          text: 'We prepared a version of this guide for {{company|your team}}.',
+          button_label: 'Download your copy',
+          show_preview: true,
+        };
       case 'html':
         return { type, id, html: '<p>Custom HTML goes here.</p>' };
       case 'divider':

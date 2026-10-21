@@ -39,7 +39,10 @@ export function guardedRegexTest(re: RegExp, input: string): boolean {
 }
 
 export function installRegexGuard(log: Logger): void {
-  report = (pattern) => log.warn('A "matches pattern" rule ran too long and is being ignored until restart. Simplify the pattern.', { pattern: pattern.slice(0, 120) });
+  report = (pattern) =>
+    log.warn('A "matches pattern" rule ran too long and is being ignored until restart. Simplify the pattern.', {
+      pattern: pattern.slice(0, 120),
+    });
   setRegexTester(guardedRegexTest);
 }
 

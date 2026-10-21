@@ -15,7 +15,13 @@ export interface Raster {
 }
 
 interface CanvasFactory {
-  create(w: number, h: number): { canvas: { toBuffer(mime: string): Buffer }; context: { getImageData(x: number, y: number, w: number, h: number): { data: Uint8ClampedArray } } };
+  create(
+    w: number,
+    h: number,
+  ): {
+    canvas: { toBuffer(mime: string): Buffer };
+    context: { getImageData(x: number, y: number, w: number, h: number): { data: Uint8ClampedArray } };
+  };
 }
 
 /** Render a page to PNG (plus raw pixels for colour sampling). */
@@ -26,9 +32,14 @@ export async function renderPageRaster(bytes: Uint8Array, pageNo: number, scale:
     const page = await doc.getPage(pageNo);
     const base = page.getViewport({ scale: 1 });
     if (base.width < 1 || base.height < 1) throw unprocessable('This PDF has a page with no size, so it can’t be shown.');
-    if (base.width > MAX_PAGE_POINTS || base.height > MAX_PAGE_POINTS) throw unprocessable('This PDF has a page larger than the 200-inch maximum PDF allows.');
+    if (base.width > MAX_PAGE_POINTS || base.height > MAX_PAGE_POINTS)
+      throw unprocessable('This PDF has a page larger than the 200-inch maximum PDF allows.');
     // posters and oversized pages are drawn at a smaller scale so a hostile file can't exhaust memory
-    const fit = Math.min(scale, Math.sqrt(MAX_RASTER_PIXELS / (base.width * base.height)), MAX_RASTER_EDGE / Math.max(base.width, base.height));
+    const fit = Math.min(
+      scale,
+      Math.sqrt(MAX_RASTER_PIXELS / (base.width * base.height)),
+      MAX_RASTER_EDGE / Math.max(base.width, base.height),
+    );
     const viewport = page.getViewport({ scale: fit });
     const factory = (doc as unknown as { canvasFactory: CanvasFactory }).canvasFactory;
     const { canvas, context } = factory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
@@ -116,7 +127,11 @@ export function sampleRunColors(r: Raster, runs: Run[]): void {
     else {
       far.sort((a, b) => b.d - a.d);
       const top = far.slice(0, Math.max(6, Math.floor(far.length * 0.25)));
-      text = [top.reduce((a, b) => a + b.c[0], 0) / top.length, top.reduce((a, b) => a + b.c[1], 0) / top.length, top.reduce((a, b) => a + b.c[2], 0) / top.length];
+      text = [
+        top.reduce((a, b) => a + b.c[0], 0) / top.length,
+        top.reduce((a, b) => a + b.c[1], 0) / top.length,
+        top.reduce((a, b) => a + b.c[2], 0) / top.length,
+      ];
     }
     run.bg = rgbToHex(...bg);
     run.color = rgbToHex(...text);

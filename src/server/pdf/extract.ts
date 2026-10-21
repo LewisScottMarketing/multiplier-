@@ -76,7 +76,13 @@ export function familyOf(fontName: string): FontFamily {
   const n = fontName.replace(/^[A-Z]{6}\+/, '').toLowerCase();
   if (/courier|mono|consolas|menlo|monaco|code|typewriter/.test(n)) return 'mono';
   if (/helvetica|arial|liberation ?sans|arimo|nimbus ?sans|swiss/.test(n)) return 'helvetica';
-  if (/times|georgia|garamond|palatino|cambria|book ?antiqua|minion|baskerville|didot|caslon|bodoni|merriweather|playfair|lora|serif(?!.*sans)|tinos|liberation ?serif|charter/.test(n) && !/sans/.test(n)) return 'serif';
+  if (
+    /times|georgia|garamond|palatino|cambria|book ?antiqua|minion|baskerville|didot|caslon|bodoni|merriweather|playfair|lora|serif(?!.*sans)|tinos|liberation ?serif|charter/.test(
+      n,
+    ) &&
+    !/sans/.test(n)
+  )
+    return 'serif';
   return 'inter';
 }
 
@@ -154,7 +160,11 @@ function buildRuns(items: RawItem[], page: number): Run[] {
  * pdf.js (like several other extractors) sometimes reports typographic quotes as the look-alike
  * modifier letters U+02BC / U+02EE when a font maps several code points to one glyph.
  */
-const fixChars = (s: string): string => s.replace(/\u02bc/g, '\u2019').replace(/\u02ee/g, '\u201d').replace(/\u02bb/g, '\u2018');
+const fixChars = (s: string): string =>
+  s
+    .replace(/\u02bc/g, '\u2019')
+    .replace(/\u02ee/g, '\u201d')
+    .replace(/\u02bb/g, '\u2018');
 
 function detrackItem(s: string): string {
   const t = fixChars(s);
@@ -207,7 +217,14 @@ async function extractPage(doc: PdfDoc, pageNo: number): Promise<{ info: PageInf
   const { OPS } = js;
   let ctm = [1, 0, 0, 1, 0, 0];
   const stack: number[][] = [];
-  const mul = (m: number[], n: number[]) => [m[0] * n[0] + m[1] * n[2], m[0] * n[1] + m[1] * n[3], m[2] * n[0] + m[3] * n[2], m[2] * n[1] + m[3] * n[3], m[4] * n[0] + m[5] * n[2] + n[4], m[4] * n[1] + m[5] * n[3] + n[5]];
+  const mul = (m: number[], n: number[]) => [
+    m[0] * n[0] + m[1] * n[2],
+    m[0] * n[1] + m[1] * n[3],
+    m[2] * n[0] + m[3] * n[2],
+    m[2] * n[1] + m[3] * n[3],
+    m[4] * n[0] + m[5] * n[2] + n[4],
+    m[4] * n[1] + m[5] * n[3] + n[5],
+  ];
   let ordinal = 0;
   for (let i = 0; i < ops.fnArray.length; i++) {
     const fn = ops.fnArray[i];
@@ -222,7 +239,7 @@ async function extractPage(doc: PdfDoc, pageNo: number): Promise<{ info: PageInf
       // unit square → placed rectangle: top-left is (e, f + d) for upright images
       const x = Math.min(t[4], t[4] + t[0] + t[2]);
       const y = Math.min(t[5], t[5] + t[1] + t[3]);
-      images.push({ ref: `${pageNo}:${ordinal++}`, page: pageNo, x, y, w, h, });
+      images.push({ ref: `${pageNo}:${ordinal++}`, page: pageNo, x, y, w, h });
     }
   }
 
@@ -254,7 +271,8 @@ export async function extractDocument(bytes: Uint8Array): Promise<ExtractedDoc> 
     const pages: PageInfo[] = [];
     for (let p = 1; p <= doc.numPages; p++) pages.push((await extractPage(doc, p)).info);
     const tokens: DetectedToken[] = [];
-    for (const pg of pages) for (const r of pg.runs) for (const m of r.text.matchAll(TOKEN_RE)) tokens.push({ token: m[0], page: pg.page, run: r.id });
+    for (const pg of pages)
+      for (const r of pg.runs) for (const m of r.text.matchAll(TOKEN_RE)) tokens.push({ token: m[0], page: pg.page, run: r.id });
     const meta = (await doc.getMetadata().catch(() => null)) as { info?: { Title?: string; Author?: string } } | null;
     return {
       page_count: doc.numPages,
@@ -297,14 +315,28 @@ export async function extractImagePng(bytes: Uint8Array, ref: string): Promise<{
       type Img = { width: number; height: number; data?: Uint8Array | Uint8ClampedArray; kind?: number } | null;
       const img: Img =
         fn === js.OPS.paintImageXObject
-          ? await new Promise<Img>((res) => (page.objs as unknown as { get(id: string, cb: (v: Img) => void): void }).get(args[0] as string, res))
+          ? await new Promise<Img>((res) =>
+              (page.objs as unknown as { get(id: string, cb: (v: Img) => void): void }).get(args[0] as string, res),
+            )
           : (args[0] as Img);
       if (!img?.data || !img.width || !img.height || img.width * img.height > MAX_PDF_IMAGE_PIXELS) return null;
       const rgba = new Uint8ClampedArray(img.width * img.height * 4);
       const kind = img.kind ?? 2;
-      if (kind === 3) rgba.set(img.data); // RGBA_32BPP
-      else if (kind === 2) for (let p = 0, q = 0; p < img.data.length; p += 3, q += 4) { rgba[q] = img.data[p]; rgba[q + 1] = img.data[p + 1]; rgba[q + 2] = img.data[p + 2]; rgba[q + 3] = 255; }
-      else if (kind === 1) for (let p = 0, q = 0; p < img.width * img.height; p++, q += 4) { const on = (img.data[p >> 3] >> (7 - (p & 7))) & 1 ? 255 : 0; rgba[q] = rgba[q + 1] = rgba[q + 2] = on; rgba[q + 3] = 255; }
+      if (kind === 3)
+        rgba.set(img.data); // RGBA_32BPP
+      else if (kind === 2)
+        for (let p = 0, q = 0; p < img.data.length; p += 3, q += 4) {
+          rgba[q] = img.data[p];
+          rgba[q + 1] = img.data[p + 1];
+          rgba[q + 2] = img.data[p + 2];
+          rgba[q + 3] = 255;
+        }
+      else if (kind === 1)
+        for (let p = 0, q = 0; p < img.width * img.height; p++, q += 4) {
+          const on = (img.data[p >> 3] >> (7 - (p & 7))) & 1 ? 255 : 0;
+          rgba[q] = rgba[q + 1] = rgba[q + 2] = on;
+          rgba[q + 3] = 255;
+        }
       else return null;
       const canvas = createCanvas(img.width, img.height);
       canvas.getContext('2d').putImageData(new ImageData(rgba, img.width, img.height), 0, 0);

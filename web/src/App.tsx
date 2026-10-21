@@ -53,11 +53,19 @@ function Shell({ user }: { user: User }) {
             up
             align="left"
             trigger={(_o, toggle) => (
-              <button className="user-chip btn ghost" style={{ height: 'auto', padding: 6, width: '100%', justifyContent: 'flex-start' }} onClick={toggle}>
+              <button
+                className="user-chip btn ghost"
+                style={{ height: 'auto', padding: 6, width: '100%', justifyContent: 'flex-start' }}
+                onClick={toggle}
+              >
                 <span className="avatar">{(user.name || user.email)[0]!.toUpperCase()}</span>
                 <span className="grow truncate" style={{ textAlign: 'left', minWidth: 0 }}>
-                  <span style={{ display: 'block', fontWeight: 600, fontSize: 13 }} className="truncate">{user.name || user.email.split('@')[0]}</span>
-                  <span className="muted tiny truncate" style={{ display: 'block' }}>{user.email}</span>
+                  <span style={{ display: 'block', fontWeight: 600, fontSize: 13 }} className="truncate">
+                    {user.name || user.email.split('@')[0]}
+                  </span>
+                  <span className="muted tiny truncate" style={{ display: 'block' }}>
+                    {user.email}
+                  </span>
                 </span>
               </button>
             )}
@@ -110,4 +118,3 @@ export function App() {
   if (!me.data) return <Login setup={!!status.data?.setup_required} />;
   return <Shell user={me.data} />;
 }
-

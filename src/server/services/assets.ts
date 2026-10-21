@@ -26,12 +26,17 @@ const MAX_DIM = 2400;
  * which strips EXIF/GPS data, flattens polyglot files, and caps the pixel size. The size is read from
  * the header first, so a tiny file that declares billions of pixels never reaches the decoder.
  */
-export async function storeImage(app: AppContext, input: { data: Buffer; filename: string; campaignId?: string | null }): Promise<AssetRow> {
+export async function storeImage(
+  app: AppContext,
+  input: { data: Buffer; filename: string; campaignId?: string | null },
+): Promise<AssetRow> {
   if (input.data.length > MAX_IMAGE_BYTES) throw badRequest('Images can be up to 8 MB.');
   const probe = probeImage(input.data);
   if (!probe) throw badRequest('Upload a PNG, JPEG, GIF or WebP image.');
   if (!withinPixelBudget(probe)) {
-    throw badRequest(`That image is ${probe.width} × ${probe.height} pixels, which is too large to process. Resize it to under ${MAX_IMAGE_PIXELS / 1_000_000} megapixels and try again.`);
+    throw badRequest(
+      `That image is ${probe.width} × ${probe.height} pixels, which is too large to process. Resize it to under ${MAX_IMAGE_PIXELS / 1_000_000} megapixels and try again.`,
+    );
   }
   const kind = probe.format;
   let img;
@@ -72,7 +77,8 @@ export async function storeImage(app: AppContext, input: { data: Buffer; filenam
   return getAsset(app, id)!;
 }
 
-export const getAsset = (app: AppContext, id: string): AssetRow | null => app.db.get<AssetRow>('SELECT * FROM assets WHERE id = ?', id) ?? null;
+export const getAsset = (app: AppContext, id: string): AssetRow | null =>
+  app.db.get<AssetRow>('SELECT * FROM assets WHERE id = ?', id) ?? null;
 
 export function requireAsset(app: AppContext, id: string): AssetRow {
   const a = getAsset(app, id);
@@ -96,7 +102,16 @@ export async function cloneAsset(app: AppContext, assetId: string, campaignId: s
   await app.storage.put(key, data);
   app.db.run(
     'INSERT INTO assets (id, kind, filename, mime, size, sha256, storage_key, meta, campaign_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    id, src.kind, src.filename, src.mime, src.size, src.sha256, key, src.meta, campaignId, Date.now(),
+    id,
+    src.kind,
+    src.filename,
+    src.mime,
+    src.size,
+    src.sha256,
+    key,
+    src.meta,
+    campaignId,
+    Date.now(),
   );
   return getAsset(app, id)!;
 }

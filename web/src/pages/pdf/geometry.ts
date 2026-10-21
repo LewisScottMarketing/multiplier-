@@ -52,7 +52,12 @@ export function resizeRect(orig: Rect, handle: Handle, dx: number, dy: number, m
 /** QR codes stay square: grow to the larger side, anchored at the corner opposite the handle. */
 export function squareUp(r: Rect, handle: Handle, orig: Rect): Rect {
   const size = Math.max(r.w, r.h);
-  return { x: handle.includes('w') ? orig.x + orig.w - size : r.x, y: handle.includes('n') ? orig.y + orig.h - size : r.y, w: size, h: size };
+  return {
+    x: handle.includes('w') ? orig.x + orig.w - size : r.x,
+    y: handle.includes('n') ? orig.y + orig.h - size : r.y,
+    w: size,
+    h: size,
+  };
 }
 
 const hex2 = (n: number) => n.toString(16).padStart(2, '0');
@@ -99,7 +104,9 @@ export async function sampleBackground(imageUrl: string, rect: Rect, pageWidthPt
       take(x1, y);
     }
     const best = [...buckets.values()].sort((a, b) => b.n - a.n)[0];
-    return best ? `#${hex2(Math.round(best.r / best.n))}${hex2(Math.round(best.g / best.n))}${hex2(Math.round(best.b / best.n))}` : '#ffffff';
+    return best
+      ? `#${hex2(Math.round(best.r / best.n))}${hex2(Math.round(best.g / best.n))}${hex2(Math.round(best.b / best.n))}`
+      : '#ffffff';
   } catch {
     return '#ffffff';
   }

@@ -98,7 +98,9 @@ describe('PDF → landing page', () => {
     const hero = r.page.blocks[0];
     if (hero.type !== 'hero') throw new Error('no hero');
     expect(hero.headline).toBe('The 2026 Outbound Pipeline Playbook');
-    expect(hero.subheadline).toBe('How high-growth B2B teams turn cold outreach into booked meetings, without sounding like everyone else.');
+    expect(hero.subheadline).toBe(
+      'How high-growth B2B teams turn cold outreach into booked meetings, without sounding like everyone else.',
+    );
     expect(hero.badge).toContain('{{first_name|you}}'); // the personal line is built in
     expect(hero.show_document).toBe(true);
     expect(hero.bg).toBe('brand');
@@ -122,7 +124,9 @@ describe('PDF → landing page', () => {
     expect(types(r)).toEqual(['hero', 'text', 'features', 'stats', 'testimonial', 'cta', 'form']);
     const f = r.page.blocks.find((b) => b.type === 'features');
     expect(f && f.type === 'features' && f.items.map((i) => i.title)).toEqual(['Guided setup', 'One-click migration', 'Success playbooks']);
-    expect(f && f.type === 'features' && f.items[1].text).toBe('Customers import their data from a spreadsheet or their old tool in minutes.');
+    expect(f && f.type === 'features' && f.items[1].text).toBe(
+      'Customers import their data from a spreadsheet or their old tool in minutes.',
+    );
     expect(r.page.footer.text).toContain('© 2026 Northwind Systems Ltd.');
     expect(r.page.header.logo_text).toBe('Northwind');
     expect(JSON.stringify(r.page)).not.toMatch(/Page \d+ of/); // page-number furniture is dropped
@@ -187,15 +191,27 @@ describe('editing a PDF', () => {
 
   it('replaces text in place, with the new content actually in the file and the placeholder gone from view', async () => {
     const { bytes, page, prepared } = await playbookDoc();
-    const doc = DocumentSchema.parse({ asset_id: 'ast_x', page_count: 3, fields: [fieldFromRun(page, prepared, { template: 'Prepared for {{company}}' })] });
-    const out = await renderPdf({ bytes, instructions: resolveInstructions(doc, ctxOf({ company: 'Initech GmbH' })), loadImage: async () => null });
+    const doc = DocumentSchema.parse({
+      asset_id: 'ast_x',
+      page_count: 3,
+      fields: [fieldFromRun(page, prepared, { template: 'Prepared for {{company}}' })],
+    });
+    const out = await renderPdf({
+      bytes,
+      instructions: resolveInstructions(doc, ctxOf({ company: 'Initech GmbH' })),
+      loadImage: async () => null,
+    });
     expect(out.warnings).toEqual([]);
     const after = await extractDocument(out.bytes);
     const texts = after.pages[0].runs.map((r) => r.text);
     expect(texts).toContain('Prepared for Initech GmbH');
     // the original sits underneath the mask, so it is still in the file but covered
     const r = await renderPageRaster(out.bytes, 1, 1);
-    const px = (x: number, y: number) => [r.rgba[(y * r.width + x) * 4], r.rgba[(y * r.width + x) * 4 + 1], r.rgba[(y * r.width + x) * 4 + 2]];
+    const px = (x: number, y: number) => [
+      r.rgba[(y * r.width + x) * 4],
+      r.rgba[(y * r.width + x) * 4 + 1],
+      r.rgba[(y * r.width + x) * 4 + 2],
+    ];
     expect(px(Math.round(prepared.x + prepared.w - 10), Math.round(prepared.baseline - 3))).toEqual([0x4f, 0x46, 0xe5]); // background, no leftover glyphs
   });
 
@@ -206,7 +222,10 @@ describe('editing a PDF', () => {
       const out = await renderPdf({ bytes, instructions: resolveInstructions(doc, ctxOf({ n })), loadImage: async () => null });
       expect(out.warnings).toEqual([]);
       // Latin and Latin-Extended glyphs live in different embedded fonts, so extraction may split the name into runs
-      const joined = (await extractDocument(out.bytes)).pages[0].runs.map((x) => x.text).join('').replace(/\s+/g, '');
+      const joined = (await extractDocument(out.bytes)).pages[0].runs
+        .map((x) => x.text)
+        .join('')
+        .replace(/\s+/g, '');
       expect(joined).toContain(n.replace(/\s+/g, ''));
     }
   });
@@ -223,7 +242,14 @@ describe('editing a PDF', () => {
     const { bytes, page, prepared } = await playbookDoc();
     const f = fieldFromRun(page, prepared, { template: '{{n}}' });
     const doc = DocumentSchema.parse({ asset_id: 'ast_x', page_count: 3, fields: [f] });
-    const out = await renderPdf({ bytes, instructions: resolveInstructions(doc, ctxOf({ n: 'An extraordinarily long company name that cannot possibly fit within the box, Incorporated' })), loadImage: async () => null });
+    const out = await renderPdf({
+      bytes,
+      instructions: resolveInstructions(
+        doc,
+        ctxOf({ n: 'An extraordinarily long company name that cannot possibly fit within the box, Incorporated' }),
+      ),
+      loadImage: async () => null,
+    });
     const run = (await extractDocument(out.bytes)).pages[0].runs.find((r) => /extraordinarily/.test(r.text))!;
     expect(run.size).toBeLessThan(prepared.size);
     expect(run.size).toBeGreaterThanOrEqual(prepared.size * 0.55 - 0.01);
@@ -236,9 +262,35 @@ describe('editing a PDF', () => {
       asset_id: 'ast_x',
       page_count: 3,
       fields: [
-        { id: 'a', type: 'text', page: 1, rect: { x: 40, y: 40, w: 300, h: 20 }, text: 'FOR MARKETERS', size: 12, color: '#ffffff', rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'marketing' }] } },
-        { id: 'b', type: 'text', page: 1, rect: { x: 40, y: 40, w: 300, h: 20 }, text: 'FOR SALES', size: 12, color: '#ffffff', rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] } },
-        { id: 'qr', type: 'qr', page: 1, rect: { x: 440, y: 640, w: 100, h: 100 }, url: '{{page_url}}', color: '#ffffff', background: null },
+        {
+          id: 'a',
+          type: 'text',
+          page: 1,
+          rect: { x: 40, y: 40, w: 300, h: 20 },
+          text: 'FOR MARKETERS',
+          size: 12,
+          color: '#ffffff',
+          rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'marketing' }] },
+        },
+        {
+          id: 'b',
+          type: 'text',
+          page: 1,
+          rect: { x: 40, y: 40, w: 300, h: 20 },
+          text: 'FOR SALES',
+          size: 12,
+          color: '#ffffff',
+          rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] },
+        },
+        {
+          id: 'qr',
+          type: 'qr',
+          page: 1,
+          rect: { x: 440, y: 640, w: 100, h: 100 },
+          url: '{{page_url}}',
+          color: '#ffffff',
+          background: null,
+        },
         { id: 'ln', type: 'link', page: 1, rect: { x: 40, y: 700, w: 200, h: 30 }, url: '{{page_url}}?src=pdf' },
       ],
     });
@@ -254,8 +306,16 @@ describe('editing a PDF', () => {
 
   it('skips images that cannot be loaded without failing the document', async () => {
     const bytes = fixture('playbook.pdf');
-    const doc = DocumentSchema.parse({ asset_id: 'ast_x', page_count: 3, fields: [{ id: 'i', type: 'image', page: 1, rect: { x: 400, y: 60, w: 120, h: 60 }, src: '{{logo_url}}' }] });
-    const out = await renderPdf({ bytes, instructions: resolveInstructions(doc, ctxOf({ logo_url: 'https://logo.test/x.png' })), loadImage: async () => null });
+    const doc = DocumentSchema.parse({
+      asset_id: 'ast_x',
+      page_count: 3,
+      fields: [{ id: 'i', type: 'image', page: 1, rect: { x: 400, y: 60, w: 120, h: 60 }, src: '{{logo_url}}' }],
+    });
+    const out = await renderPdf({
+      bytes,
+      instructions: resolveInstructions(doc, ctxOf({ logo_url: 'https://logo.test/x.png' })),
+      loadImage: async () => null,
+    });
     expect(out.warnings.join(' ')).toMatch(/image could not be loaded/);
     // and with no logo at all there is nothing to draw and nothing to warn about
     expect(resolveInstructions(doc, ctxOf({}))).toEqual([]);
@@ -263,7 +323,11 @@ describe('editing a PDF', () => {
 
   it('is deterministic: identical input resolves to identical instructions (the cache key)', async () => {
     const { page, prepared } = await playbookDoc();
-    const doc = DocumentSchema.parse({ asset_id: 'ast_x', page_count: 3, fields: [fieldFromRun(page, prepared, { template: 'Prepared for {{company}}' })] });
+    const doc = DocumentSchema.parse({
+      asset_id: 'ast_x',
+      page_count: 3,
+      fields: [fieldFromRun(page, prepared, { template: 'Prepared for {{company}}' })],
+    });
     const a = JSON.stringify(resolveInstructions(doc, ctxOf({ company: 'A' })));
     expect(JSON.stringify(resolveInstructions(doc, ctxOf({ company: 'A' })))).toBe(a);
     expect(JSON.stringify(resolveInstructions(doc, ctxOf({ company: 'B' })))).not.toBe(a);

@@ -64,7 +64,10 @@ function scalar(v: unknown): Scalar | Scalar[] | undefined {
   if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
   if (typeof v === 'boolean') return v;
   if (Array.isArray(v)) {
-    const items = v.map(scalar).filter((x): x is Scalar => x !== undefined && !Array.isArray(x)).slice(0, 50);
+    const items = v
+      .map(scalar)
+      .filter((x): x is Scalar => x !== undefined && !Array.isArray(x))
+      .slice(0, 50);
     return items.length ? items : undefined;
   }
   return undefined;
@@ -106,7 +109,12 @@ export function normalizeInput(raw: Record<string, unknown>): NormalizedInput {
   return { external_id: ext === undefined || Array.isArray(ext) ? null : String(ext).slice(0, 200), columns, data };
 }
 
-const normLinkedin = (u: string) => u.toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
+const normLinkedin = (u: string) =>
+  u
+    .toLowerCase()
+    .replace(/^https?:\/\/(www\.)?/, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/+$/, '');
 
 // ── Context for rendering ───────────────────────────────────────────────────
 
@@ -179,18 +187,30 @@ function findExisting(ctx: AppContext, campaignId: string, n: NormalizedInput): 
   }
   if (n.columns.linkedin_url) {
     const want = normLinkedin(n.columns.linkedin_url);
-    const rows = ctx.db.all<ProspectRow>('SELECT * FROM prospects WHERE campaign_id = ? AND linkedin_url IS NOT NULL AND lower(linkedin_url) LIKE ? ESCAPE \'\\\'', campaignId, `%${likeEscape(want)}%`);
+    const rows = ctx.db.all<ProspectRow>(
+      "SELECT * FROM prospects WHERE campaign_id = ? AND linkedin_url IS NOT NULL AND lower(linkedin_url) LIKE ? ESCAPE '\\'",
+      campaignId,
+      `%${likeEscape(want)}%`,
+    );
     const r = rows.find((x) => normLinkedin(x.linkedin_url ?? '') === want);
     if (r) return r;
   }
   return undefined;
 }
 
-export function upsertProspect(ctx: AppContext, campaign: Campaign, raw: Record<string, unknown>, opts: { enforceRequired?: boolean } = {}): UpsertResult {
+export function upsertProspect(
+  ctx: AppContext,
+  campaign: Campaign,
+  raw: Record<string, unknown>,
+  opts: { enforceRequired?: boolean } = {},
+): UpsertResult {
   const n = normalizeInput(raw);
-  const hasIdentity = n.external_id || n.columns.email || n.columns.linkedin_url || n.columns.first_name || n.columns.last_name || n.data.full_name;
+  const hasIdentity =
+    n.external_id || n.columns.email || n.columns.linkedin_url || n.columns.first_name || n.columns.last_name || n.data.full_name;
   if (!hasIdentity) {
-    throw unprocessable('Send at least one of: email, linkedin_url, external_id, first_name, last_name or full_name so we can recognise this prospect.');
+    throw unprocessable(
+      'Send at least one of: email, linkedin_url, external_id, first_name, last_name or full_name so we can recognise this prospect.',
+    );
   }
 
   return ctx.db.transaction(() => {
@@ -213,7 +233,9 @@ export function upsertProspect(ctx: AppContext, campaign: Campaign, raw: Record<
     const probe = buildContext({ ...merged.data, ...merged, data: undefined }, { cleanNames: campaign.settings.clean_names });
     const missing = campaign.settings.required_fields.map(normKey).filter((f) => !toStr(probe[f]));
     if (missing.length && opts.enforceRequired !== false) {
-      throw new HttpError(422, 'missing_required_fields', `Missing required field${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`, { missing });
+      throw new HttpError(422, 'missing_required_fields', `Missing required field${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`, {
+        missing,
+      });
     }
 
     if (existing) {
@@ -304,7 +326,9 @@ export interface ListQuery {
   offset?: number;
 }
 
-export const stageOf = (p: Pick<Prospect, 'views' | 'score' | 'submissions' | 'clicks' | 'downloads'>): 'new' | 'opened' | 'engaged' | 'converted' =>
+export const stageOf = (
+  p: Pick<Prospect, 'views' | 'score' | 'submissions' | 'clicks' | 'downloads'>,
+): 'new' | 'opened' | 'engaged' | 'converted' =>
   p.submissions > 0 ? 'converted' : p.clicks > 0 || p.downloads > 0 || p.score >= 25 ? 'engaged' : p.views > 0 ? 'opened' : 'new';
 
 export function listProspects(ctx: AppContext, campaignId: string, q: ListQuery = {}): { rows: Prospect[]; total: number } {
@@ -312,7 +336,9 @@ export function listProspects(ctx: AppContext, campaignId: string, q: ListQuery 
   const params: Array<string | number> = [campaignId];
   if (q.q?.trim()) {
     const like = `%${likeEscape(q.q.trim().toLowerCase())}%`;
-    where.push(`(lower(coalesce(first_name,'') || ' ' || coalesce(last_name,'')) LIKE ? ESCAPE '\\' OR lower(coalesce(email,'')) LIKE ? ESCAPE '\\' OR lower(coalesce(company,'')) LIKE ? ESCAPE '\\' OR lower(coalesce(job_title,'')) LIKE ? ESCAPE '\\')`);
+    where.push(
+      `(lower(coalesce(first_name,'') || ' ' || coalesce(last_name,'')) LIKE ? ESCAPE '\\' OR lower(coalesce(email,'')) LIKE ? ESCAPE '\\' OR lower(coalesce(company,'')) LIKE ? ESCAPE '\\' OR lower(coalesce(job_title,'')) LIKE ? ESCAPE '\\')`,
+    );
     params.push(like, like, like, like);
   }
   switch (q.stage) {
@@ -329,7 +355,13 @@ export function listProspects(ctx: AppContext, campaignId: string, q: ListQuery 
       where.push('submissions > 0');
       break;
   }
-  const sortCol = { created: 'created_at', last_seen: 'COALESCE(last_seen_at, 0)', score: 'score', views: 'views', company: 'lower(coalesce(company, \'\'))' }[q.sort ?? 'created'];
+  const sortCol = {
+    created: 'created_at',
+    last_seen: 'COALESCE(last_seen_at, 0)',
+    score: 'score',
+    views: 'views',
+    company: "lower(coalesce(company, ''))",
+  }[q.sort ?? 'created'];
   const dir = q.order === 'asc' ? 'ASC' : 'DESC';
   const total = ctx.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM prospects WHERE ${where.join(' AND ')}`, ...params)!.n;
   const rows = ctx.db.all<ProspectRow>(
@@ -343,7 +375,10 @@ export function listProspects(ctx: AppContext, campaignId: string, q: ListQuery 
 
 /** All custom field names seen in a campaign's prospects — feeds the token picker. */
 export function customFieldNames(ctx: AppContext, campaignId: string): string[] {
-  const rows = ctx.db.all<{ data: string }>('SELECT data FROM prospects WHERE campaign_id = ? ORDER BY updated_at DESC LIMIT 200', campaignId);
+  const rows = ctx.db.all<{ data: string }>(
+    'SELECT data FROM prospects WHERE campaign_id = ? ORDER BY updated_at DESC LIMIT 200',
+    campaignId,
+  );
   const seen = new Set<string>();
   for (const r of rows) for (const k of Object.keys(parseJson<Record<string, unknown>>(r.data, {}))) seen.add(k);
   return [...seen].sort();

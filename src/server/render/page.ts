@@ -111,7 +111,7 @@ ${withNonce(bodyScripts, nonce)}
     "style-src-attr 'unsafe-inline'",
     "img-src 'self' data: https:",
     "font-src 'self'",
-    "media-src https:",
+    'media-src https:',
     `frame-src ${frames}`,
     hasCustomScripts ? "connect-src 'self' https:" : "connect-src 'self'",
     "form-action 'self'",

@@ -29,7 +29,10 @@ export function useSyncPreviewContext() {
       ctx.today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
       setPreviewCtx(ctx);
     } else {
-      api.get<{ context: Record<string, string> }>(`/prospects/${src.id}`).then((r) => live && setPreviewCtx(r.context)).catch(() => live && setPreviewCtx({}));
+      api
+        .get<{ context: Record<string, string> }>(`/prospects/${src.id}`)
+        .then((r) => live && setPreviewCtx(r.context))
+        .catch(() => live && setPreviewCtx({}));
     }
     return () => {
       live = false;
@@ -49,19 +52,39 @@ function ProspectPicker({ onPick, onClose }: { onPick: (p: ProspectItem) => void
   const [q, setQ] = useState('');
   const [rows, setRows] = useState<ProspectItem[] | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => api.get<{ prospects: ProspectItem[] }>(`/campaigns/${c.id}/prospects${qs({ q, limit: 20 })}`).then((r) => setRows(r.prospects)), 200);
+    const t = setTimeout(
+      () => api.get<{ prospects: ProspectItem[] }>(`/campaigns/${c.id}/prospects${qs({ q, limit: 20 })}`).then((r) => setRows(r.prospects)),
+      200,
+    );
     return () => clearTimeout(t);
   }, [q, c.id]);
   return (
     <Modal title="Preview as a real prospect" onClose={onClose}>
       <Input autoFocus placeholder="Search by name, company or email" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="col" style={{ gap: 2, marginTop: 12 }}>
-        {rows === null ? <div className="viz-empty"><Spinner /></div> : !rows.length ? <div className="viz-empty">No prospects yet. Send one through from Clay or add one on the Audience tab.</div> : rows.map((p) => (
-          <button key={p.id} className="btn ghost" style={{ justifyContent: 'flex-start', height: 'auto', padding: '8px 10px' }} onClick={() => onPick(p)}>
-            <UserRound size={15} />
-            <span style={{ textAlign: 'left' }}><b>{personName(p)}</b><br /><span className="muted small">{[p.job_title, p.company].filter(Boolean).join(' · ') || p.email}</span></span>
-          </button>
-        ))}
+        {rows === null ? (
+          <div className="viz-empty">
+            <Spinner />
+          </div>
+        ) : !rows.length ? (
+          <div className="viz-empty">No prospects yet. Send one through from Clay or add one on the Audience tab.</div>
+        ) : (
+          rows.map((p) => (
+            <button
+              key={p.id}
+              className="btn ghost"
+              style={{ justifyContent: 'flex-start', height: 'auto', padding: '8px 10px' }}
+              onClick={() => onPick(p)}
+            >
+              <UserRound size={15} />
+              <span style={{ textAlign: 'left' }}>
+                <b>{personName(p)}</b>
+                <br />
+                <span className="muted small">{[p.job_title, p.company].filter(Boolean).join(' · ') || p.email}</span>
+              </span>
+            </button>
+          ))
+        )}
       </div>
     </Modal>
   );
@@ -77,25 +100,67 @@ export function PreviewAs() {
         align="left"
         trigger={(_o, toggle) => (
           <Button size="sm" className="pv-who" onClick={toggle}>
-            <UserRound size={14} style={{ flex: 'none' }} /> <span>Preview as <b>{sourceLabel(c.previewSource)}</b></span>
+            <UserRound size={14} style={{ flex: 'none' }} />{' '}
+            <span>
+              Preview as <b>{sourceLabel(c.previewSource)}</b>
+            </span>
           </Button>
         )}
       >
         {(close) => (
           <>
-            <div className="tiny muted" style={{ padding: '6px 10px', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 650 }}>Sample people</div>
+            <div
+              className="tiny muted"
+              style={{ padding: '6px 10px', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 650 }}
+            >
+              Sample people
+            </div>
             {SAMPLE_PROSPECTS.map((p, i) => (
-              <button key={i} onClick={() => { c.setPreviewSource({ kind: 'sample', index: i }); close(); }}>
-                <span><b>{personName(p)}</b><br /><span className="muted tiny">{p.job_title} · {p.company}</span></span>
+              <button
+                key={i}
+                onClick={() => {
+                  c.setPreviewSource({ kind: 'sample', index: i });
+                  close();
+                }}
+              >
+                <span>
+                  <b>{personName(p)}</b>
+                  <br />
+                  <span className="muted tiny">
+                    {p.job_title} · {p.company}
+                  </span>
+                </span>
               </button>
             ))}
             <hr />
-            <button onClick={() => { c.setPreviewSource({ kind: 'empty' }); close(); }}>No data — see the fallbacks</button>
-            <button onClick={() => { setPicking(true); close(); }}>A real prospect…</button>
+            <button
+              onClick={() => {
+                c.setPreviewSource({ kind: 'empty' });
+                close();
+              }}
+            >
+              No data — see the fallbacks
+            </button>
+            <button
+              onClick={() => {
+                setPicking(true);
+                close();
+              }}
+            >
+              A real prospect…
+            </button>
           </>
         )}
       </Menu>
-      {picking ? <ProspectPicker onClose={() => setPicking(false)} onPick={(p) => { c.setPreviewSource({ kind: 'prospect', id: p.id, label: personName(p) }); setPicking(false); }} /> : null}
+      {picking ? (
+        <ProspectPicker
+          onClose={() => setPicking(false)}
+          onPick={(p) => {
+            c.setPreviewSource({ kind: 'prospect', id: p.id, label: personName(p) });
+            setPicking(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }

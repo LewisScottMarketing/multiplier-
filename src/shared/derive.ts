@@ -36,7 +36,10 @@ export const SENIORITY_GROUPS: Record<Seniority, 'executive' | 'leader' | 'pract
 const SENIORITY_RULES: Array<[Seniority, RegExp]> = [
   ['owner', /\b(co-?founder|founder|(?<!product |process |budget |data |system )owner|proprietor)\b/i],
   ['vp', /\b(vp|v\.p\.|svp|evp|avp|vice[\s-]+president)\b/i],
-  ['c_level', /\b(chief|c[a-z]o|ceo|cto|cfo|coo|cmo|cro|cio|ciso|cpo|chro|cco|president|managing director|general manager|managing partner)\b/i],
+  [
+    'c_level',
+    /\b(chief|c[a-z]o|ceo|cto|cfo|coo|cmo|cro|cio|ciso|cpo|chro|cco|president|managing director|general manager|managing partner)\b/i,
+  ],
   ['head', /\b(head|global head|head of)\b/i],
   ['director', /\bdirector\b/i],
   ['manager', /\b(manager|team lead|supervisor)\b|\blead$/i],
@@ -73,18 +76,33 @@ export const DEPARTMENT_LABELS = {
 export type Department = keyof typeof DEPARTMENT_LABELS;
 
 const DEPARTMENT_RULES: Array<[Exclude<Department, 'executive' | 'other'>, RegExp]> = [
-  ['marketing', /\b(marketing|growth|brand|demand gen(?:eration)?|content|seo|sem|communications?|comms|pr|social media|community|campaigns?|cmo|digital|lifecycle|crm|events?|partnerships? marketing)\b/i],
-  ['sales', /\b(sales|account executives?|ae|business development|bizdev|bdr|sdr|revenue|cro|partnerships?|channel|commercial|inside sales|go[- ]to[- ]market|gtm|new business|enterprise accounts?)\b/i],
-  ['customer_success', /\b(customer success|customer support|customer experience|client success|client services?|support|cx|account management|implementation|onboarding|service desk)\b/i],
+  [
+    'marketing',
+    /\b(marketing|growth|brand|demand gen(?:eration)?|content|seo|sem|communications?|comms|pr|social media|community|campaigns?|cmo|digital|lifecycle|crm|events?|partnerships? marketing)\b/i,
+  ],
+  [
+    'sales',
+    /\b(sales|account executives?|ae|business development|bizdev|bdr|sdr|revenue|cro|partnerships?|channel|commercial|inside sales|go[- ]to[- ]market|gtm|new business|enterprise accounts?)\b/i,
+  ],
+  [
+    'customer_success',
+    /\b(customer success|customer support|customer experience|client success|client services?|support|cx|account management|implementation|onboarding|service desk)\b/i,
+  ],
   ['product', /\b(product|cpo|pm)\b/i],
-  ['engineering', /\b(engineers?|engineering|developers?|software|devops|sre|architect|cto|technical|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|qa|technology)\b/i],
+  [
+    'engineering',
+    /\b(engineers?|engineering|developers?|software|devops|sre|architect|cto|technical|programmer|full[- ]?stack|back[- ]?end|front[- ]?end|qa|technology)\b/i,
+  ],
   ['design', /\b(design|designer|ux|ui|creative|art director)\b/i],
   ['data', /\b(data|analytics|analyst|business intelligence|bi|machine learning|ml|scientist|ai)\b/i],
   ['finance', /\b(finance|financial|cfo|accounting|accountant|controller|treasury|fp&a|audit|billing|payroll|procurement)\b/i],
   ['hr', /\b(hr|human resources|people|talent|recruit(?:er|ing|ment)?|culture|learning|l&d|chro|workforce)\b/i],
   ['it', /\b(it|information technology|cio|sysadmin|infrastructure|security|ciso|cyber|network|helpdesk|systems)\b/i],
   ['legal', /\b(legal|counsel|compliance|attorney|lawyer|gc|clo|regulatory|privacy|risk)\b/i],
-  ['operations', /\b(operations?|ops|supply chain|logistics|coo|facilities|program manager|project manager|business operations|chief of staff|strategy)\b/i],
+  [
+    'operations',
+    /\b(operations?|ops|supply chain|logistics|coo|facilities|program manager|project manager|business operations|chief of staff|strategy)\b/i,
+  ],
 ];
 
 // Compound phrases whose head noun decides the function ("Product Marketing Manager" is marketing).
@@ -115,7 +133,28 @@ export function classifyDepartment(title: string, seniority: Seniority): Departm
 
 // ── Names & companies ───────────────────────────────────────────────────────
 
-const PARTICLES = new Set(['van', 'von', 'der', 'den', 'de', 'del', 'della', 'di', 'da', 'dos', 'das', 'du', 'la', 'le', 'bin', 'ibn', 'al', 'el', 'ter', 'ten']);
+const PARTICLES = new Set([
+  'van',
+  'von',
+  'der',
+  'den',
+  'de',
+  'del',
+  'della',
+  'di',
+  'da',
+  'dos',
+  'das',
+  'du',
+  'la',
+  'le',
+  'bin',
+  'ibn',
+  'al',
+  'el',
+  'ter',
+  'ten',
+]);
 const HONORIFICS = /^(?:dr|mr|mrs|ms|miss|mx|prof|professor|sir|dame|rev|hon)\.?\s+/i;
 const CREDENTIALS = /,?\s+\(?(?:ph\.?d|mba|cpa|cfa|pmp|md|dds|esq|jr|sr|ii|iii|iv|cissp|csm|msc|bsc|bba|ma|ba|phr|shrm-?[a-z]*|pe)\)?\.?$/i;
 const PRONOUNS = /\s*\((?:he|she|they|him|her|them|xe|ze)\/[a-z/]+\)\s*/gi;
@@ -168,7 +207,10 @@ const COMPANY_SUFFIX =
 export function shortCompany(raw: string): string {
   let s = raw.replace(EMOJI, '').replace(/\s+/g, ' ').trim();
   for (let i = 0; i < 2; i++) {
-    const next = s.replace(COMPANY_SUFFIX, '').replace(/[,\s]+$/, '').trim();
+    const next = s
+      .replace(COMPANY_SUFFIX, '')
+      .replace(/[,\s]+$/, '')
+      .trim();
     if (!next || next === s) break;
     s = next;
   }
@@ -195,7 +237,21 @@ export function domainOf(value: string): string {
   return m?.[1] ?? '';
 }
 
-const FREE_MAIL = new Set(['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com', 'aol.com', 'live.com', 'msn.com', 'gmx.com']);
+const FREE_MAIL = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'yahoo.com',
+  'icloud.com',
+  'me.com',
+  'proton.me',
+  'protonmail.com',
+  'aol.com',
+  'live.com',
+  'msn.com',
+  'gmx.com',
+]);
 
 // ── Putting it together ─────────────────────────────────────────────────────
 

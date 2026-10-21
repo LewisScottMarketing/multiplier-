@@ -39,7 +39,9 @@ describe('transport security', () => {
   it('asks browsers to keep using https when the app is served over https', async () => {
     t = await createTestApp({ APP_URL: 'https://app.test', PUBLIC_URL: 'https://go.test' });
     expect((await t.req('GET', '/api/health')).headers.get('strict-transport-security')).toMatch(/max-age=\d+/);
-    expect((await t.req('GET', '/p/zzzzzzzzzz', undefined, { host: 'go.test' })).headers.get('strict-transport-security')).toMatch(/max-age=\d+/);
+    expect((await t.req('GET', '/p/zzzzzzzzzz', undefined, { host: 'go.test' })).headers.get('strict-transport-security')).toMatch(
+      /max-age=\d+/,
+    );
   });
 
   it('stays quiet over plain http, where browsers would ignore it anyway', async () => {
@@ -140,7 +142,8 @@ describe('public PDFs built from the address bar', () => {
     expect((await get(`/c/${campaign.slug}/cover.png`)).status).toBe(200);
 
     let status = 200;
-    for (let i = 0; i < 70 && status === 200; i++) status = (await get(i % 2 ? `/c/${campaign.slug}.pdf` : `/c/${campaign.slug}/cover.png`)).status;
+    for (let i = 0; i < 70 && status === 200; i++)
+      status = (await get(i % 2 ? `/c/${campaign.slug}.pdf` : `/c/${campaign.slug}/cover.png`)).status;
     expect(status).toBe(429);
     expect((await get(`/c/${campaign.slug}.pdf`)).headers.get('retry-after')).toBeTruthy();
     // the page itself, and everyone else’s links, are untouched
@@ -173,7 +176,11 @@ describe('outbound webhooks', () => {
       });
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
-    return { received, url: `http://127.0.0.1:${(server.address() as { port: number }).port}/hook`, close: () => new Promise((r) => server.close(r)) };
+    return {
+      received,
+      url: `http://127.0.0.1:${(server.address() as { port: number }).port}/hook`,
+      close: () => new Promise((r) => server.close(r)),
+    };
   }
 
   it('does not let a prospect’s profile ping a whole Slack channel or plant links', async () => {
@@ -183,7 +190,18 @@ describe('outbound webhooks', () => {
     const key = await createApiKey(t);
     const rx = await receiver();
     await t.json('POST', '/api/webhooks', { name: 'Slack', kind: 'slack', url: rx.url });
-    const made = await t.json('POST', '/api/v1/personalize', { campaign: campaign.id, email: 'x@evil.example', first_name: '<@U12345>', company: '<!channel> <https://evil.example/login|Verify your account>', job_title: 'CEO' }, bearer(key));
+    const made = await t.json(
+      'POST',
+      '/api/v1/personalize',
+      {
+        campaign: campaign.id,
+        email: 'x@evil.example',
+        first_name: '<@U12345>',
+        company: '<!channel> <https://evil.example/login|Verify your account>',
+        job_title: 'CEO',
+      },
+      bearer(key),
+    );
     const token = new URL(made.body.url).pathname.split('/').pop();
     await t.req('POST', `/t/${token}`, { type: 'view', sid: 'abcd1234' }, publicHeaders(HUMAN));
     expect(await processDeliveries(t.ctx)).toBe(1);
@@ -203,11 +221,37 @@ describe('outbound webhooks', () => {
     t = await createTestApp({ ALLOW_PRIVATE_FETCH: 'true' });
     await t.login();
     for (const name of ['Host', 'content-length', 'Transfer-Encoding', 'Connection', 'Content-Type']) {
-      const res = await t.json('POST', '/api/webhooks', { name: 'x', kind: 'generic', url: 'http://127.0.0.1:9/hook', auth_header: name, auth_value: 'v' });
+      const res = await t.json('POST', '/api/webhooks', {
+        name: 'x',
+        kind: 'generic',
+        url: 'http://127.0.0.1:9/hook',
+        auth_header: name,
+        auth_value: 'v',
+      });
       expect(res.status, name).toBe(400);
     }
-    expect((await t.json('POST', '/api/webhooks', { name: 'ok', kind: 'clay', url: 'http://127.0.0.1:9/hook', auth_header: 'x-clay-webhook-auth', auth_value: 'v' })).status).toBe(201);
-    expect((await t.json('POST', '/api/webhooks', { name: 'ok', kind: 'generic', url: 'http://127.0.0.1:9/hook', auth_header: 'Authorization', auth_value: 'Bearer abc' })).status).toBe(201);
+    expect(
+      (
+        await t.json('POST', '/api/webhooks', {
+          name: 'ok',
+          kind: 'clay',
+          url: 'http://127.0.0.1:9/hook',
+          auth_header: 'x-clay-webhook-auth',
+          auth_value: 'v',
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await t.json('POST', '/api/webhooks', {
+          name: 'ok',
+          kind: 'generic',
+          url: 'http://127.0.0.1:9/hook',
+          auth_header: 'Authorization',
+          auth_value: 'Bearer abc',
+        })
+      ).status,
+    ).toBe(201);
   });
 });
 
@@ -217,7 +261,12 @@ describe('tracked buttons', () => {
     await t.login();
     const campaign = await createLiveCampaign(t);
     const key = await createApiKey(t);
-    const made = await t.json('POST', '/api/v1/personalize', { campaign: campaign.id, email: 'jane@acme.com', first_name: 'Jane' }, bearer(key));
+    const made = await t.json(
+      'POST',
+      '/api/v1/personalize',
+      { campaign: campaign.id, email: 'jane@acme.com', first_name: 'Jane' },
+      bearer(key),
+    );
     const token = new URL(made.body.url).pathname.split('/').pop();
     const clicks = async () => (await t.json('GET', `/api/prospects/${made.body.id}`)).body.prospect.engagement.clicks;
 
@@ -238,10 +287,14 @@ describe('block ids', () => {
     const campaign = await createLiveCampaign(t);
     const page = demoPage();
     for (const bad of ['x" onfocus="alert(1)', 'a.b', 'has space', '']) {
-      const res = await t.json('PUT', `/api/campaigns/${campaign.id}`, { page: { ...page, blocks: [{ ...page.blocks[0], id: bad }, ...page.blocks.slice(1)] } });
+      const res = await t.json('PUT', `/api/campaigns/${campaign.id}`, {
+        page: { ...page, blocks: [{ ...page.blocks[0], id: bad }, ...page.blocks.slice(1)] },
+      });
       expect(res.status, JSON.stringify(bad)).toBe(400);
     }
-    const ok = await t.json('PUT', `/api/campaigns/${campaign.id}`, { page: { ...page, blocks: [{ ...page.blocks[0], id: 'hero_2-b' }, ...page.blocks.slice(1)] } });
+    const ok = await t.json('PUT', `/api/campaigns/${campaign.id}`, {
+      page: { ...page, blocks: [{ ...page.blocks[0], id: 'hero_2-b' }, ...page.blocks.slice(1)] },
+    });
     expect(ok.status).toBe(200);
   });
 });
@@ -255,7 +308,12 @@ describe('erasing people', () => {
     const campaign = await createLiveCampaign(t);
     const key = await createApiKey(t);
     await t.json('POST', '/api/webhooks', { name: 'Everything', kind: 'generic', url: 'http://127.0.0.1:9/hook', events: ['*'] });
-    const ann = await t.json('POST', '/api/v1/personalize', { campaign: campaign.id, email: 'ann@acme.com', first_name: 'Ann' }, bearer(key));
+    const ann = await t.json(
+      'POST',
+      '/api/v1/personalize',
+      { campaign: campaign.id, email: 'ann@acme.com', first_name: 'Ann' },
+      bearer(key),
+    );
     await t.json('POST', '/api/v1/personalize', { campaign: campaign.id, email: 'bob@acme.com', first_name: 'Bob' }, bearer(key));
     expect(count()).toBe(2);
     expect(count(`prospect_id = '${ann.body.id}' AND campaign_id = '${campaign.id}'`)).toBe(1);
@@ -275,7 +333,14 @@ describe('erasing people', () => {
     const day = 86_400_000;
     const now = Date.now();
     const add = (id: string, status: string, ageDays: number) =>
-      t.ctx.db.run(`INSERT INTO webhook_deliveries (id, webhook_id, event, payload, status, next_attempt_at, created_at) VALUES (?, ?, 'page.viewed', '{}', ?, ?, ?)`, id, hook.id, status, now, now - ageDays * day);
+      t.ctx.db.run(
+        `INSERT INTO webhook_deliveries (id, webhook_id, event, payload, status, next_attempt_at, created_at) VALUES (?, ?, 'page.viewed', '{}', ?, ?, ?)`,
+        id,
+        hook.id,
+        status,
+        now,
+        now - ageDays * day,
+      );
     add('old_ok', 'delivered', 15);
     add('new_ok', 'delivered', 13);
     add('old_failed', 'failed', 31);

@@ -82,7 +82,10 @@ export function PageCanvas({
   const H = page.height;
   const s = scale;
   const onPage = useMemo(() => fields.filter((f) => f.page === pageNo), [fields, pageNo]);
-  const covered = useMemo(() => new Set(page.runs.filter((r) => runCoveredBy(r, fields, pageNo)).map((r) => r.id)), [page.runs, fields, pageNo]);
+  const covered = useMemo(
+    () => new Set(page.runs.filter((r) => runCoveredBy(r, fields, pageNo)).map((r) => r.id)),
+    [page.runs, fields, pageNo],
+  );
 
   const pt = (e: { clientX: number; clientY: number }): Pt => {
     const r = wrap.current!.getBoundingClientRect();
@@ -94,7 +97,9 @@ export function PageCanvas({
     e.stopPropagation();
     onSelect(f.id);
     const start = pt(e);
-    drag.current = handle ? { kind: 'resize', id: f.id, handle, start, orig: f.rect, square: f.type === 'qr' } : { kind: 'move', id: f.id, start, orig: f.rect, moved: false };
+    drag.current = handle
+      ? { kind: 'resize', id: f.id, handle, start, orig: f.rect, square: f.type === 'qr' }
+      : { kind: 'move', id: f.id, start, orig: f.rect, moved: false };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -160,8 +165,14 @@ export function PageCanvas({
 
       {mode === 'preview' ? (
         <>
-          {previewUrl ? <img className="pdf-img pdf-preview" src={previewUrl} alt="How this page looks for the previewed person" draggable={false} /> : null}
-          {previewBusy ? <div className="pdf-busy"><Spinner size={16} /> Rendering…</div> : null}
+          {previewUrl ? (
+            <img className="pdf-img pdf-preview" src={previewUrl} alt="How this page looks for the previewed person" draggable={false} />
+          ) : null}
+          {previewBusy ? (
+            <div className="pdf-busy">
+              <Spinner size={16} /> Rendering…
+            </div>
+          ) : null}
         </>
       ) : (
         <>
@@ -217,13 +228,22 @@ export function PageCanvas({
                   <Icon size={11} /> <span>{fieldTitle(f)}</span>
                 </span>
                 {f.type === 'text' ? (
-                  <span className="pdf-ftext" style={{ fontSize: Math.max(8, Math.min(f.size * s, 16)), textAlign: f.align, fontFamily: FONT_CSS[f.font.family] ?? FONT_CSS.inter }}>
+                  <span
+                    className="pdf-ftext"
+                    style={{
+                      fontSize: Math.max(8, Math.min(f.size * s, 16)),
+                      textAlign: f.align,
+                      fontFamily: FONT_CSS[f.font.family] ?? FONT_CSS.inter,
+                    }}
+                  >
                     {f.text}
                   </span>
                 ) : f.type === 'image' ? (
                   <span className="pdf-fcenter">{f.src.replace(/\{\{\s*|\s*\}\}/g, '') || 'Image'}</span>
                 ) : f.type === 'qr' ? (
-                  <span className="pdf-fcenter"><Icon size={Math.min(28, f.rect.w * s * 0.5)} /></span>
+                  <span className="pdf-fcenter">
+                    <Icon size={Math.min(28, f.rect.w * s * 0.5)} />
+                  </span>
                 ) : null}
                 {sel
                   ? (f.type === 'qr' ? CORNERS : HANDLES).map((h) => (
@@ -234,7 +254,9 @@ export function PageCanvas({
             );
           })}
 
-          {draft ? <div className="pdf-draft" style={{ left: draft.x * s, top: draft.y * s, width: draft.w * s, height: draft.h * s }} /> : null}
+          {draft ? (
+            <div className="pdf-draft" style={{ left: draft.x * s, top: draft.y * s, width: draft.w * s, height: draft.h * s }} />
+          ) : null}
         </>
       )}
     </div>

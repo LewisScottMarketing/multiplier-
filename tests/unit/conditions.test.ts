@@ -46,7 +46,9 @@ describe('evalRule', () => {
     expect(evalRule({ match: 'any', conditions: conds }, ctx)).toBe(true);
   });
   it('describes rules in plain English', () => {
-    expect(describeRule({ match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] })).toBe('department is “sales”');
+    expect(describeRule({ match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] })).toBe(
+      'department is “sales”',
+    );
     expect(describeRule(undefined)).toBe('Everyone');
   });
 });

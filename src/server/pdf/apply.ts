@@ -1,4 +1,16 @@
-import { PDFArray, PDFDocument, PDFName, PDFString, clip, endPath, popGraphicsState, pushGraphicsState, rectangle, rgb, type PDFPage } from 'pdf-lib';
+import {
+  PDFArray,
+  PDFDocument,
+  PDFName,
+  PDFString,
+  clip,
+  endPath,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
+  rgb,
+  type PDFPage,
+} from 'pdf-lib';
 import QRCode from 'qrcode';
 import { evalRule } from '@shared/conditions';
 import type { DocumentConfig, PdfField, Rect } from '@shared/schema';
@@ -165,7 +177,12 @@ function wrapText(text: string, chain: Face[], size: number, maxW: number, book:
   return lines;
 }
 
-export async function renderPdf(input: { bytes: Uint8Array; instructions: Instruction[]; loadImage: ImageLoader; title?: string }): Promise<RenderResult> {
+export async function renderPdf(input: {
+  bytes: Uint8Array;
+  instructions: Instruction[];
+  loadImage: ImageLoader;
+  title?: string;
+}): Promise<RenderResult> {
   const warnings: string[] = [];
   const pdf = await PDFDocument.load(input.bytes, { updateMetadata: false });
   const book = new FontBook(pdf);
@@ -212,7 +229,8 @@ export async function renderPdf(input: { bytes: Uint8Array; instructions: Instru
     }
   }
 
-  if (book.missingGlyphs.length) warnings.push(`These characters aren’t available in the font and were replaced with “?”: ${book.missingGlyphs.join(' ')}`);
+  if (book.missingGlyphs.length)
+    warnings.push(`These characters aren’t available in the font and were replaced with “?”: ${book.missingGlyphs.join(' ')}`);
   if (input.title) pdf.setTitle(input.title);
   pdf.setProducer('Multiplier');
   pdf.setModificationDate(new Date());
@@ -255,7 +273,8 @@ async function drawText(page: PDFPage, book: FontBook, inst: Extract<Instruction
 
   const blockH = size + (lines.length - 1) * size * inst.lineHeight;
   let firstBaseline: number;
-  if (lines.length === 1 && inst.valign === 'top') firstBaseline = rect.y + ASCENT * base; // stay on the original baseline when shrinking
+  if (lines.length === 1 && inst.valign === 'top')
+    firstBaseline = rect.y + ASCENT * base; // stay on the original baseline when shrinking
   else if (inst.valign === 'top') firstBaseline = rect.y + ASCENT * size;
   else if (inst.valign === 'middle') firstBaseline = rect.y + (rect.h - blockH) / 2 + ASCENT * size;
   else firstBaseline = rect.y + rect.h - blockH + ASCENT * size - 0.1 * size;
@@ -295,13 +314,19 @@ async function drawImage(
   }
   if (!img) return;
   const { rect } = inst;
-  const scale = inst.fit === 'cover' ? Math.max(rect.w / img.width, rect.h / img.height) : Math.min(rect.w / img.width, rect.h / img.height);
+  const scale =
+    inst.fit === 'cover' ? Math.max(rect.w / img.width, rect.h / img.height) : Math.min(rect.w / img.width, rect.h / img.height);
   const w = img.width * scale;
   const h = img.height * scale;
   const x = box.x + rect.x + (rect.w - w) / 2;
   const y = box.y + box.height - rect.y - rect.h + (rect.h - h) / 2;
   if (inst.fit === 'cover') {
-    page.pushOperators(pushGraphicsState(), rectangle(box.x + rect.x, box.y + box.height - rect.y - rect.h, rect.w, rect.h), clip(), endPath());
+    page.pushOperators(
+      pushGraphicsState(),
+      rectangle(box.x + rect.x, box.y + box.height - rect.y - rect.h, rect.w, rect.h),
+      clip(),
+      endPath(),
+    );
     page.drawImage(img, { x, y, width: w, height: h });
     page.pushOperators(popGraphicsState());
   } else page.drawImage(img, { x, y, width: w, height: h });
@@ -319,7 +344,8 @@ function drawQr(page: PDFPage, inst: Extract<Instruction, { kind: 'qr' }>, box: 
   const cell = side / (n + quiet * 2);
   const left = box.x + inst.rect.x + (inst.rect.w - side) / 2;
   const top = box.y + box.height - inst.rect.y - (inst.rect.h - side) / 2; // PDF y of the square's top edge
-  if (inst.background) page.drawRectangle({ x: left, y: top - side, width: side, height: side, color: color(inst.background), borderWidth: 0 });
+  if (inst.background)
+    page.drawRectangle({ x: left, y: top - side, width: side, height: side, color: color(inst.background), borderWidth: 0 });
   const fill = color(inst.color);
   for (let row = 0; row < n; row++) {
     let col = 0;
@@ -330,7 +356,14 @@ function drawQr(page: PDFPage, inst: Extract<Instruction, { kind: 'qr' }>, box: 
       }
       let end = col;
       while (end < n && qr.modules.get(row, end)) end++;
-      page.drawRectangle({ x: left + (col + quiet) * cell, y: top - (row + quiet + 1) * cell, width: (end - col) * cell + 0.2, height: cell + 0.2, color: fill, borderWidth: 0 });
+      page.drawRectangle({
+        x: left + (col + quiet) * cell,
+        y: top - (row + quiet + 1) * cell,
+        width: (end - col) * cell + 0.2,
+        height: cell + 0.2,
+        color: fill,
+        borderWidth: 0,
+      });
       col = end;
     }
   }

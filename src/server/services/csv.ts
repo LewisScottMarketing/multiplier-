@@ -27,12 +27,22 @@ export const MAX_IMPORT_ROWS = 5000;
 export function parseCsv(buf: Buffer): ParsedCsv {
   let records: Array<Record<string, string>>;
   try {
-    records = parse(buf, { columns: (h: string[]) => h.map((x) => x.trim()), skip_empty_lines: true, skip_records_with_empty_values: true, bom: true, relax_column_count: true, relax_quotes: true, trim: true, max_record_size: 100_000 });
+    records = parse(buf, {
+      columns: (h: string[]) => h.map((x) => x.trim()),
+      skip_empty_lines: true,
+      skip_records_with_empty_values: true,
+      bom: true,
+      relax_column_count: true,
+      relax_quotes: true,
+      trim: true,
+      max_record_size: 100_000,
+    });
   } catch (e) {
     throw badRequest(`Couldn’t read that CSV: ${(e as Error).message}`);
   }
   if (records.length === 0) throw badRequest('That CSV has no rows.');
-  if (records.length > MAX_IMPORT_ROWS) throw badRequest(`Please import at most ${MAX_IMPORT_ROWS} rows at a time (this file has ${records.length}).`);
+  if (records.length > MAX_IMPORT_ROWS)
+    throw badRequest(`Please import at most ${MAX_IMPORT_ROWS} rows at a time (this file has ${records.length}).`);
   const headers = Object.keys(records[0]).filter(Boolean);
   return { headers, rows: records, suggested_mapping: suggestMapping(headers) };
 }
@@ -62,5 +72,8 @@ export const safeCell = (v: unknown): string => {
 };
 
 export function toCsv(headers: string[], rows: Array<Record<string, unknown>>): string {
-  return stringify(rows.map((r) => headers.map((h) => safeCell(r[h]))), { header: true, columns: headers });
+  return stringify(
+    rows.map((r) => headers.map((h) => safeCell(r[h]))),
+    { header: true, columns: headers },
+  );
 }

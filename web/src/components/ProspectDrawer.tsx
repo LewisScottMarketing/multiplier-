@@ -94,10 +94,16 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
       title={
         p ? (
           <div className="row" style={{ alignItems: 'flex-start' }}>
-            <span className="avatar" style={{ width: 40, height: 40, fontSize: 14 }}>{initials(name)}</span>
+            <span className="avatar" style={{ width: 40, height: 40, fontSize: 14 }}>
+              {initials(name)}
+            </span>
             <div style={{ minWidth: 0 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 680 }} className="truncate">{name}</h2>
-              <div className="muted small truncate">{[p.job_title, p.company].filter(Boolean).join(' · ') || p.email || 'No details yet'}</div>
+              <h2 style={{ fontSize: 18, fontWeight: 680 }} className="truncate">
+                {name}
+              </h2>
+              <div className="muted small truncate">
+                {[p.job_title, p.company].filter(Boolean).join(' · ') || p.email || 'No details yet'}
+              </div>
             </div>
           </div>
         ) : (
@@ -112,28 +118,44 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
         ) : null
       }
     >
-      {q.isLoading ? <CenterSpinner /> : q.error ? <Alert tone="bad">{(q.error as Error).message}</Alert> : d && p ? (
+      {q.isLoading ? (
+        <CenterSpinner />
+      ) : q.error ? (
+        <Alert tone="bad">{(q.error as Error).message}</Alert>
+      ) : d && p ? (
         <>
           <div className="row wrap">
             <StageChip stage={p.stage} />
             {p.seniority ? <span className="chip">{SENIORITY_LABELS[p.seniority as Seniority] ?? p.seniority}</span> : null}
-            {p.department && p.department !== 'other' ? <span className="chip">{DEPARTMENT_LABELS[p.department as Department] ?? p.department}</span> : null}
+            {p.department && p.department !== 'other' ? (
+              <span className="chip">{DEPARTMENT_LABELS[p.department as Department] ?? p.department}</span>
+            ) : null}
             <span className="muted tiny right">Added {timeAgo(p.created_at)}</span>
           </div>
 
           <section className="col" style={{ gap: 8 }}>
             <div className="label">Their personalised links</div>
-            {d.campaign.status !== 'live' ? <Alert tone="warn">This campaign isn’t published yet, so these links will say “not available” until you publish it.</Alert> : null}
+            {d.campaign.status !== 'live' ? (
+              <Alert tone="warn">This campaign isn’t published yet, so these links will say “not available” until you publish it.</Alert>
+            ) : null}
             <CopyBox text={p.url} />
             {p.pdf_url ? <CopyBox text={p.pdf_url} /> : null}
             <div className="row wrap">
-              <Button size="sm" onClick={() => window.open(p.url, '_blank', 'noopener')}><ExternalLink size={14} /> Open page</Button>
-              {p.pdf_url ? <Button size="sm" onClick={() => window.open(p.pdf_url!, '_blank', 'noopener')}><FileText size={14} /> Open PDF</Button> : null}
+              <Button size="sm" onClick={() => window.open(p.url, '_blank', 'noopener')}>
+                <ExternalLink size={14} /> Open page
+              </Button>
+              {p.pdf_url ? (
+                <Button size="sm" onClick={() => window.open(p.pdf_url!, '_blank', 'noopener')}>
+                  <FileText size={14} /> Open PDF
+                </Button>
+              ) : null}
             </div>
           </section>
 
           <section>
-            <div className="label" style={{ marginBottom: 8 }}>Engagement</div>
+            <div className="label" style={{ marginBottom: 8 }}>
+              Engagement
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
               {[
                 ['Views', p.engagement.views],
@@ -149,7 +171,11 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
                 </div>
               ))}
             </div>
-            {p.engagement.last_seen_at ? <div className="muted small" style={{ marginTop: 8 }}>Last seen {timeAgo(p.engagement.last_seen_at)}</div> : null}
+            {p.engagement.last_seen_at ? (
+              <div className="muted small" style={{ marginTop: 8 }}>
+                Last seen {timeAgo(p.engagement.last_seen_at)}
+              </div>
+            ) : null}
           </section>
 
           {d.submissions.length ? (
@@ -157,7 +183,9 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
               <div className="label">What they sent</div>
               {d.submissions.map((s) => (
                 <div key={s.id} style={{ background: 'var(--ok-bg)', borderRadius: 10, padding: '10px 12px' }}>
-                  <div className="muted tiny" style={{ marginBottom: 4 }}>{fmtDateTime(s.created_at)}</div>
+                  <div className="muted tiny" style={{ marginBottom: 4 }}>
+                    {fmtDateTime(s.created_at)}
+                  </div>
                   <dl className="kv" style={{ gridTemplateColumns: '90px 1fr', margin: 0 }}>
                     {Object.entries(s.data).map(([k, v]) => (
                       <div key={k} style={{ display: 'contents' }}>
@@ -181,7 +209,9 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
               ) : null}
             </div>
             {!shown.length ? (
-              <div className="muted small" style={{ padding: '8px 0' }}>Nothing yet. They haven’t opened their link.</div>
+              <div className="muted small" style={{ padding: '8px 0' }}>
+                Nothing yet. They haven’t opened their link.
+              </div>
             ) : (
               <div className="timeline">
                 {shown.map((e) => {
@@ -193,7 +223,9 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
                         <div>{t.text}</div>
                         {t.detail ? <div className="muted tiny">{t.detail}</div> : null}
                       </div>
-                      <div className="muted tiny nowrap" title={fmtDateTime(e.created_at)}>{timeAgo(e.created_at)}</div>
+                      <div className="muted tiny nowrap" title={fmtDateTime(e.created_at)}>
+                        {timeAgo(e.created_at)}
+                      </div>
                     </div>
                   );
                 })}
@@ -202,10 +234,22 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
           </section>
 
           <section>
-            <div className="label" style={{ marginBottom: 8 }}>Data from Clay</div>
+            <div className="label" style={{ marginBottom: 8 }}>
+              Data from Clay
+            </div>
             <dl className="kv">
-              {p.email ? <><dt>Email</dt><dd>{p.email}</dd></> : null}
-              {p.external_id ? <><dt>Your ID</dt><dd className="mono">{p.external_id}</dd></> : null}
+              {p.email ? (
+                <>
+                  <dt>Email</dt>
+                  <dd>{p.email}</dd>
+                </>
+              ) : null}
+              {p.external_id ? (
+                <>
+                  <dt>Your ID</dt>
+                  <dd className="mono">{p.external_id}</dd>
+                </>
+              ) : null}
               {custom.map(([k, v]) => (
                 <div key={k} style={{ display: 'contents' }}>
                   <dt>{k.replace(/_/g, ' ')}</dt>
@@ -215,7 +259,9 @@ export function ProspectDrawer({ id, onClose, onDeleted }: { id: string; onClose
             </dl>
             {!p.email && !custom.length && !p.external_id ? <div className="muted small">No extra fields.</div> : null}
             <details style={{ marginTop: 12 }}>
-              <summary className="small muted" style={{ cursor: 'pointer' }}>Every merge field the page can use for {p.first_name || 'them'}</summary>
+              <summary className="small muted" style={{ cursor: 'pointer' }}>
+                Every merge field the page can use for {p.first_name || 'them'}
+              </summary>
               <dl className="kv" style={{ marginTop: 8 }}>
                 {Object.entries(d.context)
                   .filter(([k]) => !HIDDEN_CONTEXT.has(k))

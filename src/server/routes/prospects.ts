@@ -87,9 +87,26 @@ export function prospectRoutes() {
     const campaign = requireCampaign(app, c.req.param('id'));
     const { rows } = listProspects(app, campaign.id, { limit: 500, sort: 'created', order: 'asc' });
     const all = [...rows];
-    for (let offset = 500; offset < 50_000 && all.length === offset; offset += 500) all.push(...listProspects(app, campaign.id, { limit: 500, offset, sort: 'created', order: 'asc' }).rows);
+    for (let offset = 500; offset < 50_000 && all.length === offset; offset += 500)
+      all.push(...listProspects(app, campaign.id, { limit: 500, offset, sort: 'created', order: 'asc' }).rows);
     const custom = customFieldNames(app, campaign.id);
-    const headers = ['first_name', 'last_name', 'email', 'company', 'job_title', 'linkedin_url', ...custom, 'multiplier_url', 'multiplier_pdf_url', 'stage', 'views', 'clicks', 'downloads', 'submissions', 'last_seen_at'];
+    const headers = [
+      'first_name',
+      'last_name',
+      'email',
+      'company',
+      'job_title',
+      'linkedin_url',
+      ...custom,
+      'multiplier_url',
+      'multiplier_pdf_url',
+      'stage',
+      'views',
+      'clicks',
+      'downloads',
+      'submissions',
+      'last_seen_at',
+    ];
     const data = all.map((p) => ({
       first_name: p.first_name,
       last_name: p.last_name,
@@ -121,7 +138,10 @@ export function prospectRoutes() {
     const p = requireProspect(app, c.req.param('id'));
     const campaign = requireCampaign(app, p.campaign_id);
     const submissions = app.db
-      .all<{ id: string; data: string; created_at: number }>('SELECT id, data, created_at FROM submissions WHERE prospect_id = ? ORDER BY created_at DESC LIMIT 20', p.id)
+      .all<{ id: string; data: string; created_at: number }>(
+        'SELECT id, data, created_at FROM submissions WHERE prospect_id = ? ORDER BY created_at DESC LIMIT 20',
+        p.id,
+      )
       .map((s) => ({ id: s.id, created_at: s.created_at, data: parseJson<Record<string, unknown>>(s.data, {}) }));
     const context = contextFor(app, campaign, p);
     return c.json({

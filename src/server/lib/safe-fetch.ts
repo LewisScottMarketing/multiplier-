@@ -27,7 +27,8 @@ for (const [net4, prefix] of [
   ['203.0.113.0', 24],
   ['224.0.0.0', 4],
   ['240.0.0.0', 4],
-] as const) blocked.addSubnet(net4, prefix, 'ipv4');
+] as const)
+  blocked.addSubnet(net4, prefix, 'ipv4');
 for (const [net6, prefix] of [
   ['::', 96], // unspecified, loopback and the deprecated IPv4-compatible range
   ['::1', 128],
@@ -37,7 +38,8 @@ for (const [net6, prefix] of [
   ['2001:db8::', 32],
   ['64:ff9b::', 96],
   ['2002::', 16],
-] as const) blocked.addSubnet(net6, prefix, 'ipv6');
+] as const)
+  blocked.addSubnet(net6, prefix, 'ipv6');
 
 export function isBlockedAddress(addr: string): boolean {
   const mapped = addr.toLowerCase().match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
@@ -107,7 +109,9 @@ function once(url: URL, opts: SafeRequestOptions): Promise<SafeResponse> {
           }
           chunks.push(c);
         });
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks), url: url.toString() }));
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks), url: url.toString() }),
+        );
         res.on('error', reject);
       },
     );
@@ -126,7 +130,8 @@ export async function safeRequest(rawUrl: string, opts: SafeRequestOptions = {})
   let url = new URL(rawUrl);
   const maxRedirects = opts.method && opts.method !== 'GET' ? 0 : (opts.maxRedirects ?? 3);
   for (let hop = 0; ; hop++) {
-    if (url.protocol !== 'https:' && (opts.httpsOnly || url.protocol !== 'http:')) throw new FetchBlockedError('Only https URLs are allowed');
+    if (url.protocol !== 'https:' && (opts.httpsOnly || url.protocol !== 'http:'))
+      throw new FetchBlockedError('Only https URLs are allowed');
     if (!opts.allowPrivate && net.isIP(url.hostname.replace(/^\[|\]$/g, '')) && isBlockedAddress(url.hostname.replace(/^\[|\]$/g, ''))) {
       throw new FetchBlockedError('Refusing to connect to a private address');
     }

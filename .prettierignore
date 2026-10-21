@@ -1,0 +1,8 @@
+node_modules
+dist
+web/dist
+.data
+coverage
+tests/fixtures
+docs/screenshots
+package-lock.json

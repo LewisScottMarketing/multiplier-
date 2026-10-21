@@ -38,7 +38,12 @@ export function Preview({ selectedId, onSelect }: { selectedId: string | null; o
     setBusy(true);
     const t = setTimeout(async () => {
       try {
-        const r = await api.post<PreviewResult>(`/campaigns/${c.id}/preview`, { page: c.draft.page, document: c.draft.document, settings: c.draft.settings, source: sourceToApi(c.previewSource) });
+        const r = await api.post<PreviewResult>(`/campaigns/${c.id}/preview`, {
+          page: c.draft.page,
+          document: c.draft.document,
+          settings: c.draft.settings,
+          source: sourceToApi(c.previewSource),
+        });
         if (id !== req.current) return;
         setError('');
         setResult(r);
@@ -101,9 +106,17 @@ export function Preview({ selectedId, onSelect }: { selectedId: string | null; o
     <div className="pv">
       <div className="pv-bar">
         <PreviewAs />
-        {persona ? <span className="sample-pill" title="Segment derived from the job title">{persona}</span> : <span className="muted small">No job title → no segment</span>}
+        {persona ? (
+          <span className="sample-pill" title="Segment derived from the job title">
+            {persona}
+          </span>
+        ) : (
+          <span className="muted small">No job title → no segment</span>
+        )}
         {missing.length ? (
-          <span className="badge warn" title={`Empty with no fallback: ${missing.join(', ')}`}><AlertTriangle size={11} /> {missing.length} empty field{missing.length === 1 ? '' : 's'}</span>
+          <span className="badge warn" title={`Empty with no fallback: ${missing.join(', ')}`}>
+            <AlertTriangle size={11} /> {missing.length} empty field{missing.length === 1 ? '' : 's'}
+          </span>
         ) : null}
         <div className="grow" />
         {busy ? <Spinner size={15} /> : null}
@@ -116,12 +129,28 @@ export function Preview({ selectedId, onSelect }: { selectedId: string | null; o
             { value: 'mobile', label: <Smartphone size={14} />, title: 'Phone' },
           ]}
         />
-        <Button size="sm" icon variant="ghost" title="Refresh preview" aria-label="Refresh preview" onClick={() => setNonce((n) => n + 1)}><RefreshCw size={14} /></Button>
-        <Button size="sm" icon variant="ghost" title={live ? 'Open the published generic page' : 'Open this preview in a new tab'} aria-label="Open in new tab" onClick={() => window.open(urls[front] || undefined, '_blank')}><ExternalLink size={14} /></Button>
+        <Button size="sm" icon variant="ghost" title="Refresh preview" aria-label="Refresh preview" onClick={() => setNonce((n) => n + 1)}>
+          <RefreshCw size={14} />
+        </Button>
+        <Button
+          size="sm"
+          icon
+          variant="ghost"
+          title={live ? 'Open the published generic page' : 'Open this preview in a new tab'}
+          aria-label="Open in new tab"
+          onClick={() => window.open(urls[front] || undefined, '_blank')}
+        >
+          <ExternalLink size={14} />
+        </Button>
       </div>
       <div className="pv-stage">
         <div className="pv-frame" style={{ width: WIDTH[device] }}>
-          {error ? <div className="alert bad" style={{ margin: 16 }}><AlertTriangle size={16} /><div>{error}</div></div> : null}
+          {error ? (
+            <div className="alert bad" style={{ margin: 16 }}>
+              <AlertTriangle size={16} />
+              <div>{error}</div>
+            </div>
+          ) : null}
           {(['a', 'b'] as const).map((k) => (
             <iframe
               key={k}

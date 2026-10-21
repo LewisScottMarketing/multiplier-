@@ -23,7 +23,8 @@ export interface StoredPdf {
 
 /** Validate, store and analyse an uploaded PDF. */
 export async function storePdf(app: AppContext, input: { data: Buffer; filename: string; campaignId?: string | null }): Promise<StoredPdf> {
-  if (input.data.length > app.config.maxUploadBytes) throw tooLarge(`PDFs can be up to ${Math.round(app.config.maxUploadBytes / 1024 / 1024)} MB.`);
+  if (input.data.length > app.config.maxUploadBytes)
+    throw tooLarge(`PDFs can be up to ${Math.round(app.config.maxUploadBytes / 1024 / 1024)} MB.`);
   if (!isPdf(input.data)) throw badRequest('That file doesn’t look like a PDF.');
 
   const { extracted, rasters } = await pdfGate.run(() =>
@@ -34,7 +35,8 @@ export async function storePdf(app: AppContext, input: { data: Buffer; filename:
         const wanted = new Set<number>([1, 2, 3].filter((n) => n <= extracted.page_count));
         for (const t of extracted.tokens) wanted.add(t.page);
         const rasters: Raster[] = [];
-        for (const n of [...wanted].sort((a, b) => a - b)) rasters.push(Object.assign(await renderPageRaster(input.data, n, 1.5), { page: n }));
+        for (const n of [...wanted].sort((a, b) => a - b))
+          rasters.push(Object.assign(await renderPageRaster(input.data, n, 1.5), { page: n }));
         return { extracted, rasters };
       })(),
       90_000,
@@ -78,12 +80,21 @@ export async function storePdf(app: AppContext, input: { data: Buffer; filename:
 function tokenFields(extracted: ExtractedDoc, rasters: Array<Raster & { page?: number }>) {
   for (const r of rasters) {
     const pg = extracted.pages[(r.page ?? 1) - 1];
-    if (pg) sampleRunColors(r, pg.runs.filter((run) => /\{\{[^{}]{1,80}\}\}/.test(run.text)));
+    if (pg)
+      sampleRunColors(
+        r,
+        pg.runs.filter((run) => /\{\{[^{}]{1,80}\}\}/.test(run.text)),
+      );
   }
   return fieldsForTokenRuns(extracted.pages);
 }
 
-const safeName = (s: string) => s.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+const safeName = (s: string) =>
+  s
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60);
 
 export interface ImportOutcome {
   campaign: Campaign;
@@ -91,7 +102,10 @@ export interface ImportOutcome {
 }
 
 /** Upload a PDF → a campaign with a landing page built from it and the PDF ready to personalise. */
-export async function importPdfCampaign(app: AppContext, input: { data: Buffer; filename: string; name?: string; ai?: boolean }): Promise<ImportOutcome> {
+export async function importPdfCampaign(
+  app: AppContext,
+  input: { data: Buffer; filename: string; name?: string; ai?: boolean },
+): Promise<ImportOutcome> {
   const stored = await storePdf(app, input);
   const { extracted, asset } = stored;
   const first = stored.rasters.slice(0, 3);
@@ -117,7 +131,10 @@ export async function importPdfCampaign(app: AppContext, input: { data: Buffer; 
 
   const headline = importedPage.blocks.find((b) => b.type === 'hero');
   const title = headline?.type === 'hero' && headline.headline ? headline.headline : input.filename.replace(/\.pdf$/i, '');
-  if (!stored.editable) report.push('This PDF can’t be edited (it may use unusual encryption or structure), so each prospect gets the original file. The landing page is unaffected.');
+  if (!stored.editable)
+    report.push(
+      'This PDF can’t be edited (it may use unusual encryption or structure), so each prospect gets the original file. The landing page is unaffected.',
+    );
 
   const fields = stored.editable ? tokenFields(extracted, stored.rasters) : [];
   const document: DocumentConfig = {
@@ -138,7 +155,11 @@ export async function importPdfCampaign(app: AppContext, input: { data: Buffer; 
 }
 
 /** Attach (or replace) the PDF of an existing campaign. Existing fields are dropped: page geometry may differ. */
-export async function attachPdf(app: AppContext, campaignId: string, input: { data: Buffer; filename: string }): Promise<{ campaign: Campaign; detected: number }> {
+export async function attachPdf(
+  app: AppContext,
+  campaignId: string,
+  input: { data: Buffer; filename: string },
+): Promise<{ campaign: Campaign; detected: number }> {
   const current = requireCampaign(app, campaignId);
   const stored = await storePdf(app, { ...input, campaignId });
   const fields = stored.editable ? tokenFields(stored.extracted, stored.rasters) : [];

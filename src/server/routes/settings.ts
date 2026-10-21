@@ -9,15 +9,7 @@ import { requireCampaign } from '../services/campaigns';
 import { getAsset, listAssets, MAX_IMAGE_BYTES, storeImage } from '../services/assets';
 import { getWorkspace, saveWorkspace } from '../services/settings';
 import { listProspects } from '../services/prospects';
-import {
-  createWebhook,
-  deleteWebhook,
-  EVENT_NAMES,
-  listWebhooks,
-  recentDeliveries,
-  sendTest,
-  updateWebhook,
-} from '../services/webhooks';
+import { createWebhook, deleteWebhook, EVENT_NAMES, listWebhooks, recentDeliveries, sendTest, updateWebhook } from '../services/webhooks';
 import net from 'node:net';
 
 const hostname = z
@@ -27,7 +19,20 @@ const hostname = z
   .regex(/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/, 'Enter a domain like go.yourbrand.com');
 
 /** Headers that frame the request itself; letting a setting override them can only break (or confuse) the delivery. */
-const RESERVED_HEADERS = new Set(['host', 'content-length', 'content-type', 'transfer-encoding', 'connection', 'keep-alive', 'upgrade', 'te', 'trailer', 'expect', 'proxy-authorization', 'proxy-connection']);
+const RESERVED_HEADERS = new Set([
+  'host',
+  'content-length',
+  'content-type',
+  'transfer-encoding',
+  'connection',
+  'keep-alive',
+  'upgrade',
+  'te',
+  'trailer',
+  'expect',
+  'proxy-authorization',
+  'proxy-connection',
+]);
 
 const WebhookBody = z.object({
   name: z.string().trim().min(1).max(80),
@@ -41,7 +46,10 @@ const WebhookBody = z.object({
     .refine((h) => !RESERVED_HEADERS.has(h.toLowerCase()), 'That header is set by the connection itself. Choose another name.')
     .nullish(),
   auth_value: z.string().max(500).nullish(),
-  events: z.array(z.enum([...EVENT_NAMES, '*'])).max(10).optional(),
+  events: z
+    .array(z.enum([...EVENT_NAMES, '*']))
+    .max(10)
+    .optional(),
   campaign_id: z.string().max(40).nullish(),
   active: z.boolean().optional(),
 });
@@ -143,7 +151,9 @@ export function settingsRoutes() {
   r.get('/assets', (c) => {
     const app = c.get('app');
     const rows = listAssets(app, 'image', c.req.query('campaign') || undefined);
-    return c.json({ assets: rows.map((a) => ({ id: a.id, filename: a.filename, url: `/a/${a.id}`, meta: JSON.parse(a.meta), created_at: a.created_at })) });
+    return c.json({
+      assets: rows.map((a) => ({ id: a.id, filename: a.filename, url: `/a/${a.id}`, meta: JSON.parse(a.meta), created_at: a.created_at })),
+    });
   });
 
   r.post('/assets', async (c) => {

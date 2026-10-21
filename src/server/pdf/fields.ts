@@ -20,7 +20,8 @@ export function fieldFromRun(page: Pick<PageInfo, 'width' | 'runs' | 'page'>, ru
 
   const centre = run.x + run.w / 2;
   const centred = Math.abs(centre - page.width / 2) < Math.max(6, page.width * 0.012) && run.w < page.width * 0.85;
-  const rightAligned = !centred && run.x > page.width * 0.4 && Math.abs(run.x + run.w - (page.width - MARGIN)) < Math.max(10, page.width * 0.02);
+  const rightAligned =
+    !centred && run.x > page.width * 0.4 && Math.abs(run.x + run.w - (page.width - MARGIN)) < Math.max(10, page.width * 0.02);
 
   const grow = Math.max(60, run.size * 12);
   let x = run.x;
@@ -70,7 +71,8 @@ export function fieldsForTokenRuns(pages: Array<Pick<PageInfo, 'width' | 'runs' 
 
 /** A discreet "Prepared for …" line near the bottom of page 1, coloured to contrast with what is under it. */
 export function stampField(page: Pick<PageInfo, 'width' | 'height' | 'runs' | 'page'>, bgHex: string): TextField {
-  const dark = parseInt(bgHex.slice(1, 3), 16) * 0.299 + parseInt(bgHex.slice(3, 5), 16) * 0.587 + parseInt(bgHex.slice(5, 7), 16) * 0.114 < 140;
+  const dark =
+    parseInt(bgHex.slice(1, 3), 16) * 0.299 + parseInt(bgHex.slice(3, 5), 16) * 0.587 + parseInt(bgHex.slice(5, 7), 16) * 0.114 < 140;
   const size = 10;
   return {
     id: `f_${newBlockId()}`,

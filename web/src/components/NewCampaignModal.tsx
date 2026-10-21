@@ -64,12 +64,21 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
         <div className="col" style={{ padding: '18px 0 26px', gap: 16 }}>
           {mode === 'pdf' ? (
             <>
-              <div className="row"><FileText size={18} className="muted" /> <b className="truncate">{fileName}</b></div>
-              <div className="progress indeterminate"><i /></div>
-              <p className="muted small">Reading the text and layout, picking your brand colour and drafting the page. This usually takes a few seconds{aiOn && polish ? ', a little longer with AI polish' : ''}.</p>
+              <div className="row">
+                <FileText size={18} className="muted" /> <b className="truncate">{fileName}</b>
+              </div>
+              <div className="progress indeterminate">
+                <i />
+              </div>
+              <p className="muted small">
+                Reading the text and layout, picking your brand colour and drafting the page. This usually takes a few seconds
+                {aiOn && polish ? ', a little longer with AI polish' : ''}.
+              </p>
             </>
           ) : (
-            <div className="progress indeterminate"><i /></div>
+            <div className="progress indeterminate">
+              <i />
+            </div>
           )}
         </div>
       </Modal>
@@ -84,7 +93,13 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
         footer={
           <>
             <Button onClick={onClose}>Later</Button>
-            <Button variant="primary" onClick={() => { nav(`/campaigns/${result.campaign.id}/page`); onClose(); }}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                nav(`/campaigns/${result.campaign.id}/page`);
+                onClose();
+              }}
+            >
               Open the builder <ArrowRight size={15} />
             </Button>
           </>
@@ -100,12 +115,17 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
           </div>
           <ul className="steps-list" style={{ padding: 0, margin: 0 }}>
             {result.report.map((line, i) => (
-              <li key={i}><CheckCircle2 size={15} />{line}</li>
+              <li key={i}>
+                <CheckCircle2 size={15} />
+                {line}
+              </li>
             ))}
           </ul>
           {result.campaign.document?.fields.length ? (
             <Alert tone="ok">
-              We spotted <b>{result.campaign.document.fields.length}</b> placeholder{result.campaign.document.fields.length === 1 ? '' : 's'} in your PDF, so each prospect’s copy will have their details filled in.
+              We spotted <b>{result.campaign.document.fields.length}</b> placeholder
+              {result.campaign.document.fields.length === 1 ? '' : 's'} in your PDF, so each prospect’s copy will have their details filled
+              in.
             </Alert>
           ) : (
             <Alert>
@@ -121,15 +141,23 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
     <Modal title="New campaign" onClose={onClose} description="Start from a PDF you already have, or build a page from scratch.">
       <div className="option-cards">
         <button type="button" className={`option-card ${mode === 'pdf' ? 'on' : ''}`} onClick={() => setMode('pdf')}>
-          <b><FileUp size={17} /> From a PDF</b>
+          <b>
+            <FileUp size={17} /> From a PDF
+          </b>
           <span>We build the landing page from it, and each prospect gets their own edited copy of the PDF.</span>
         </button>
         <button type="button" className={`option-card ${mode === 'blank' ? 'on' : ''}`} onClick={() => setMode('blank')}>
-          <b><LayoutTemplate size={17} /> From scratch</b>
+          <b>
+            <LayoutTemplate size={17} /> From scratch
+          </b>
           <span>Start with a ready-made personalised page and edit the blocks.</span>
         </button>
       </div>
-      {error ? <div style={{ marginBottom: 12 }}><Alert tone="bad">{error}</Alert></div> : null}
+      {error ? (
+        <div style={{ marginBottom: 12 }}>
+          <Alert tone="bad">{error}</Alert>
+        </div>
+      ) : null}
       <Field label="Campaign name" hint={mode === 'pdf' ? 'Optional. We’ll use the PDF’s title.' : undefined}>
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Q4 outbound — Playbook" autoFocus />
       </Field>
@@ -139,28 +167,55 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
           {aiOn ? (
             <label className="check" style={{ marginBottom: 12 }}>
               <input type="checkbox" checked={polish} onChange={(e) => setPolish(e.target.checked)} />
-              <span>Let Claude tidy the copy where the PDF’s wording is weak <span className="muted">(optional; it never rewrites text that already reads well)</span></span>
+              <span>
+                Let Claude tidy the copy where the PDF’s wording is weak{' '}
+                <span className="muted">(optional; it never rewrites text that already reads well)</span>
+              </span>
             </label>
           ) : null}
           <div
             className={`dropzone ${over ? 'over' : ''}`}
             onClick={() => input.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setOver(true);
+            }}
             onDragLeave={() => setOver(false)}
-            onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) void upload(f); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setOver(false);
+              const f = e.dataTransfer.files[0];
+              if (f) void upload(f);
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && input.current?.click()}
           >
-            <div className="icon-bubble"><FileUp size={22} /></div>
+            <div className="icon-bubble">
+              <FileUp size={22} />
+            </div>
             <b>Drop a PDF here, or click to browse</b>
-            <p className="muted small" style={{ marginTop: 4 }}>Case studies, one-pagers, proposals, decks, whitepapers. Up to 25 MB.</p>
-            <input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} />
+            <p className="muted small" style={{ marginTop: 4 }}>
+              Case studies, one-pagers, proposals, decks, whitepapers. Up to 25 MB.
+            </p>
+            <input
+              ref={input}
+              type="file"
+              accept="application/pdf,.pdf"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void upload(f);
+                e.target.value = '';
+              }}
+            />
           </div>
         </>
       ) : (
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <Button variant="primary" onClick={createBlank}>Create campaign <ArrowRight size={15} /></Button>
+          <Button variant="primary" onClick={createBlank}>
+            Create campaign <ArrowRight size={15} />
+          </Button>
         </div>
       )}
     </Modal>

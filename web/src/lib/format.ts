@@ -1,4 +1,5 @@
-export const fmtNum = (n: number): string => (n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1).replace(/\.0$/, '')}K` : n.toLocaleString('en-GB'));
+export const fmtNum = (n: number): string =>
+  n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1).replace(/\.0$/, '')}K` : n.toLocaleString('en-GB');
 export const fmtPct = (n: number, d: number): string => (d > 0 ? `${Math.round((n / d) * 100)}%` : '—');
 
 export function timeAgo(ts: number | string | null | undefined): string {

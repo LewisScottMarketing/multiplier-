@@ -9,7 +9,17 @@ import type { CampaignSummary } from '../types';
 import { Badge, Button, CenterSpinner, EmptyState, Segmented } from '../ui';
 
 export function StatusBadge({ status }: { status: CampaignSummary['status'] }) {
-  return status === 'live' ? <Badge tone="ok" dot>Live</Badge> : status === 'archived' ? <Badge>Archived</Badge> : <Badge tone="warn" dot>Draft</Badge>;
+  return status === 'live' ? (
+    <Badge tone="ok" dot>
+      Live
+    </Badge>
+  ) : status === 'archived' ? (
+    <Badge>Archived</Badge>
+  ) : (
+    <Badge tone="warn" dot>
+      Draft
+    </Badge>
+  );
 }
 
 export function Campaigns() {
@@ -35,21 +45,47 @@ export function Campaigns() {
         <CenterSpinner />
       ) : all.length === 0 ? (
         <div className="card">
-          <EmptyState icon={<FolderKanban size={24} />} title="Create your first campaign" action={<Button variant="primary" onClick={() => setCreating(true)}><Plus size={16} /> New campaign</Button>}>
+          <EmptyState
+            icon={<FolderKanban size={24} />}
+            title="Create your first campaign"
+            action={
+              <Button variant="primary" onClick={() => setCreating(true)}>
+                <Plus size={16} /> New campaign
+              </Button>
+            }
+          >
             Drop in a PDF and we’ll turn it into a landing page, then you can send a personalised version to every prospect.
           </EmptyState>
         </div>
       ) : (
         <>
           <div className="filters">
-            <Segmented value={filter} onChange={setFilter} options={[{ value: 'all', label: `All ${all.length}` }, { value: 'live', label: 'Live' }, { value: 'draft', label: 'Drafts' }]} />
+            <Segmented
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: 'all', label: `All ${all.length}` },
+                { value: 'live', label: 'Live' },
+                { value: 'draft', label: 'Drafts' },
+              ]}
+            />
           </div>
           <div className="grid-cards">
             {list.map((c) => (
               <Link key={c.id} to={`/campaigns/${c.id}/page`} className="camp">
                 <div className="camp-thumb" style={{ background: brandGradient(c.brand) }}>
-                  <span className="pill"><StatusBadge status={c.status} /></span>
-                  <span className="s">{c.has_document ? <><FileText size={11} style={{ verticalAlign: '-1px' }} /> Page + PDF</> : 'Page'}</span>
+                  <span className="pill">
+                    <StatusBadge status={c.status} />
+                  </span>
+                  <span className="s">
+                    {c.has_document ? (
+                      <>
+                        <FileText size={11} style={{ verticalAlign: '-1px' }} /> Page + PDF
+                      </>
+                    ) : (
+                      'Page'
+                    )}
+                  </span>
                   <span className="t">{c.headline || c.name}</span>
                 </div>
                 <div className="camp-body">
@@ -58,9 +94,18 @@ export function Campaigns() {
                     <span className="muted tiny">Updated {timeAgo(c.updated_at)}</span>
                   </div>
                   <div className="camp-stats">
-                    <div><b>{fmtNum(c.prospects)}</b><span>Prospects</span></div>
-                    <div><b>{fmtPct(c.viewed, c.prospects)}</b><span>Opened</span></div>
-                    <div><b>{fmtNum(c.submissions)}</b><span>Replies</span></div>
+                    <div>
+                      <b>{fmtNum(c.prospects)}</b>
+                      <span>Prospects</span>
+                    </div>
+                    <div>
+                      <b>{fmtPct(c.viewed, c.prospects)}</b>
+                      <span>Opened</span>
+                    </div>
+                    <div>
+                      <b>{fmtNum(c.submissions)}</b>
+                      <span>Replies</span>
+                    </div>
                   </div>
                 </div>
               </Link>

@@ -57,11 +57,26 @@ function loadSource(): PreviewSource {
   return { kind: 'sample', index: 0 };
 }
 
-const section = (d: Draft) => ({ page: JSON.stringify(d.page), document: JSON.stringify(d.document), settings: JSON.stringify(d.settings) });
+const section = (d: Draft) => ({
+  page: JSON.stringify(d.page),
+  document: JSON.stringify(d.document),
+  settings: JSON.stringify(d.settings),
+});
 
-export function CampaignProvider({ id, children }: { id: string; children: (ctx: CampaignCtx | null, status: { loading: boolean; error: Error | null }) => ReactNode }) {
+export function CampaignProvider({
+  id,
+  children,
+}: {
+  id: string;
+  children: (ctx: CampaignCtx | null, status: { loading: boolean; error: Error | null }) => ReactNode;
+}) {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['campaign', id], queryFn: () => api.get<CampaignDetail>(`/campaigns/${id}`), staleTime: Infinity, refetchOnMount: 'always' });
+  const q = useQuery({
+    queryKey: ['campaign', id],
+    queryFn: () => api.get<CampaignDetail>(`/campaigns/${id}`),
+    staleTime: Infinity,
+    refetchOnMount: 'always',
+  });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [state, setState] = useState<SaveState>('saved');
   const [error, setError] = useState('');
@@ -100,7 +115,12 @@ export function CampaignProvider({ id, children }: { id: string; children: (ctx:
   }, [id]);
 
   const draftJson = draft ? section(draft) : null;
-  const dirty = !!draftJson && !!saved.current && (draftJson.page !== saved.current.page || draftJson.document !== saved.current.document || draftJson.settings !== saved.current.settings);
+  const dirty =
+    !!draftJson &&
+    !!saved.current &&
+    (draftJson.page !== saved.current.page ||
+      draftJson.document !== saved.current.document ||
+      draftJson.settings !== saved.current.settings);
 
   const flush = useCallback(async () => {
     if (!draft || !saved.current) return;
@@ -114,8 +134,16 @@ export function CampaignProvider({ id, children }: { id: string; children: (ctx:
     try {
       const r = await api.put<{ campaign: Campaign; issues: LintIssue[] }>(`/campaigns/${id}`, patch);
       version.current = r.campaign.version;
-      saved.current = { page: patch.page ? now.page : saved.current.page, document: 'document' in patch ? now.document : saved.current.document, settings: 'settings' in patch ? now.settings : saved.current.settings };
-      qc.setQueryData<CampaignDetail>(['campaign', id], (old) => (old ? { ...old, campaign: { ...old.campaign, version: r.campaign.version, updated_at: r.campaign.updated_at }, issues: r.issues } : old));
+      saved.current = {
+        page: patch.page ? now.page : saved.current.page,
+        document: 'document' in patch ? now.document : saved.current.document,
+        settings: 'settings' in patch ? now.settings : saved.current.settings,
+      };
+      qc.setQueryData<CampaignDetail>(['campaign', id], (old) =>
+        old
+          ? { ...old, campaign: { ...old.campaign, version: r.campaign.version, updated_at: r.campaign.updated_at }, issues: r.issues }
+          : old,
+      );
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       setState('saved');
       setError('');
@@ -169,8 +197,14 @@ export function CampaignProvider({ id, children }: { id: string; children: (ctx:
       return { ...d, page: next };
     });
   }, []);
-  const setDocument = useCallback((fn: (d: DocumentConfig | null) => DocumentConfig | null) => setDraft((d) => (d ? { ...d, document: fn(d.document) } : d)), []);
-  const setSettings = useCallback((fn: (s: CampaignSettings) => CampaignSettings) => setDraft((d) => (d ? { ...d, settings: fn(d.settings) } : d)), []);
+  const setDocument = useCallback(
+    (fn: (d: DocumentConfig | null) => DocumentConfig | null) => setDraft((d) => (d ? { ...d, document: fn(d.document) } : d)),
+    [],
+  );
+  const setSettings = useCallback(
+    (fn: (s: CampaignSettings) => CampaignSettings) => setDraft((d) => (d ? { ...d, settings: fn(d.settings) } : d)),
+    [],
+  );
 
   const history = useMemo(
     () => ({
@@ -209,7 +243,9 @@ export function CampaignProvider({ id, children }: { id: string; children: (ctx:
     async (name: string) => {
       const r = await api.put<{ campaign: Campaign }>(`/campaigns/${id}`, { name });
       version.current = r.campaign.version;
-      qc.setQueryData<CampaignDetail>(['campaign', id], (old) => (old ? { ...old, campaign: { ...old.campaign, name: r.campaign.name, version: r.campaign.version } } : old));
+      qc.setQueryData<CampaignDetail>(['campaign', id], (old) =>
+        old ? { ...old, campaign: { ...old.campaign, name: r.campaign.name, version: r.campaign.version } } : old,
+      );
       qc.invalidateQueries({ queryKey: ['campaigns'] });
     },
     [id, qc],
@@ -229,8 +265,16 @@ export function CampaignProvider({ id, children }: { id: string; children: (ctx:
   const fields = useMemo<FieldInfo[]>(() => {
     if (!draft || !detail) return STANDARD_FIELDS;
     const known = new Set(STANDARD_FIELDS.map((f) => f.key));
-    const custom: FieldInfo[] = detail.custom_fields.filter((k) => !known.has(k)).map((k) => ({ key: k, label: k.replace(/_/g, ' '), example: '', group: 'person', hint: 'Custom field from Clay' }));
-    const ai: FieldInfo[] = draft.settings.ai_fields.map((f) => ({ key: `ai_${f.key}`, label: f.label || `AI: ${f.key}`, example: f.fallback || 'AI-written', group: 'segment', hint: 'Written per prospect by AI' }));
+    const custom: FieldInfo[] = detail.custom_fields
+      .filter((k) => !known.has(k))
+      .map((k) => ({ key: k, label: k.replace(/_/g, ' '), example: '', group: 'person', hint: 'Custom field from Clay' }));
+    const ai: FieldInfo[] = draft.settings.ai_fields.map((f) => ({
+      key: `ai_${f.key}`,
+      label: f.label || `AI: ${f.key}`,
+      example: f.fallback || 'AI-written',
+      group: 'segment',
+      hint: 'Written per prospect by AI',
+    }));
     return [...STANDARD_FIELDS, ...custom, ...ai];
   }, [draft, detail]);
 

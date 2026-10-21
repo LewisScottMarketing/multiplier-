@@ -22,9 +22,24 @@ const le16 = (n: number) => Buffer.from([n & 255, (n >>> 8) & 255]);
 const le24 = (n: number) => Buffer.from([n & 255, (n >>> 8) & 255, (n >>> 16) & 255]);
 
 const png = (w: number, h: number) =>
-  Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), be32(13), Buffer.from('IHDR'), be32(w), be32(h), Buffer.from([8, 6, 0, 0, 0]), Buffer.alloc(8)]);
+  Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    be32(13),
+    Buffer.from('IHDR'),
+    be32(w),
+    be32(h),
+    Buffer.from([8, 6, 0, 0, 0]),
+    Buffer.alloc(8),
+  ]);
 const jpeg = (w: number, h: number) =>
-  Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), Buffer.alloc(14), Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08]), be16(h), be16(w), Buffer.from([3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1])]);
+  Buffer.concat([
+    Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
+    Buffer.alloc(14),
+    Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08]),
+    be16(h),
+    be16(w),
+    Buffer.from([3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]),
+  ]);
 const gif = (w: number, h: number) => Buffer.concat([Buffer.from('GIF89a'), le16(w), le16(h), Buffer.alloc(8)]);
 const webp = (kind: 'VP8X' | 'VP8L' | 'VP8 ', w: number, h: number) => {
   const head = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'), Buffer.from(kind), Buffer.alloc(4)]);
@@ -107,7 +122,9 @@ describe('rendering pages of any size', () => {
 
 describe('merge fields only read the prospect’s own data', () => {
   it('does not resolve names that exist on every object', () => {
-    expect(renderTemplate('[{{constructor}}][{{constructor.name}}][{{tostring}}][{{__proto__}}][{{a.constructor}}]', { a: { b: 1 } })).toBe('[][][][][]');
+    expect(renderTemplate('[{{constructor}}][{{constructor.name}}][{{tostring}}][{{__proto__}}][{{a.constructor}}]', { a: { b: 1 } })).toBe(
+      '[][][][][]',
+    );
     expect(renderTemplate('{{constructor|fallback}}', {})).toBe('fallback');
   });
 
@@ -118,7 +135,18 @@ describe('merge fields only read the prospect’s own data', () => {
 
 describe('link safety', () => {
   it('rejects anything a browser would treat as another site or a script', () => {
-    for (const bad of ['//evil.example', '/\\evil.example', '\\\\evil.example', '\\/evil.example', '/\t/evil.example', 'javascript:alert(1)', 'java\tscript:alert(1)', ' JaVaScRiPt:alert(1)', 'data:text/html,<b>', 'vbscript:x']) {
+    for (const bad of [
+      '//evil.example',
+      '/\\evil.example',
+      '\\\\evil.example',
+      '\\/evil.example',
+      '/\t/evil.example',
+      'javascript:alert(1)',
+      'java\tscript:alert(1)',
+      ' JaVaScRiPt:alert(1)',
+      'data:text/html,<b>',
+      'vbscript:x',
+    ]) {
       expect(safeUrl(bad), JSON.stringify(bad)).toBe('');
     }
   });
@@ -135,7 +163,18 @@ describe('link safety', () => {
 describe('hostile profile data cannot stall the server', () => {
   // values are capped at 2000 characters when they are stored; every pattern must stay fast at that size
   const N = 2000;
-  const inputs = [' '.repeat(N) + 'x', 'a' + ','.repeat(N) + 'x', 'a' + ' \u{1F600}'.repeat(N / 2), '('.repeat(N), ' (he/'.repeat(N / 5), 'x.' + 'a'.repeat(N), '@'.repeat(N), 'a@'.repeat(N / 2), 'Acme' + ' inc'.repeat(N / 4), 'Ph.D, '.repeat(N / 6)];
+  const inputs = [
+    ' '.repeat(N) + 'x',
+    'a' + ','.repeat(N) + 'x',
+    'a' + ' \u{1F600}'.repeat(N / 2),
+    '('.repeat(N),
+    ' (he/'.repeat(N / 5),
+    'x.' + 'a'.repeat(N),
+    '@'.repeat(N),
+    'a@'.repeat(N / 2),
+    'Acme' + ' inc'.repeat(N / 4),
+    'Ph.D, '.repeat(N / 6),
+  ];
 
   it('keeps name, company and domain clean-up fast', () => {
     const started = performance.now();
@@ -155,7 +194,24 @@ describe('hostile profile data cannot stall the server', () => {
 
 describe('addresses outbound requests may not reach', () => {
   it('blocks private, loopback, link-local and mapped forms', () => {
-    for (const a of ['127.0.0.1', '10.1.2.3', '192.168.0.9', '172.16.5.5', '169.254.169.254', '100.64.0.1', '0.0.0.0', '::1', '::', '::7f00:1', '::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:a00:1', 'fd00::1', 'fe80::1', 'not-an-ip']) {
+    for (const a of [
+      '127.0.0.1',
+      '10.1.2.3',
+      '192.168.0.9',
+      '172.16.5.5',
+      '169.254.169.254',
+      '100.64.0.1',
+      '0.0.0.0',
+      '::1',
+      '::',
+      '::7f00:1',
+      '::ffff:127.0.0.1',
+      '::ffff:7f00:1',
+      '::ffff:a00:1',
+      'fd00::1',
+      'fe80::1',
+      'not-an-ip',
+    ]) {
       expect(isBlockedAddress(a), a).toBe(true);
     }
   });
@@ -231,14 +287,19 @@ describe('the rate limiter', () => {
 
 describe('Slack messages', () => {
   it('neutralises mentions and links that came from a profile', () => {
-    expect(slackSafe('<!channel> <https://evil.example|Reset your password> & more')).toBe('&lt;!channel&gt; &lt;https://evil.example|Reset your password&gt; &amp; more');
+    expect(slackSafe('<!channel> <https://evil.example|Reset your password> & more')).toBe(
+      '&lt;!channel&gt; &lt;https://evil.example|Reset your password&gt; &amp; more',
+    );
     expect(slackSafe(undefined)).toBe('');
     expect(slackSafe('Jane Doe')).toBe('Jane Doe');
   });
 });
 
 describe('targeting rules that use a pattern', () => {
-  const rule = (pattern: string) => ({ match: 'all' as const, conditions: [{ field: 'job_title', op: 'matches' as const, value: pattern }] });
+  const rule = (pattern: string) => ({
+    match: 'all' as const,
+    conditions: [{ field: 'job_title', op: 'matches' as const, value: pattern }],
+  });
 
   it('still match ordinary titles, with or without repetition in the pattern', () => {
     installRegexGuard(silentLogger);

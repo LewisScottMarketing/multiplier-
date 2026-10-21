@@ -5,7 +5,11 @@ import type { TestApp } from './app';
 /** A small page that exercises personalisation: tokens with fallbacks, a persona-specific block, and a form. */
 export function demoPage(overrides: Partial<Page> = {}): Page {
   return PageSchema.parse({
-    header: { enabled: true, logo_text: 'Acme Co', button: { label: 'Book a call', action: { type: 'link', url: 'https://cal.com/acme/intro?name={{full_name}}' } } },
+    header: {
+      enabled: true,
+      logo_text: 'Acme Co',
+      button: { label: 'Book a call', action: { type: 'link', url: 'https://cal.com/acme/intro?name={{full_name}}' } },
+    },
     footer: { text: 'Prepared for {{first_name|you}}', links: [{ label: 'Privacy', url: 'https://acme.com/privacy' }] },
     blocks: [
       newBlock('hero', {
@@ -16,15 +20,28 @@ export function demoPage(overrides: Partial<Page> = {}): Page {
         primary: { label: 'Book a call', action: { type: 'link', url: 'https://cal.com/acme/intro' } },
         secondary: { label: 'Get the PDF', action: { type: 'document' } },
       }),
-      newBlock('text', { id: 'mkt', heading: 'For marketing leaders', body: 'Marketing-specific copy for {{company_short}}.', rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'marketing' }] } }),
-      newBlock('text', { id: 'sales', heading: 'For sales leaders', body: 'Sales-specific copy.', rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] } }),
+      newBlock('text', {
+        id: 'mkt',
+        heading: 'For marketing leaders',
+        body: 'Marketing-specific copy for {{company_short}}.',
+        rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'marketing' }] },
+      }),
+      newBlock('text', {
+        id: 'sales',
+        heading: 'For sales leaders',
+        body: 'Sales-specific copy.',
+        rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] },
+      }),
       newBlock('form', { id: 'form1' }),
     ],
     ...overrides,
   });
 }
 
-export async function createLiveCampaign(t: TestApp, opts: { name?: string; page?: Page; settings?: Record<string, unknown>; publish?: boolean } = {}) {
+export async function createLiveCampaign(
+  t: TestApp,
+  opts: { name?: string; page?: Page; settings?: Record<string, unknown>; publish?: boolean } = {},
+) {
   const created = await t.json('POST', '/api/campaigns', { name: opts.name ?? 'Test Campaign' });
   const id = created.body.campaign.id as string;
   await t.json('PUT', `/api/campaigns/${id}`, { page: opts.page ?? demoPage(), ...(opts.settings ? { settings: opts.settings } : {}) });
@@ -39,4 +56,6 @@ export async function createApiKey(t: TestApp, opts: { campaign_id?: string } = 
 }
 
 export const bearer = (key: string) => ({ authorization: `Bearer ${key}`, cookie: '' });
-export const publicHeaders = (ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36') => ({ host: 'go.test', 'user-agent': ua, cookie: '' });
+export const publicHeaders = (
+  ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+) => ({ host: 'go.test', 'user-agent': ua, cookie: '' });

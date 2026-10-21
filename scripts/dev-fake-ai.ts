@@ -24,7 +24,8 @@ const backend: AiBackend = {
       const who = facts.company ? `Teams like ${facts.company}` : 'Teams like yours';
       const role = facts.job_title ? `, and ${facts.job_title.toLowerCase()}s especially,` : '';
       const out: Record<string, string> = {};
-      for (const f of fields) out[f.key] = `${who}${role} tend to get the most from starting with the message, not the list.`.slice(0, f.max_characters);
+      for (const f of fields)
+        out[f.key] = `${who}${role} tend to get the most from starting with the message, not the list.`.slice(0, f.max_characters);
       return { ok: true, data: out };
     }
     if (call.label === 'persona-variant') {
@@ -33,7 +34,10 @@ const backend: AiBackend = {
       const out: Record<string, string> = {};
       for (const [id, leaf] of Object.entries(leaves)) {
         const t = leaf.text;
-        const next = t.length < 90 ? `${t.replace(/[.:!?]+$/, '')}, the ${label} way` : `${t.replace(/\s+$/, '')} For ${label}, the first result is usually visible inside a week.`;
+        const next =
+          t.length < 90
+            ? `${t.replace(/[.:!?]+$/, '')}, the ${label} way`
+            : `${t.replace(/\s+$/, '')} For ${label}, the first result is usually visible inside a week.`;
         out[id] = next.slice(0, leaf.max_characters);
       }
       return { ok: true, data: out };
@@ -49,4 +53,6 @@ const ctx = createContext(config);
 setAiBackend(ctx, backend);
 const app = createApp(ctx);
 startWebhookWorker(ctx);
-serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => ctx.log.info(`Multiplier (fake AI) on http://localhost:${info.port}`));
+serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) =>
+  ctx.log.info(`Multiplier (fake AI) on http://localhost:${info.port}`),
+);

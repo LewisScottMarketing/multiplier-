@@ -83,7 +83,12 @@ export function campaignRoutes() {
       }),
     );
     const saved = requireCampaign(app, c.req.param('id'));
-    const draft = { ...saved, page: body.page ?? saved.page, document: body.document === undefined ? saved.document : body.document, settings: body.settings ?? saved.settings };
+    const draft = {
+      ...saved,
+      page: body.page ?? saved.page,
+      document: body.document === undefined ? saved.document : body.document,
+      settings: body.settings ?? saved.settings,
+    };
     const src = parsePreviewSource(previewSourceString(body.source));
     const out = renderPreview(app, draft, src, new URL(app.config.appUrl).host);
     const id = randomToken(12);

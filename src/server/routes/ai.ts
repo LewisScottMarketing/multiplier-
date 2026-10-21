@@ -9,7 +9,8 @@ import { requireCampaign } from '../services/campaigns';
 import { customFieldNames } from '../services/prospects';
 import { parsePreviewSource, previewContext, previewSourceString, PreviewSourceSchema } from '../services/render';
 
-const unavailable = () => new HttpError(503, 'ai_unavailable', 'AI isn’t switched on for this server. Set ANTHROPIC_API_KEY and restart to use it.');
+const unavailable = () =>
+  new HttpError(503, 'ai_unavailable', 'AI isn’t switched on for this server. Set ANTHROPIC_API_KEY and restart to use it.');
 
 /** Dashboard helpers that call Claude on the author's behalf. Nothing here is saved; the editor decides. */
 export function aiRoutes() {
@@ -31,12 +32,19 @@ export function aiRoutes() {
   r.post('/:id/ai/variant', limit, async (c) => {
     const app = c.get('app');
     const campaign = requireCampaign(app, c.req.param('id'));
-    const body = await jsonBody(c, z.object({ block: BlockSchema, persona: z.object({ label: z.string().trim().min(1).max(60), description: z.string().trim().min(1).max(400) }) }));
+    const body = await jsonBody(
+      c,
+      z.object({
+        block: BlockSchema,
+        persona: z.object({ label: z.string().trim().min(1).max(60), description: z.string().trim().min(1).max(400) }),
+      }),
+    );
     if (!aiEnabled(app)) throw unavailable();
     if (!canVary(body.block)) throw unprocessable('This kind of block can’t be rewritten automatically.');
     const out = await suggestVariant(app, campaign, body.block, body.persona, customFieldNames(app, campaign.id));
     if (!out.ok) {
-      if (out.reason === 'refused') throw unprocessable('The AI declined to write this one. Try different wording in the block, or write it by hand.');
+      if (out.reason === 'refused')
+        throw unprocessable('The AI declined to write this one. Try different wording in the block, or write it by hand.');
       if (out.reason === 'bad_output' || out.reason === 'config') throw unprocessable(out.message);
       throw new HttpError(502, 'ai_failed', out.message);
     }

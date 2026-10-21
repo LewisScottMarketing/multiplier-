@@ -4,7 +4,8 @@ import { createTestApp, type TestApp } from '../helpers/app';
 let t: TestApp;
 afterEach(() => t.close());
 
-const ask = (domain: string, headers: Record<string, string> = {}) => t.req('GET', `/internal/tls-check?domain=${encodeURIComponent(domain)}`, undefined, { host: 'app:3000', ...headers });
+const ask = (domain: string, headers: Record<string, string> = {}) =>
+  t.req('GET', `/internal/tls-check?domain=${encodeURIComponent(domain)}`, undefined, { host: 'app:3000', ...headers });
 
 describe('on-demand TLS check (called by Caddy)', () => {
   it('approves the app host, the links host and domains added in settings, and nothing else', async () => {

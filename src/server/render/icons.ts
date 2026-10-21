@@ -55,7 +55,12 @@ export function icon(name: string | undefined, size = 22): string {
   let svg = '';
   if (node) {
     const inner = node
-      .map(([tag, a]) => `<${tag} ${Object.entries(a).map(([k, v]) => `${k}="${attr(v)}"`).join(' ')}/>`)
+      .map(
+        ([tag, a]) =>
+          `<${tag} ${Object.entries(a)
+            .map(([k, v]) => `${k}="${attr(v)}"`)
+            .join(' ')}/>`,
+      )
       .join('');
     svg = `<svg class="ic" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
   }

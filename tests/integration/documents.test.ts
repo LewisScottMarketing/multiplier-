@@ -30,12 +30,27 @@ describe('PDF import through the API', () => {
     expect(campaign.name).toBe('The 2026 Outbound Pipeline Playbook');
     expect(campaign.status).toBe('draft');
     expect(campaign.page.theme.brand).toBe('#4f46e5');
-    expect(campaign.page.blocks.map((b: { type: string }) => b.type)).toEqual(['hero', 'text', 'stats', 'image', 'checklist', 'testimonial', 'steps', 'cta', 'form']);
+    expect(campaign.page.blocks.map((b: { type: string }) => b.type)).toEqual([
+      'hero',
+      'text',
+      'stats',
+      'image',
+      'checklist',
+      'testimonial',
+      'steps',
+      'cta',
+      'form',
+    ]);
     expect(campaign.document.page_count).toBe(3);
     expect(campaign.document.filename).toBe('The 2026 Outbound Pipeline Playbook - {{company_short|for you}}.pdf');
     // the {{first_name}} {{last_name}} placeholder on the cover became a ready-made replace field
     expect(campaign.document.fields).toHaveLength(1);
-    expect(campaign.document.fields[0]).toMatchObject({ type: 'text', page: 1, text: 'Attn: {{first_name}} {{last_name}}', color: '#ffffff' });
+    expect(campaign.document.fields[0]).toMatchObject({
+      type: 'text',
+      page: 1,
+      text: 'Attn: {{first_name}} {{last_name}}',
+      color: '#ffffff',
+    });
     expect(campaign.document.fields[0].mask.color).toBe('#4f46e5');
     expect(report.join(' ')).toMatch(/Found \{\{first_name\}\}/);
     // the picture from the PDF was stored and referenced
@@ -81,7 +96,8 @@ describe('personalised PDFs for prospects', () => {
     const key = await createApiKey(t);
     return { id: c.id as string, key, campaign: c };
   }
-  const personalize = (key: string, id: string, row: Record<string, unknown>) => t.json('POST', '/api/v1/personalize', { campaign: id, ...row }, bearer(key));
+  const personalize = (key: string, id: string, row: Record<string, unknown>) =>
+    t.json('POST', '/api/v1/personalize', { campaign: id, ...row }, bearer(key));
 
   it('serves each prospect their own PDF, edited in place, and records the download', async () => {
     const { id, key } = await liveCampaign();
@@ -109,10 +125,16 @@ describe('personalised PDFs for prospects', () => {
     const { id, key } = await liveCampaign();
     const jane = await personalize(key, id, { email: 'jane@acme.com', first_name: 'Jane', last_name: 'Doe' });
     const lukasz = await personalize(key, id, { email: 'l@initech.pl', first_name: 'ŁUKASZ', last_name: 'NOWAK', company: 'Initech GmbH' });
-    const get = async (url: string) => new Uint8Array(await (await t.req('GET', new URL(url).pathname, undefined, publicHeaders())).arrayBuffer());
+    const get = async (url: string) =>
+      new Uint8Array(await (await t.req('GET', new URL(url).pathname, undefined, publicHeaders())).arrayBuffer());
     const a = await get(jane.body.pdf_url);
     const b = await get(lukasz.body.pdf_url);
-    expect((await extractDocument(b)).pages[0].runs.map((r) => r.text).join('').replace(/\s/g, '')).toContain('Attn:ŁukaszNowak'); // names are tidied
+    expect(
+      (await extractDocument(b)).pages[0].runs
+        .map((r) => r.text)
+        .join('')
+        .replace(/\s/g, ''),
+    ).toContain('Attn:ŁukaszNowak'); // names are tidied
     expect(Buffer.compare(Buffer.from(a), Buffer.from(b))).not.toBe(0);
     // second request is served from the content-addressed cache: byte-identical (the PDF carries a timestamp, so a rebuild would differ)
     const again = await get(jane.body.pdf_url);
@@ -140,7 +162,11 @@ describe('personalised PDFs for prospects', () => {
     const cover = await t.req('GET', `/p/${token}/cover.png`, undefined, publicHeaders());
     expect(cover.status).toBe(200);
     expect(cover.headers.get('content-type')).toBe('image/png');
-    expect(Buffer.from(await cover.arrayBuffer()).subarray(1, 4).toString()).toBe('PNG');
+    expect(
+      Buffer.from(await cover.arrayBuffer())
+        .subarray(1, 4)
+        .toString(),
+    ).toBe('PNG');
     const html = await (await t.req('GET', `/p/${token}`, undefined, publicHeaders())).text();
     expect(html).toContain(`src="/p/${token}/cover.png"`);
     expect(html).toContain(`href="/p/${token}.pdf"`);
@@ -178,10 +204,26 @@ describe('personalised PDFs for prospects', () => {
 
     const { id, key, campaign } = await liveCampaign();
     await t.json('PUT', `/api/campaigns/${id}`, {
-      document: { ...campaign.document, fields: [...campaign.document.fields, { id: 'logo', type: 'image', page: 1, rect: { x: 440, y: 60, w: 100, h: 50 }, src: '{{logo_url}}', fit: 'contain' }] },
+      document: {
+        ...campaign.document,
+        fields: [
+          ...campaign.document.fields,
+          { id: 'logo', type: 'image', page: 1, rect: { x: 440, y: 60, w: 100, h: 50 }, src: '{{logo_url}}', fit: 'contain' },
+        ],
+      },
     });
-    const ok = await personalize(key, id, { email: 'a@b.co', first_name: 'A', last_name: 'B', logo_url: `http://127.0.0.1:${port}/logo.png` });
-    const missing = await personalize(key, id, { email: 'c@d.co', first_name: 'C', last_name: 'D', logo_url: `http://127.0.0.1:${port}/nope.png` });
+    const ok = await personalize(key, id, {
+      email: 'a@b.co',
+      first_name: 'A',
+      last_name: 'B',
+      logo_url: `http://127.0.0.1:${port}/logo.png`,
+    });
+    const missing = await personalize(key, id, {
+      email: 'c@d.co',
+      first_name: 'C',
+      last_name: 'D',
+      logo_url: `http://127.0.0.1:${port}/nope.png`,
+    });
     const withLogo = await t.req('GET', new URL(ok.body.pdf_url).pathname, undefined, publicHeaders());
     const without = await t.req('GET', new URL(missing.body.pdf_url).pathname, undefined, publicHeaders());
     expect(withLogo.status).toBe(200);
@@ -199,10 +241,20 @@ describe('personalised PDFs for prospects', () => {
     form.set('file', new File([fixture('playbook.pdf')], 'p.pdf'));
     const imp = await strict.json('POST', '/api/campaigns/import-pdf', form);
     const c = imp.body.campaign;
-    await strict.json('PUT', `/api/campaigns/${c.id}`, { document: { ...c.document, fields: [{ id: 'logo', type: 'image', page: 1, rect: { x: 440, y: 60, w: 100, h: 50 }, src: '{{logo_url}}' }] } });
+    await strict.json('PUT', `/api/campaigns/${c.id}`, {
+      document: {
+        ...c.document,
+        fields: [{ id: 'logo', type: 'image', page: 1, rect: { x: 440, y: 60, w: 100, h: 50 }, src: '{{logo_url}}' }],
+      },
+    });
     await strict.json('POST', `/api/campaigns/${c.id}/status`, { status: 'live' });
     const key = await createApiKey(strict);
-    const p = await strict.json('POST', '/api/v1/personalize', { campaign: c.id, email: 'a@b.co', first_name: 'A', logo_url: 'http://169.254.169.254/latest/meta-data/' }, bearer(key));
+    const p = await strict.json(
+      'POST',
+      '/api/v1/personalize',
+      { campaign: c.id, email: 'a@b.co', first_name: 'A', logo_url: 'http://169.254.169.254/latest/meta-data/' },
+      bearer(key),
+    );
     const res = await strict.req('GET', new URL(p.body.pdf_url).pathname, undefined, publicHeaders());
     expect(res.status).toBe(200); // PDF still builds
     await strict.close();
@@ -221,7 +273,11 @@ describe('studio endpoints', () => {
     expect(img.status).toBe(200);
     expect(img.headers.get('content-type')).toBe('image/png');
 
-    const f = await t.json('POST', `/api/campaigns/${campaign.id}/document/field-from-run`, { page: 1, run_id: prepared.id, template: 'Prepared for {{company}}' });
+    const f = await t.json('POST', `/api/campaigns/${campaign.id}/document/field-from-run`, {
+      page: 1,
+      run_id: prepared.id,
+      template: 'Prepared for {{company}}',
+    });
     expect(f.body.field).toMatchObject({ type: 'text', text: 'Prepared for {{company}}', page: 1 });
     expect(f.body.field.rect.w).toBeGreaterThan(prepared.w);
     expect((await t.json('POST', `/api/campaigns/${campaign.id}/document/field-from-run`, { page: 1, run_id: 'nope' })).status).toBe(404);
@@ -232,8 +288,18 @@ describe('studio endpoints', () => {
     const { campaign } = (await upload()).body;
     const page = (await t.json('GET', `/api/campaigns/${campaign.id}/document/page/1`)).body.page;
     const prepared = page.runs.find((r: { text: string }) => /Prepared for/.test(r.text));
-    const field = (await t.json('POST', `/api/campaigns/${campaign.id}/document/field-from-run`, { page: 1, run_id: prepared.id, template: 'Prepared for {{company_short}}' })).body.field;
-    const res = await t.req('POST', `/api/campaigns/${campaign.id}/document/preview`, { document: { ...campaign.document, fields: [field] }, source: { kind: 'sample', index: 0 }, page: 1 });
+    const field = (
+      await t.json('POST', `/api/campaigns/${campaign.id}/document/field-from-run`, {
+        page: 1,
+        run_id: prepared.id,
+        template: 'Prepared for {{company_short}}',
+      })
+    ).body.field;
+    const res = await t.req('POST', `/api/campaigns/${campaign.id}/document/preview`, {
+      document: { ...campaign.document, fields: [field] },
+      source: { kind: 'sample', index: 0 },
+      page: 1,
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/png');
     expect(Buffer.from(await res.arrayBuffer()).length).toBeGreaterThan(5000);
@@ -269,7 +335,12 @@ describe('document lifecycle', () => {
     const { campaign } = (await upload()).body;
     await t.json('POST', `/api/campaigns/${campaign.id}/status`, { status: 'live' });
     const key = await createApiKey(t);
-    const p = await t.json('POST', '/api/v1/personalize', { campaign: campaign.id, email: 'a@b.co', first_name: 'A', last_name: 'B' }, bearer(key));
+    const p = await t.json(
+      'POST',
+      '/api/v1/personalize',
+      { campaign: campaign.id, email: 'a@b.co', first_name: 'A', last_name: 'B' },
+      bearer(key),
+    );
     await t.req('GET', new URL(p.body.pdf_url).pathname, undefined, publicHeaders());
     expect((await t.ctx.storage.list(`campaigns/${campaign.id}/generated`)).length).toBeGreaterThan(0);
     const asset = t.ctx.db.get<{ storage_key: string }>("SELECT storage_key FROM assets WHERE kind = 'pdf'")!;

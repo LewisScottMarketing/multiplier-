@@ -31,7 +31,12 @@ export interface R {
   button(btn: Button | undefined, slot: string, kind?: 'primary' | 'secondary', size?: 'sm'): string;
 }
 
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
 
 export function blockAnchor(b: Block): string {
   return (b.anchor && slug(b.anchor)) || b.id;
@@ -172,12 +177,20 @@ function testimonial(b: BlockOf<'testimonial'>, r: R): string {
   const av = r.img(b.avatar);
   const logo = r.img(b.logo);
   const who = [b.name, b.role, b.company].some(Boolean)
-    ? `<div class="who">${av ? `<img class="av" src="${esc(av.src)}" alt="${esc(av.alt)}" loading="lazy">` : ''}<div><b>${r.inline(b.name)}</b><span>${[b.role, b.company].filter(Boolean).map((x) => r.inline(x)).join(', ')}</span></div></div>`
+    ? `<div class="who">${av ? `<img class="av" src="${esc(av.src)}" alt="${esc(av.alt)}" loading="lazy">` : ''}<div><b>${r.inline(b.name)}</b><span>${[
+        b.role,
+        b.company,
+      ]
+        .filter(Boolean)
+        .map((x) => r.inline(x))
+        .join(', ')}</span></div></div>`
     : '';
   return section(
     b,
     'testimonial',
-    wrap(`<figure class="quote" style="margin:0"><blockquote>${r.inline(b.quote)}</blockquote>${who}${logo ? `<img class="logo" src="${esc(logo.src)}" alt="${esc(logo.alt)}" loading="lazy">` : ''}</figure>`),
+    wrap(
+      `<figure class="quote" style="margin:0"><blockquote>${r.inline(b.quote)}</blockquote>${who}${logo ? `<img class="logo" src="${esc(logo.src)}" alt="${esc(logo.alt)}" loading="lazy">` : ''}</figure>`,
+    ),
   );
 }
 
@@ -196,7 +209,11 @@ function image(b: BlockOf<'image'>, r: R): string {
   const img = r.img(b.image);
   if (!img) return '';
   const cap = b.caption ? `<figcaption>${r.inline(b.caption)}</figcaption>` : '';
-  return section(b, `image w-${b.width}`, wrap(`<figure class="figure"><img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="lazy">${cap}</figure>`, b.width === 'content'));
+  return section(
+    b,
+    `image w-${b.width}`,
+    wrap(`<figure class="figure"><img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="lazy">${cap}</figure>`, b.width === 'content'),
+  );
 }
 
 function video(b: BlockOf<'video'>, r: R): string {
@@ -236,7 +253,8 @@ function form(b: BlockOf<'form'>, r: R): string {
       if (f.type === 'textarea') control = `<textarea id="${id}" ${name}${req}${ph}>${esc(pre)}</textarea>`;
       else if (f.type === 'select') {
         control = `<select id="${id}" ${name}${req}><option value="">Select…</option>${(f.options ?? []).map((o) => `<option>${esc(o)}</option>`).join('')}</select>`;
-      } else control = `<input type="${f.type}" id="${id}" ${name}${req}${ph}${val} autocomplete="${f.type === 'email' ? 'email' : f.key === 'name' ? 'name' : 'off'}">`;
+      } else
+        control = `<input type="${f.type}" id="${id}" ${name}${req}${ph}${val} autocomplete="${f.type === 'email' ? 'email' : f.key === 'name' ? 'name' : 'off'}">`;
       return `<div class="field"><label for="${id}">${label}${f.required ? '' : ' <span style="font-weight:400;opacity:.6">(optional)</span>'}</label>${control}</div>`;
     })
     .join('');
@@ -266,20 +284,37 @@ function calendar(b: BlockOf<'calendar'>, r: R): string {
   const head = sectionHead(r, b.heading, b.intro);
   if (!e) {
     const link = safeUrl(raw);
-    return link ? section(b, 'calendar', wrap(`${head}<p><a class="btn btn-primary" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Book a time</a></p>`), 'center') : '';
+    return link
+      ? section(
+          b,
+          'calendar',
+          wrap(`${head}<p><a class="btn btn-primary" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Book a time</a></p>`),
+          'center',
+        )
+      : '';
   }
-  return section(b, 'calendar', wrap(`${head}<div class="embed"><iframe src="${esc(e.src)}" height="${b.height}" title="Book a meeting" loading="lazy"></iframe></div>`));
+  return section(
+    b,
+    'calendar',
+    wrap(
+      `${head}<div class="embed"><iframe src="${esc(e.src)}" height="${b.height}" title="Book a meeting" loading="lazy"></iframe></div>`,
+    ),
+  );
 }
 
 function note(b: BlockOf<'note'>, r: R): string {
   const av = r.img(b.avatar);
   const name = r.inline(b.from_name);
   const initial = (r.plain(b.from_name).trim()[0] ?? '·').toUpperCase();
-  const avatar = av ? `<img src="${esc(av.src)}" alt="${esc(av.alt || r.plain(b.from_name))}" loading="lazy">` : `<div class="av-fallback" aria-hidden="true">${esc(initial)}</div>`;
+  const avatar = av
+    ? `<img src="${esc(av.src)}" alt="${esc(av.alt || r.plain(b.from_name))}" loading="lazy">`
+    : `<div class="av-fallback" aria-hidden="true">${esc(initial)}</div>`;
   return section(
     b,
     'note',
-    wrap(`<div class="note"><div class="msg">${r.rich(b.message)}</div><div class="from">${avatar}<div><b>${name}</b>${b.from_role ? `<span>${r.inline(b.from_role)}</span>` : ''}</div></div></div>`),
+    wrap(
+      `<div class="note"><div class="msg">${r.rich(b.message)}</div><div class="from">${avatar}<div><b>${name}</b>${b.from_role ? `<span>${r.inline(b.from_role)}</span>` : ''}</div></div></div>`,
+    ),
   );
 }
 
@@ -293,7 +328,40 @@ function documentBlock(b: BlockOf<'document'>, r: R): string {
 }
 
 const SANITIZE = {
-  allowedTags: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'a', 'ul', 'ol', 'li', 'h2', 'h3', 'h4', 'blockquote', 'img', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'div', 'small', 'code', 'pre', 'figure', 'figcaption', 'iframe'],
+  allowedTags: [
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'u',
+    's',
+    'a',
+    'ul',
+    'ol',
+    'li',
+    'h2',
+    'h3',
+    'h4',
+    'blockquote',
+    'img',
+    'hr',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'th',
+    'td',
+    'span',
+    'div',
+    'small',
+    'code',
+    'pre',
+    'figure',
+    'figcaption',
+    'iframe',
+  ],
   allowedAttributes: {
     a: ['href', 'title', 'target', 'rel'],
     img: ['src', 'alt', 'width', 'height', 'loading'],
@@ -306,7 +374,10 @@ const SANITIZE = {
   allowProtocolRelative: false,
   allowedIframeHostnames: [...FRAME_HOSTS],
   transformTags: {
-    a: (_tag: string, attribs: Record<string, string>) => ({ tagName: 'a', attribs: { ...attribs, rel: 'noopener noreferrer', target: '_blank' } }),
+    a: (_tag: string, attribs: Record<string, string>) => ({
+      tagName: 'a',
+      attribs: { ...attribs, rel: 'noopener noreferrer', target: '_blank' },
+    }),
   },
 } as sanitizeHtml.IOptions;
 

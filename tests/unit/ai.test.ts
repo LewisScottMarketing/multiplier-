@@ -69,7 +69,12 @@ describe('stripUnknownTokens', () => {
 
 describe('campaignBrief', () => {
   it('describes the page without leaking merge tokens', () => {
-    const page = PageSchema.parse({ blocks: [newBlock('hero', { headline: 'Plan for {{company|your team}}', subheadline: 'Hi {{first_name|there}}, read on.' }), newBlock('text', { heading: 'Why it works', body: 'x' })] });
+    const page = PageSchema.parse({
+      blocks: [
+        newBlock('hero', { headline: 'Plan for {{company|your team}}', subheadline: 'Hi {{first_name|there}}, read on.' }),
+        newBlock('text', { heading: 'Why it works', body: 'x' }),
+      ],
+    });
     const brief = campaignBrief({ name: 'Q4', page });
     expect(brief).toContain('Headline: Plan for your team');
     expect(brief).toContain('Sub-headline: Hi there, read on.');
@@ -80,10 +85,23 @@ describe('campaignBrief', () => {
 
 describe('block text leaves', () => {
   it('addresses the prose of a block and nothing else', () => {
-    const b = newBlock('features', { heading: 'Why us', intro: 'Short intro', items: [{ icon: 'zap', title: 'Fast', text: 'Quick to set up' }, { title: 'Safe', text: '' }] });
+    const b = newBlock('features', {
+      heading: 'Why us',
+      intro: 'Short intro',
+      items: [
+        { icon: 'zap', title: 'Fast', text: 'Quick to set up' },
+        { title: 'Safe', text: '' },
+      ],
+    });
     const leaves = textLeaves(b);
     expect(leaves.map((l) => l.path)).toEqual(['heading', 'intro', 'items.0.title', 'items.0.text', 'items.1.title']);
-    const next = withLeaves(b, { heading: 'Why marketers pick us', 'items.0.title': 'Fast setup', 'items.9.title': 'ignored', icon: 'hacked', id: 'evil' });
+    const next = withLeaves(b, {
+      heading: 'Why marketers pick us',
+      'items.0.title': 'Fast setup',
+      'items.9.title': 'ignored',
+      icon: 'hacked',
+      id: 'evil',
+    });
     expect(next.type === 'features' && next.heading).toBe('Why marketers pick us');
     expect(next.type === 'features' && next.items[0]!.title).toBe('Fast setup');
     expect(next.type === 'features' && next.items[0]!.icon).toBe('zap');
@@ -103,12 +121,17 @@ describe('block text leaves', () => {
 describe('excludingRule', () => {
   const marketing = PERSONAS.find((p) => p.id === 'marketing')!.rule;
   it('turns a persona into "everyone except them"', () => {
-    expect(excludingRule(undefined, marketing)).toEqual({ match: 'all', conditions: [{ field: 'department', op: 'not_equals', value: 'marketing' }] });
+    expect(excludingRule(undefined, marketing)).toEqual({
+      match: 'all',
+      conditions: [{ field: 'department', op: 'not_equals', value: 'marketing' }],
+    });
   });
   it('adds to an existing rule when that stays unambiguous', () => {
     const existing = { match: 'all' as const, conditions: [{ field: 'seniority_group', op: 'equals' as const, value: 'leader' }] };
     expect(excludingRule(existing, marketing)!.conditions).toHaveLength(2);
-    expect(excludingRule({ match: 'any', conditions: [existing.conditions[0]!, { field: 'x', op: 'exists', value: '' }] }, marketing)).toBeNull();
+    expect(
+      excludingRule({ match: 'any', conditions: [existing.conditions[0]!, { field: 'x', op: 'exists', value: '' }] }, marketing),
+    ).toBeNull();
   });
   it('refuses personas that cannot be inverted', () => {
     expect(excludingRule(undefined, { match: 'all', conditions: [{ field: 'a', op: 'matches', value: 'x' }] })).toBeNull();
@@ -129,10 +152,25 @@ describe('intersectRule', () => {
 
 describe('applyPolish', () => {
   const none = { headline: '', subheadline: '', cta_heading: '', cta_text: '', cta_button: '', seo_title: '', seo_description: '' };
-  const page = () => PageSchema.parse({ blocks: [newBlock('hero', { headline: 'Report.pdf', subheadline: 'x'.repeat(400) }), newBlock('cta', { heading: 'Ready to talk?', text: '', button: { label: 'Learn more', action: { type: 'form' } } })] });
+  const page = () =>
+    PageSchema.parse({
+      blocks: [
+        newBlock('hero', { headline: 'Report.pdf', subheadline: 'x'.repeat(400) }),
+        newBlock('cta', { heading: 'Ready to talk?', text: '', button: { label: 'Learn more', action: { type: 'form' } } }),
+      ],
+    });
 
   it('fixes weak copy and fills gaps', () => {
-    const r = applyPolish(page(), { ...none, headline: 'A better headline', subheadline: 'A tight sub-headline.', cta_heading: 'Get your copy', cta_text: 'Free download.', cta_button: 'Download', seo_title: 'Title', seo_description: 'Description' });
+    const r = applyPolish(page(), {
+      ...none,
+      headline: 'A better headline',
+      subheadline: 'A tight sub-headline.',
+      cta_heading: 'Get your copy',
+      cta_text: 'Free download.',
+      cta_button: 'Download',
+      seo_title: 'Title',
+      seo_description: 'Description',
+    });
     const hero = r.page.blocks[0]!;
     const cta = r.page.blocks[1]!;
     expect(hero.type === 'hero' && hero.headline).toBe('A better headline');
@@ -144,13 +182,35 @@ describe('applyPolish', () => {
   });
 
   it('keeps a call to action the PDF wrote itself, even a generic-sounding one', () => {
-    const own = PageSchema.parse({ blocks: [newBlock('cta', { heading: 'Ready to talk?', text: 'Book a 20-minute walkthrough.', button: { label: 'Learn more', action: { type: 'form' } } })] });
+    const own = PageSchema.parse({
+      blocks: [
+        newBlock('cta', {
+          heading: 'Ready to talk?',
+          text: 'Book a 20-minute walkthrough.',
+          button: { label: 'Learn more', action: { type: 'form' } },
+        }),
+      ],
+    });
     expect(applyPolish(own, { ...none, cta_heading: 'Get your copy', cta_text: 'x', cta_button: 'Download' }).page).toEqual(own);
   });
 
   it('leaves copy that already reads well alone', () => {
-    const good = PageSchema.parse({ seo: { title: 'Mine', description: 'Mine too' }, blocks: [newBlock('hero', { headline: 'Our own headline', subheadline: 'Short and fine.' }), newBlock('cta', { heading: 'Book a walkthrough', button: { label: 'Book', action: { type: 'form' } } })] });
-    const r = applyPolish(good, { headline: 'X', subheadline: 'Y', cta_heading: 'Z', cta_text: 'T', cta_button: 'B', seo_title: 'S', seo_description: 'D' });
+    const good = PageSchema.parse({
+      seo: { title: 'Mine', description: 'Mine too' },
+      blocks: [
+        newBlock('hero', { headline: 'Our own headline', subheadline: 'Short and fine.' }),
+        newBlock('cta', { heading: 'Book a walkthrough', button: { label: 'Book', action: { type: 'form' } } }),
+      ],
+    });
+    const r = applyPolish(good, {
+      headline: 'X',
+      subheadline: 'Y',
+      cta_heading: 'Z',
+      cta_text: 'T',
+      cta_button: 'B',
+      seo_title: 'S',
+      seo_description: 'D',
+    });
     expect(r.page).toEqual(good);
     expect(r.notes).toEqual([]);
   });

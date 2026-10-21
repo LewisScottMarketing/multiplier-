@@ -21,13 +21,22 @@ function optionsFor(field: string): Array<[string, string]> | null {
  * "Show this only to…": persona targeting. Quick presets cover the common job-title segments;
  * the editor below handles anything else, including your own Clay fields.
  */
-export function RuleEditor({ rule, onChange, noun = 'block' }: { rule: Rule | undefined; onChange: (r: Rule | undefined) => void; noun?: string }) {
+export function RuleEditor({
+  rule,
+  onChange,
+  noun = 'block',
+}: {
+  rule: Rule | undefined;
+  onChange: (r: Rule | undefined) => void;
+  noun?: string;
+}) {
   const c = useCampaign();
   const active = !!rule && rule.conditions.length > 0;
   const matches = active ? evalRule(rule, c.previewCtx) : true;
   const fieldKeys = [...new Set([...c.fields.map((f) => f.key), ...(rule?.conditions.map((x) => x.field) ?? [])])];
 
-  const setCond = (i: number, patch: Partial<Condition>) => onChange({ ...(rule as Rule), conditions: rule!.conditions.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  const setCond = (i: number, patch: Partial<Condition>) =>
+    onChange({ ...(rule as Rule), conditions: rule!.conditions.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
 
   return (
     <div className="col" style={{ gap: 12 }}>
@@ -36,7 +45,12 @@ export function RuleEditor({ rule, onChange, noun = 'block' }: { rule: Rule | un
         {PRESETS.map((p) => {
           const on = active && JSON.stringify(rule!.conditions) === JSON.stringify(p.rule.conditions);
           return (
-            <button key={p.label} type="button" className={`btn xs ${on ? 'primary' : ''}`} onClick={() => onChange(on ? undefined : p.rule)}>
+            <button
+              key={p.label}
+              type="button"
+              className={`btn xs ${on ? 'primary' : ''}`}
+              onClick={() => onChange(on ? undefined : p.rule)}
+            >
               {p.label}
             </button>
           );
@@ -48,7 +62,12 @@ export function RuleEditor({ rule, onChange, noun = 'block' }: { rule: Rule | un
           {rule!.conditions.length > 1 ? (
             <div className="row small">
               Match
-              <Select small value={rule!.match} onChange={(e) => onChange({ ...rule!, match: e.target.value as 'all' | 'any' })} style={{ width: 90 }}>
+              <Select
+                small
+                value={rule!.match}
+                onChange={(e) => onChange({ ...rule!, match: e.target.value as 'all' | 'any' })}
+                style={{ width: 90 }}
+              >
                 <option value="all">all</option>
                 <option value="any">any</option>
               </Select>
@@ -59,36 +78,80 @@ export function RuleEditor({ rule, onChange, noun = 'block' }: { rule: Rule | un
             const opts = optionsFor(cond.field);
             const noValue = cond.op === 'exists' || cond.op === 'not_exists';
             return (
-              <div key={i} className="col" style={{ gap: 6, paddingBottom: 8, borderBottom: i < rule!.conditions.length - 1 ? '1px dashed var(--line-2)' : 0 }}>
+              <div
+                key={i}
+                className="col"
+                style={{ gap: 6, paddingBottom: 8, borderBottom: i < rule!.conditions.length - 1 ? '1px dashed var(--line-2)' : 0 }}
+              >
                 <div className="row" style={{ gap: 6 }}>
                   <Select small value={cond.field} onChange={(e) => setCond(i, { field: e.target.value, value: '' })} aria-label="Field">
-                    {fieldKeys.map((k) => <option key={k} value={k}>{c.fields.find((f) => f.key === k)?.label ?? k}</option>)}
+                    {fieldKeys.map((k) => (
+                      <option key={k} value={k}>
+                        {c.fields.find((f) => f.key === k)?.label ?? k}
+                      </option>
+                    ))}
                   </Select>
-                  <Button size="xs" variant="ghost" icon aria-label="Remove condition" onClick={() => { const next = rule!.conditions.filter((_, j) => j !== i); onChange(next.length ? { ...rule!, conditions: next } : undefined); }}>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    icon
+                    aria-label="Remove condition"
+                    onClick={() => {
+                      const next = rule!.conditions.filter((_, j) => j !== i);
+                      onChange(next.length ? { ...rule!, conditions: next } : undefined);
+                    }}
+                  >
                     <Trash2 size={13} />
                   </Button>
                 </div>
                 <div className="row" style={{ gap: 6 }}>
-                  <Select small value={cond.op} onChange={(e) => setCond(i, { op: e.target.value as Condition['op'] })} aria-label="Operator" style={{ width: 150 }}>
-                    {CONDITION_OPS.map((op) => <option key={op} value={op}>{OP_LABELS[op]}</option>)}
+                  <Select
+                    small
+                    value={cond.op}
+                    onChange={(e) => setCond(i, { op: e.target.value as Condition['op'] })}
+                    aria-label="Operator"
+                    style={{ width: 150 }}
+                  >
+                    {CONDITION_OPS.map((op) => (
+                      <option key={op} value={op}>
+                        {OP_LABELS[op]}
+                      </option>
+                    ))}
                   </Select>
                   {noValue ? null : opts && (cond.op === 'equals' || cond.op === 'not_equals') ? (
                     <Select small value={cond.value} onChange={(e) => setCond(i, { value: e.target.value })} aria-label="Value">
                       <option value="">Choose…</option>
-                      {opts.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      {opts.map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
                     </Select>
                   ) : (
-                    <Input small value={cond.value} onChange={(e) => setCond(i, { value: e.target.value })} placeholder={cond.op === 'in' || cond.op === 'not_in' ? 'a, b, c' : cond.op === 'matches' ? 'regular expression' : 'value'} aria-label="Value" />
+                    <Input
+                      small
+                      value={cond.value}
+                      onChange={(e) => setCond(i, { value: e.target.value })}
+                      placeholder={
+                        cond.op === 'in' || cond.op === 'not_in' ? 'a, b, c' : cond.op === 'matches' ? 'regular expression' : 'value'
+                      }
+                      aria-label="Value"
+                    />
                   )}
                 </div>
               </div>
             );
           })}
           <div className="row">
-            <Button size="xs" onClick={() => onChange({ ...rule!, conditions: [...rule!.conditions, { field: 'job_title', op: 'contains', value: '' }] })}>
+            <Button
+              size="xs"
+              onClick={() => onChange({ ...rule!, conditions: [...rule!.conditions, { field: 'job_title', op: 'contains', value: '' }] })}
+            >
               <Plus size={13} /> Add condition
             </Button>
-            <Button size="xs" variant="ghost" className="right" onClick={() => onChange(undefined)}>Show to everyone</Button>
+            <Button size="xs" variant="ghost" className="right" onClick={() => onChange(undefined)}>
+              Show to everyone
+            </Button>
           </div>
         </div>
       ) : (
@@ -99,11 +162,17 @@ export function RuleEditor({ rule, onChange, noun = 'block' }: { rule: Rule | un
 
       {active ? (
         <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', color: matches ? 'var(--ok)' : 'var(--ink-3)' }}>
-          {matches ? <CheckCircle2 size={15} style={{ flex: 'none', marginTop: 2 }} /> : <XCircle size={15} style={{ flex: 'none', marginTop: 2 }} />}
+          {matches ? (
+            <CheckCircle2 size={15} style={{ flex: 'none', marginTop: 2 }} />
+          ) : (
+            <XCircle size={15} style={{ flex: 'none', marginTop: 2 }} />
+          )}
           <span>
             <b>{describeRule(rule)}</b>
             <br />
-            {matches ? 'Matches the person you’re previewing.' : 'Doesn’t match the person you’re previewing, so it’s hidden in the preview.'}
+            {matches
+              ? 'Matches the person you’re previewing.'
+              : 'Doesn’t match the person you’re previewing, so it’s hidden in the preview.'}
           </span>
         </div>
       ) : null}

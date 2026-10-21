@@ -102,7 +102,11 @@ function segments(app: AppContext, campaignId: string): { departments: SegmentRo
     bump(dept, d, DEPARTMENT_LABELS[d as Department] ?? 'Unknown title', r);
     bump(sen, s, SENIORITY_LABELS[s as Seniority] ?? 'Unknown title', r);
   }
-  const sort = (m: Map<string, SegmentRow>) => [...m.values()].filter((x) => x.key !== 'unknown').sort((a, b) => b.prospects - a.prospects).slice(0, 8);
+  const sort = (m: Map<string, SegmentRow>) =>
+    [...m.values()]
+      .filter((x) => x.key !== 'unknown')
+      .sort((a, b) => b.prospects - a.prospects)
+      .slice(0, 8);
   return { departments: sort(dept), seniority: sort(sen) };
 }
 
@@ -128,7 +132,10 @@ function top(app: AppContext, where: string, params: Array<string | number>, lim
       ...params,
       limit,
     )
-    .map(({ first_name, last_name, email, ...rest }) => ({ ...rest, name: [first_name, last_name].filter(Boolean).join(' ') || email || 'Unknown' }));
+    .map(({ first_name, last_name, email, ...rest }) => ({
+      ...rest,
+      name: [first_name, last_name].filter(Boolean).join(' ') || email || 'Unknown',
+    }));
 }
 
 export interface ActivityItem {
@@ -144,7 +151,19 @@ export interface ActivityItem {
 }
 
 function activity(app: AppContext, where: string, params: Array<string | number>, limit = 15): ActivityItem[] {
-  const rows = app.db.all<{ id: number; type: string; props: string; created_at: number; prospect_id: string | null; campaign_id: string; first_name: string | null; last_name: string | null; email: string | null; company: string | null; campaign_name: string }>(
+  const rows = app.db.all<{
+    id: number;
+    type: string;
+    props: string;
+    created_at: number;
+    prospect_id: string | null;
+    campaign_id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    company: string | null;
+    campaign_name: string;
+  }>(
     `SELECT e.id, e.type, e.props, e.created_at, e.prospect_id, e.campaign_id, p.first_name, p.last_name, p.email, p.company, c.name AS campaign_name
        FROM events e LEFT JOIN prospects p ON p.id = e.prospect_id JOIN campaigns c ON c.id = e.campaign_id
       WHERE ${where} AND e.is_bot = 0 AND e.type IN ('view', 'click', 'download', 'submit', 'booked')
@@ -180,7 +199,10 @@ export function campaignAnalytics(app: AppContext, campaignId: string, days = 30
        FROM events WHERE campaign_id = ? AND type = 'view' AND is_bot = 0`,
     campaignId,
   )!;
-  const anonymous = app.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM events WHERE campaign_id = ? AND prospect_id IS NULL AND type = 'view' AND is_bot = 0`, campaignId)!.n;
+  const anonymous = app.db.get<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM events WHERE campaign_id = ? AND prospect_id IS NULL AND type = 'view' AND is_bot = 0`,
+    campaignId,
+  )!.n;
   return {
     totals,
     funnel: [
@@ -200,7 +222,9 @@ export function campaignAnalytics(app: AppContext, campaignId: string, days = 30
 }
 
 export function overview(app: AppContext, days = 14) {
-  const campaigns = app.db.get<{ live: number; total: number }>(`SELECT COALESCE(SUM(status = 'live'), 0) AS live, COUNT(*) AS total FROM campaigns WHERE status <> 'archived'`)!;
+  const campaigns = app.db.get<{ live: number; total: number }>(
+    `SELECT COALESCE(SUM(status = 'live'), 0) AS live, COUNT(*) AS total FROM campaigns WHERE status <> 'archived'`,
+  )!;
   return {
     campaigns,
     totals: totalsFor(app, '1 = 1', []),

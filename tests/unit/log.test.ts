@@ -8,7 +8,12 @@ describe('logger', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     createLogger('info', true).error('unhandled error', { err: new Error('disk is full'), path: '/p/abc…' });
     const line = JSON.parse(spy.mock.calls[0][0] as string);
-    expect(line).toMatchObject({ level: 'error', msg: 'unhandled error', path: '/p/abc…', err: { name: 'Error', message: 'disk is full' } });
+    expect(line).toMatchObject({
+      level: 'error',
+      msg: 'unhandled error',
+      path: '/p/abc…',
+      err: { name: 'Error', message: 'disk is full' },
+    });
     expect(line.err.stack).toContain('disk is full');
   });
 

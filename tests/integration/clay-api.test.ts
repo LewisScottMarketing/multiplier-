@@ -18,7 +18,14 @@ const personalize = (body: Record<string, unknown>, k = key) => t.json('POST', '
 
 describe('POST /api/v1/personalize (what Clay calls)', () => {
   it('creates a prospect and returns a flat, Clay-friendly response', async () => {
-    const res = await personalize({ campaign: campaign.id, first_name: 'Jane', last_name: 'Doe', email: 'jane@acme.com', company: 'Acme, Inc.', job_title: 'VP of Marketing' });
+    const res = await personalize({
+      campaign: campaign.id,
+      first_name: 'Jane',
+      last_name: 'Doe',
+      email: 'jane@acme.com',
+      company: 'Acme, Inc.',
+      job_title: 'VP of Marketing',
+    });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       ok: true,
@@ -74,10 +81,20 @@ describe('POST /api/v1/personalize (what Clay calls)', () => {
   });
 
   it('treats unknown top-level keys as custom fields, normalising their names, and keeps nested data', async () => {
-    const res = await personalize({ campaign: campaign.id, email: 'a@x.co', 'Company Industry': 'Fintech', data: { pain_point: 'low reply rates' }, enrichment: { employees: 120 } });
+    const res = await personalize({
+      campaign: campaign.id,
+      email: 'a@x.co',
+      'Company Industry': 'Fintech',
+      data: { pain_point: 'low reply rates' },
+      enrichment: { employees: 120 },
+    });
     expect(res.status).toBe(200);
     const list = await t.json('GET', `/api/campaigns/${campaign.id}/prospects`);
-    expect(list.body.prospects[0].data).toMatchObject({ company_industry: 'Fintech', pain_point: 'low reply rates', enrichment_employees: 120 });
+    expect(list.body.prospects[0].data).toMatchObject({
+      company_industry: 'Fintech',
+      pain_point: 'low reply rates',
+      enrichment_employees: 120,
+    });
     expect(list.body.custom_fields).toEqual(expect.arrayContaining(['company_industry', 'pain_point']));
   });
 
@@ -107,7 +124,10 @@ describe('POST /api/v1/personalize (what Clay calls)', () => {
 
   it('warns about blanks that would show, and about unpublished campaigns', async () => {
     const page = await t.json('GET', `/api/campaigns/${campaign.id}`);
-    const withBare = { ...page.body.campaign.page, blocks: [...page.body.campaign.page.blocks, { id: 'bare', type: 'text', body: 'Role: {{job_title}}' }] };
+    const withBare = {
+      ...page.body.campaign.page,
+      blocks: [...page.body.campaign.page.blocks, { id: 'bare', type: 'text', body: 'Role: {{job_title}}' }],
+    };
     await t.json('PUT', `/api/campaigns/${campaign.id}`, { page: withBare });
     const res = await personalize({ campaign: campaign.id, email: 'a@x.co', first_name: 'Jane' });
     expect(res.body.warnings).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'missing_field', field: 'job_title' })]));
@@ -117,7 +137,13 @@ describe('POST /api/v1/personalize (what Clay calls)', () => {
   });
 
   it('cleans shouty names from enrichment tools', async () => {
-    const res = await personalize({ campaign: campaign.id, email: 'a@x.co', first_name: 'JANE', last_name: 'MCDONALD', company: 'ACME INC' });
+    const res = await personalize({
+      campaign: campaign.id,
+      email: 'a@x.co',
+      first_name: 'JANE',
+      last_name: 'MCDONALD',
+      company: 'ACME INC',
+    });
     expect(res.body.first_name).toBe('Jane');
     const page = await t.req('GET', new URL(res.body.url).pathname, undefined, publicHeaders());
     expect(await page.text()).toContain('Prepared for Jane at ACME INC'); // company is left exactly as supplied
@@ -169,7 +195,12 @@ describe('API key auth', () => {
 describe('POST /api/v1/personalize/batch', () => {
   it('processes rows independently and reports per-row results', async () => {
     await t.json('PUT', `/api/campaigns/${campaign.id}`, { settings: { required_fields: ['company'] } });
-    const res = await t.json('POST', '/api/v1/personalize/batch', { campaign: campaign.id, rows: [{ email: 'a@x.co', company: 'A' }, { email: 'b@x.co' }, { email: 'c@x.co', company: 'C' }] }, bearer(key));
+    const res = await t.json(
+      'POST',
+      '/api/v1/personalize/batch',
+      { campaign: campaign.id, rows: [{ email: 'a@x.co', company: 'A' }, { email: 'b@x.co' }, { email: 'c@x.co', company: 'C' }] },
+      bearer(key),
+    );
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ ok: false, processed: 3, succeeded: 2, failed: 1 });
     expect(res.body.results[1].error.code).toBe('missing_required_fields');

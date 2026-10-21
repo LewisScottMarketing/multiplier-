@@ -38,7 +38,11 @@ export function safeJoin(root: string, rel: string): string | null {
   return full === root || full.startsWith(root + path.sep) ? full : null;
 }
 
-export async function sendFile(c: Context, file: string, opts: { immutable?: boolean; headers?: Record<string, string> } = {}): Promise<Response | null> {
+export async function sendFile(
+  c: Context,
+  file: string,
+  opts: { immutable?: boolean; headers?: Record<string, string> } = {},
+): Promise<Response | null> {
   let stat: fs.Stats;
   try {
     stat = await fs.promises.stat(file);

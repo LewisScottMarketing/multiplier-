@@ -21,8 +21,7 @@ describe('auth', () => {
   });
 
   it('refuses concurrent first-run requests beyond the first', async () => {
-    const attempt = (email: string) =>
-      t.json('POST', '/api/auth/setup', { email, password: 'another long password' }, { cookie: '' });
+    const attempt = (email: string) => t.json('POST', '/api/auth/setup', { email, password: 'another long password' }, { cookie: '' });
     const results = await Promise.all([attempt('a@x.co'), attempt('b@x.co'), attempt('c@x.co')]);
     expect(results.filter((r) => r.status === 201)).toHaveLength(1);
   });
@@ -75,18 +74,38 @@ describe('auth', () => {
 
   it('blocks cross-site writes made with the session cookie (CSRF)', async () => {
     await t.login();
-    const evil = await t.json('POST', '/api/auth/password', { current: 'correct horse battery', next: 'a brand new password' }, { origin: 'https://evil.example' });
+    const evil = await t.json(
+      'POST',
+      '/api/auth/password',
+      { current: 'correct horse battery', next: 'a brand new password' },
+      { origin: 'https://evil.example' },
+    );
     expect(evil.status).toBe(403);
-    const sameSite = await t.json('POST', '/api/auth/password', { current: 'correct horse battery', next: 'a brand new password' }, { 'sec-fetch-site': 'cross-site' });
+    const sameSite = await t.json(
+      'POST',
+      '/api/auth/password',
+      { current: 'correct horse battery', next: 'a brand new password' },
+      { 'sec-fetch-site': 'cross-site' },
+    );
     expect(sameSite.status).toBe(403);
-    const ok = await t.json('POST', '/api/auth/password', { current: 'correct horse battery', next: 'a brand new password' }, { origin: 'http://app.test' });
+    const ok = await t.json(
+      'POST',
+      '/api/auth/password',
+      { current: 'correct horse battery', next: 'a brand new password' },
+      { origin: 'http://app.test' },
+    );
     expect(ok.status).toBe(200);
   });
 
   it('changing the password signs out other sessions but keeps this one', async () => {
     await t.login();
     const first = t.cookie;
-    const second = await t.req('POST', '/api/auth/login', { email: 'owner@example.com', password: 'correct horse battery' }, { cookie: '' });
+    const second = await t.req(
+      'POST',
+      '/api/auth/login',
+      { email: 'owner@example.com', password: 'correct horse battery' },
+      { cookie: '' },
+    );
     const secondCookie = (second.headers.get('set-cookie') ?? '').split(';')[0];
     expect(secondCookie).not.toBe(first);
     await t.json('POST', '/api/auth/password', { current: 'correct horse battery', next: 'a brand new password' });

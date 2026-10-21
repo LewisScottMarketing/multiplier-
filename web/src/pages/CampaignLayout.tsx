@@ -1,5 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BarChart3, Check, CloudOff, Copy, ExternalLink, FileText, Layers, Loader2, MoreHorizontal, Settings, Trash2, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  BarChart3,
+  Check,
+  CloudOff,
+  Copy,
+  ExternalLink,
+  FileText,
+  Layers,
+  Loader2,
+  MoreHorizontal,
+  Settings,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
@@ -25,7 +39,9 @@ function Bar() {
         title: `Publish with ${warnings.length} warning${warnings.length === 1 ? '' : 's'}?`,
         body: (
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {warnings.slice(0, 5).map((w, i) => <li key={i}>{w.message}</li>)}
+            {warnings.slice(0, 5).map((w, i) => (
+              <li key={i}>{w.message}</li>
+            ))}
           </ul>
         ),
         confirm: 'Publish anyway',
@@ -69,10 +85,22 @@ function Bar() {
       >
         {(close) => (
           <>
-            <button disabled={!live} onClick={() => { window.open(`/c/${c.campaign.slug}`, '_blank'); close(); }}>
+            <button
+              disabled={!live}
+              onClick={() => {
+                window.open(`/c/${c.campaign.slug}`, '_blank');
+                close();
+              }}
+            >
               <ExternalLink size={15} /> Open generic page {live ? '' : '(publish first)'}
             </button>
-            <button onClick={async () => { await copyText(publicLink); toast.ok('Link copied'); close(); }}>
+            <button
+              onClick={async () => {
+                await copyText(publicLink);
+                toast.ok('Link copied');
+                close();
+              }}
+            >
               <Copy size={15} /> Copy generic page link
             </button>
           </>
@@ -90,7 +118,15 @@ function Bar() {
       >
         {(close) => (
           <>
-            <button onClick={async () => { close(); const r = await api.post<{ campaign: { id: string } }>(`/campaigns/${c.id}/duplicate`); qc.invalidateQueries({ queryKey: ['campaigns'] }); nav(`/campaigns/${r.campaign.id}/page`); toast.ok('Duplicated'); }}>
+            <button
+              onClick={async () => {
+                close();
+                const r = await api.post<{ campaign: { id: string } }>(`/campaigns/${c.id}/duplicate`);
+                qc.invalidateQueries({ queryKey: ['campaigns'] });
+                nav(`/campaigns/${r.campaign.id}/page`);
+                toast.ok('Duplicated');
+              }}
+            >
               <Layers size={15} /> Duplicate
             </button>
             <hr />
@@ -98,7 +134,12 @@ function Bar() {
               className="danger"
               onClick={async () => {
                 close();
-                const ok = await confirm({ title: 'Delete this campaign?', body: 'This permanently deletes the page, the PDF, every prospect and all their activity. Links already sent will stop working.', confirm: 'Delete campaign', danger: true });
+                const ok = await confirm({
+                  title: 'Delete this campaign?',
+                  body: 'This permanently deletes the page, the PDF, every prospect and all their activity. Links already sent will stop working.',
+                  confirm: 'Delete campaign',
+                  danger: true,
+                });
                 if (!ok) return;
                 await api.del(`/campaigns/${c.id}`);
                 qc.invalidateQueries({ queryKey: ['campaigns'] });
@@ -124,18 +165,46 @@ function NavLinkBack() {
 
 function SaveIndicator() {
   const { save } = useCampaign();
-  if (save.state === 'saving') return <span className="save-state"><Loader2 size={13} className="spin" /> Saving…</span>;
+  if (save.state === 'saving')
+    return (
+      <span className="save-state">
+        <Loader2 size={13} className="spin" /> Saving…
+      </span>
+    );
   if (save.state === 'dirty') return <span className="save-state">Unsaved changes…</span>;
-  if (save.state === 'error') return <span className="save-state err"><CloudOff size={13} /> {save.error} <Button size="xs" onClick={() => void save.flush()}>Retry</Button></span>;
-  return <span className="save-state"><Check size={13} /> Saved</span>;
+  if (save.state === 'error')
+    return (
+      <span className="save-state err">
+        <CloudOff size={13} /> {save.error}{' '}
+        <Button size="xs" onClick={() => void save.flush()}>
+          Retry
+        </Button>
+      </span>
+    );
+  return (
+    <span className="save-state">
+      <Check size={13} /> Saved
+    </span>
+  );
 }
 
 function ConflictModal() {
   const c = useCampaign();
   if (c.save.state !== 'conflict') return null;
   return (
-    <Modal title="Changed somewhere else" onClose={() => undefined} footer={<Button variant="primary" onClick={() => void c.reload()}>Reload the latest version</Button>}>
-      <Alert tone="warn">This campaign was edited in another tab or by someone else, so your last change couldn’t be saved. Reload to continue from the latest version.</Alert>
+    <Modal
+      title="Changed somewhere else"
+      onClose={() => undefined}
+      footer={
+        <Button variant="primary" onClick={() => void c.reload()}>
+          Reload the latest version
+        </Button>
+      }
+    >
+      <Alert tone="warn">
+        This campaign was edited in another tab or by someone else, so your last change couldn’t be saved. Reload to continue from the
+        latest version.
+      </Alert>
     </Modal>
   );
 }
@@ -150,7 +219,16 @@ function Tabs() {
   );
   return (
     <div className="camp-tabs tabs">
-      {tab('page', <Layers size={15} />, 'Page', warn ? <span className="badge warn" title={`${warn} to check`}>{warn}</span> : null)}
+      {tab(
+        'page',
+        <Layers size={15} />,
+        'Page',
+        warn ? (
+          <span className="badge warn" title={`${warn} to check`}>
+            {warn}
+          </span>
+        ) : null,
+      )}
       {tab('pdf', <FileText size={15} />, 'PDF', !c.draft.document ? <span className="badge">none</span> : null)}
       {tab('audience', <Users size={15} />, 'Audience')}
       {tab('analytics', <BarChart3 size={15} />, 'Analytics')}
@@ -166,7 +244,9 @@ export function CampaignLayout() {
       {(ctx, status) =>
         !ctx ? (
           status.error ? (
-            <div className="page"><Alert tone="bad">{status.error.message}</Alert></div>
+            <div className="page">
+              <Alert tone="bad">{status.error.message}</Alert>
+            </div>
           ) : (
             <CenterSpinner />
           )

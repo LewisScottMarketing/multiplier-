@@ -33,7 +33,8 @@ export class Semaphore {
   ) {}
   async run<T>(fn: () => Promise<T>): Promise<T> {
     if (this.active >= this.max) {
-      if (this.waiting.length >= this.maxQueue) throw new HttpError(503, 'busy', 'The server is busy building documents. Try again in a moment.');
+      if (this.waiting.length >= this.maxQueue)
+        throw new HttpError(503, 'busy', 'The server is busy building documents. Try again in a moment.');
       // a finishing job hands its slot straight to the next waiter, so `active` never dips and a
       // newcomer can't jump the queue between the two
       await new Promise<void>((r) => this.waiting.push(r));
@@ -108,4 +109,11 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 export const rgbToHex = (r: number, g: number, b: number): string =>
-  '#' + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  '#' +
+  [r, g, b]
+    .map((v) =>
+      Math.max(0, Math.min(255, Math.round(v)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('');

@@ -87,10 +87,18 @@ function classify(e: unknown): AiResult {
   if (e instanceof SyntaxError) return { ok: false, reason: 'bad_output', message: 'The reply wasn’t valid JSON.' };
   if (e instanceof Anthropic.APIConnectionTimeoutError) return { ok: false, reason: 'timeout', message: 'The AI took too long to answer.' };
   if (e instanceof Anthropic.APIConnectionError) return { ok: false, reason: 'unavailable', message: 'Couldn’t reach the AI service.' };
-  if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return { ok: false, reason: 'auth', message: 'The Anthropic API key was rejected.' };
-  if (e instanceof Anthropic.RateLimitError) return { ok: false, reason: 'rate_limited', message: 'The AI service is rate limiting this workspace.' };
-  if (e instanceof Anthropic.BadRequestError || e instanceof Anthropic.NotFoundError) return { ok: false, reason: 'config', message: `The AI request was rejected (${(e as Error).message.slice(0, 160)}). Check AI_MODEL_FAST / AI_MODEL_SMART.` };
-  if (e instanceof Anthropic.APIError) return { ok: false, reason: 'unavailable', message: `The AI service returned an error (${e.status ?? 'unknown'}).` };
+  if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError)
+    return { ok: false, reason: 'auth', message: 'The Anthropic API key was rejected.' };
+  if (e instanceof Anthropic.RateLimitError)
+    return { ok: false, reason: 'rate_limited', message: 'The AI service is rate limiting this workspace.' };
+  if (e instanceof Anthropic.BadRequestError || e instanceof Anthropic.NotFoundError)
+    return {
+      ok: false,
+      reason: 'config',
+      message: `The AI request was rejected (${(e as Error).message.slice(0, 160)}). Check AI_MODEL_FAST / AI_MODEL_SMART.`,
+    };
+  if (e instanceof Anthropic.APIError)
+    return { ok: false, reason: 'unavailable', message: `The AI service returned an error (${e.status ?? 'unknown'}).` };
   return { ok: false, reason: 'unavailable', message: 'The AI request failed.' };
 }
 
@@ -113,7 +121,14 @@ const runtimes = new WeakMap<AppContext, Runtime>();
 function runtime(ctx: AppContext): Runtime {
   let r = runtimes.get(ctx);
   if (!r) {
-    r = { backend: ctx.config.anthropicApiKey ? new AnthropicBackend(ctx.config.anthropicApiKey) : null, inflight: 0, waiters: [], failures: 0, openUntil: 0, lastError: null };
+    r = {
+      backend: ctx.config.anthropicApiKey ? new AnthropicBackend(ctx.config.anthropicApiKey) : null,
+      inflight: 0,
+      waiters: [],
+      failures: 0,
+      openUntil: 0,
+      lastError: null,
+    };
     runtimes.set(ctx, r);
   }
   return r;
@@ -237,8 +252,20 @@ const safeJson = (v: unknown) => JSON.stringify(v, null, 1).replace(/</g, LT);
 // ── What the writer is told about a prospect ────────────────────────────────
 
 const FACT_SKIP = new Set([
-  'email', 'linkedin_url', 'logo_url', 'page_url', 'pdf_url', 'cover_url', 'prospect_id', 'today',
-  'full_name', 'company_short', 'seniority', 'seniority_group', 'department', 'website',
+  'email',
+  'linkedin_url',
+  'logo_url',
+  'page_url',
+  'pdf_url',
+  'cover_url',
+  'prospect_id',
+  'today',
+  'full_name',
+  'company_short',
+  'seniority',
+  'seniority_group',
+  'department',
+  'website',
 ]);
 const SECRETISH = /token|secret|password|passwd|api[_-]?key|authorization|cookie/i;
 
@@ -247,7 +274,11 @@ export function factsFrom(ctx: Ctx): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(ctx)) {
     if (FACT_SKIP.has(k) || k.startsWith('ai_') || SECRETISH.test(k)) continue;
-    const s = toStr(v).replace(/\p{Cc}/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+    const s = toStr(v)
+      .replace(/\p{Cc}/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 300);
     if (!s) continue;
     out[k] = s;
     if (Object.keys(out).length >= 40) break;
@@ -257,7 +288,10 @@ export function factsFrom(ctx: Ctx): Record<string, string> {
 
 /** What the page is about, in a few lines, with merge tokens resolved to their fallbacks. */
 export function campaignBrief(campaign: Pick<Campaign, 'name' | 'page'>): string {
-  const plain = (t: string | undefined) => renderTemplate(t ?? '', {}).replace(/\s+/g, ' ').trim();
+  const plain = (t: string | undefined) =>
+    renderTemplate(t ?? '', {})
+      .replace(/\s+/g, ' ')
+      .trim();
   const lines: string[] = [`Campaign: ${campaign.name}`];
   const hero = campaign.page.blocks.find((b) => b.type === 'hero');
   if (hero?.type === 'hero') {
@@ -311,12 +345,24 @@ export interface FieldWriting {
 }
 
 const failureWarning = (res: Extract<AiResult, { ok: false }>): AiWarning => {
-  const code = res.reason === 'refused' ? 'ai_declined' : res.reason === 'bad_output' ? 'ai_bad_output' : res.reason === 'unavailable' && /switched on|configured/.test(res.message) ? 'ai_unavailable' : 'ai_failed';
+  const code =
+    res.reason === 'refused'
+      ? 'ai_declined'
+      : res.reason === 'bad_output'
+        ? 'ai_bad_output'
+        : res.reason === 'unavailable' && /switched on|configured/.test(res.message)
+          ? 'ai_unavailable'
+          : 'ai_failed';
   return { code, message: `${res.message} The fallback text is being used instead.` };
 };
 
 /** One call that writes every requested field for one set of facts. Empty or unusable output is simply absent. */
-export async function writeFields(ctx: AppContext, campaign: Pick<Campaign, 'name' | 'page'>, fields: AiField[], facts: Record<string, string>): Promise<FieldWriting> {
+export async function writeFields(
+  ctx: AppContext,
+  campaign: Pick<Campaign, 'name' | 'page'>,
+  fields: AiField[],
+  facts: Record<string, string>,
+): Promise<FieldWriting> {
   if (!fields.length) return { values: {}, warnings: [] };
   const keys = fields.map((f) => f.key);
   const user = `<campaign>
@@ -354,14 +400,22 @@ Reply with a JSON object that has one string for each key: ${keys.join(', ')}.`;
   return { values, warnings: [] };
 }
 
-const signature = (f: AiField, facts: Record<string, string>) => createHash('sha256').update(JSON.stringify([f.prompt, f.max_chars, facts])).digest('hex').slice(0, 16);
+const signature = (f: AiField, facts: Record<string, string>) =>
+  createHash('sha256')
+    .update(JSON.stringify([f.prompt, f.max_chars, facts]))
+    .digest('hex')
+    .slice(0, 16);
 const SIG = (key: string) => `__sig:${key}`;
 
 /**
  * Fill in this prospect's AI fields. Copy Clay already sent (`ai_<key>`) always wins, and anything
  * generated before for identical inputs is reused, so re-running a row costs nothing.
  */
-export async function generateAiFields(ctx: AppContext, campaign: Campaign, prospect: Prospect): Promise<{ prospect: Prospect; warnings: AiWarning[] }> {
+export async function generateAiFields(
+  ctx: AppContext,
+  campaign: Campaign,
+  prospect: Prospect,
+): Promise<{ prospect: Prospect; warnings: AiWarning[] }> {
   const fields = campaign.settings.ai_fields;
   if (!fields.length) return { prospect, warnings: [] };
 
@@ -376,7 +430,11 @@ export async function generateAiFields(ctx: AppContext, campaign: Campaign, pros
 
   const { values, warnings } = await writeFields(ctx, campaign, wanted, facts);
   if (!Object.keys(values).length) {
-    if (!warnings.length) warnings.push({ code: 'ai_empty', message: 'The AI had nothing specific to add for this prospect, so the fallback text is being used.' });
+    if (!warnings.length)
+      warnings.push({
+        code: 'ai_empty',
+        message: 'The AI had nothing specific to add for this prospect, so the fallback text is being used.',
+      });
     return { prospect, warnings };
   }
 
@@ -392,7 +450,12 @@ export async function generateAiFields(ctx: AppContext, campaign: Campaign, pros
 }
 
 /** "Try it" in the dashboard: write one field for whoever is being previewed. */
-export async function previewAiField(ctx: AppContext, campaign: Campaign, field: AiField, context: Ctx): Promise<{ text: string; used_fallback: boolean; warnings: AiWarning[] }> {
+export async function previewAiField(
+  ctx: AppContext,
+  campaign: Campaign,
+  field: AiField,
+  context: Ctx,
+): Promise<{ text: string; used_fallback: boolean; warnings: AiWarning[] }> {
   const { values, warnings } = await writeFields(ctx, campaign, [field], factsFrom(context));
   const text = values[field.key];
   return { text: text ?? aiFieldValue(field, null), used_fallback: !text, warnings };
@@ -486,9 +549,19 @@ Reply with a JSON object that has one string for each id: ${ids.join(', ')}.`;
     const raw = data[ids[i]!];
     if (typeof raw !== 'string' || !raw.trim()) return;
     // multi-line prose (a text block's body) keeps its line breaks; everything else is single-line
-    const body = leaf.path === 'body' || leaf.path === 'message' ? raw.replace(/<[^>]*>/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : cleanSingle(raw);
+    const body =
+      leaf.path === 'body' || leaf.path === 'message'
+        ? raw
+            .replace(/<[^>]*>/g, '')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim()
+        : cleanSingle(raw);
     const stripped = stripUnknownTokens(body, known);
-    if (stripped.removed.length) warnings.push(`Removed unknown merge field${stripped.removed.length === 1 ? '' : 's'} ${[...new Set(stripped.removed)].map((r) => `{{${r}}}`).join(', ')}.`);
+    if (stripped.removed.length)
+      warnings.push(
+        `Removed unknown merge field${stripped.removed.length === 1 ? '' : 's'} ${[...new Set(stripped.removed)].map((r) => `{{${r}}}`).join(', ')}.`,
+      );
     const text = stripped.text.length > leaf.max ? fitTo(stripped.text, leaf.max) : stripped.text;
     if (text && text !== leaf.text) values[leaf.path] = text;
   });
@@ -527,16 +600,29 @@ Rules:
 - Write in the language of the document.`;
 
 const POLISH_KEYS = ['headline', 'subheadline', 'cta_heading', 'cta_text', 'cta_button', 'seo_title', 'seo_description'] as const;
-const POLISH_LIMITS: Record<(typeof POLISH_KEYS)[number], number> = { headline: 90, subheadline: 220, cta_heading: 80, cta_text: 200, cta_button: 28, seo_title: 60, seo_description: 155 };
+const POLISH_LIMITS: Record<(typeof POLISH_KEYS)[number], number> = {
+  headline: 90,
+  subheadline: 220,
+  cta_heading: 80,
+  cta_text: 200,
+  cta_button: 28,
+  seo_title: 60,
+  seo_description: 155,
+};
 
 function outline(page: Page, filename: string): string {
-  const plain = (t: string | undefined) => (t ?? '').replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, ' ').trim();
+  const plain = (t: string | undefined) =>
+    (t ?? '')
+      .replace(/\{\{[^}]*\}\}/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   const lines = [`File: ${filename}`];
   for (const b of page.blocks) {
     if (b.type === 'hero') lines.push(`HERO headline: ${plain(b.headline)} | sub-headline: ${plain(b.subheadline)}`);
     else if (b.type === 'cta') lines.push(`CTA heading: ${plain(b.heading)} | text: ${plain(b.text)} | button: ${plain(b.button.label)}`);
     else if (b.type === 'text') lines.push(`TEXT ${plain(b.heading)}: ${plain(b.body).slice(0, 260)}`);
-    else if (b.type === 'features' || b.type === 'steps' || b.type === 'checklist') lines.push(`${b.type.toUpperCase()} ${plain(b.heading)} (${b.items.length} items)`);
+    else if (b.type === 'features' || b.type === 'steps' || b.type === 'checklist')
+      lines.push(`${b.type.toUpperCase()} ${plain(b.heading)} (${b.items.length} items)`);
     else if (b.type === 'stats') lines.push(`STATS ${b.items.map((i) => `${i.value} ${i.label}`).join('; ')}`);
     else if (b.type === 'testimonial') lines.push(`QUOTE ${plain(b.quote).slice(0, 160)}`);
   }
@@ -568,7 +654,15 @@ export async function polishImport(ctx: AppContext, input: { page: Page; filenam
   if (!res.ok) return { page: input.page, notes: [`AI polish skipped: ${res.message}`] };
   const data = (res.data && typeof res.data === 'object' ? res.data : {}) as Record<string, unknown>;
   const v = (k: (typeof POLISH_KEYS)[number]) => cleanCopy(data[k], POLISH_LIMITS[k]);
-  return applyPolish(input.page, { headline: v('headline'), subheadline: v('subheadline'), cta_heading: v('cta_heading'), cta_text: v('cta_text'), cta_button: v('cta_button'), seo_title: v('seo_title'), seo_description: v('seo_description') });
+  return applyPolish(input.page, {
+    headline: v('headline'),
+    subheadline: v('subheadline'),
+    cta_heading: v('cta_heading'),
+    cta_text: v('cta_text'),
+    cta_button: v('cta_button'),
+    seo_title: v('seo_title'),
+    seo_description: v('seo_description'),
+  });
 }
 
 const GENERIC_CTA = /^(ready to (talk|get started)\??|get in touch|contact us|learn more|talk to us)$/i;

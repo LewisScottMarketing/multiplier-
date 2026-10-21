@@ -45,7 +45,11 @@ function NoPdf() {
       form.set('file', file);
       const r = await api.upload<{ detected: number }>(`/campaigns/${c.id}/document/upload`, form);
       await c.reload();
-      toast.ok(r.detected ? `PDF added. We found ${r.detected} placeholder${r.detected === 1 ? '' : 's'} to fill in.` : 'PDF added. Click any text to personalise it.');
+      toast.ok(
+        r.detected
+          ? `PDF added. We found ${r.detected} placeholder${r.detected === 1 ? '' : 's'} to fill in.`
+          : 'PDF added. Click any text to personalise it.',
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not add the PDF');
     } finally {
@@ -56,7 +60,8 @@ function NoPdf() {
     <div className="page" style={{ maxWidth: 760 }}>
       <div className="card">
         <EmptyState icon={<FileUp size={24} />} title="Add a PDF to personalise">
-          Each prospect gets their own copy of your PDF with their name, company, logo or a QR code in place. You choose what changes by clicking the text.
+          Each prospect gets their own copy of your PDF with their name, company, logo or a QR code in place. You choose what changes by
+          clicking the text.
         </EmptyState>
         <div
           className={`dropzone ${over ? 'over' : ''}`}
@@ -65,13 +70,31 @@ function NoPdf() {
           tabIndex={0}
           onClick={() => input.current?.click()}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && input.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setOver(true);
+          }}
           onDragLeave={() => setOver(false)}
-          onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) void upload(f); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOver(false);
+            const f = e.dataTransfer.files[0];
+            if (f) void upload(f);
+          }}
         >
           <div className="icon-bubble">{busy ? <Spinner size={22} /> : <FileUp size={22} />}</div>
           <b>{busy ? 'Reading your PDF…' : 'Drop a PDF here, or click to browse'}</b>
-          <input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} />
+          <input
+            ref={input}
+            type="file"
+            accept="application/pdf,.pdf"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+              e.target.value = '';
+            }}
+          />
         </div>
       </div>
     </div>
@@ -103,7 +126,11 @@ function Studio() {
   const stageSize = useSize(stage);
   useSyncPreviewContext();
 
-  const fileQ = useQuery({ queryKey: ['document', c.id, doc.asset_id], queryFn: () => api.get<{ file: FileInfo | null }>(`/campaigns/${c.id}/document`), staleTime: Infinity });
+  const fileQ = useQuery({
+    queryKey: ['document', c.id, doc.asset_id],
+    queryFn: () => api.get<{ file: FileInfo | null }>(`/campaigns/${c.id}/document`),
+    staleTime: Infinity,
+  });
   const file = fileQ.data?.file ?? undefined;
   const page = Math.min(Math.max(pageNo, 1), doc.page_count);
   const pageQ = useQuery({
@@ -116,7 +143,10 @@ function Studio() {
   const selected = doc.fields.find((f) => f.id === selectedId) ?? null;
 
   // ── document edits ────────────────────────────────────────────────────────
-  const patchFields = useCallback((fn: (fields: PdfField[]) => PdfField[]) => c.setDocument((d) => (d ? { ...d, fields: fn(d.fields) } : d)), [c]);
+  const patchFields = useCallback(
+    (fn: (fields: PdfField[]) => PdfField[]) => c.setDocument((d) => (d ? { ...d, fields: fn(d.fields) } : d)),
+    [c],
+  );
   const addField = (f: PdfField) => {
     patchFields((fs) => [...fs, f]);
     setSelectedId(f.id);
@@ -142,7 +172,11 @@ function Studio() {
     const existing = runCoveredBy(run, doc.fields, page);
     if (existing) return setSelectedId(existing.id);
     try {
-      const r = await api.post<{ field: PdfField }>(`/campaigns/${c.id}/document/field-from-run`, { page, run_id: run.id, template: suggestTemplate(run.text) });
+      const r = await api.post<{ field: PdfField }>(`/campaigns/${c.id}/document/field-from-run`, {
+        page,
+        run_id: run.id,
+        template: suggestTemplate(run.text),
+      });
       addField(r.field);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not use that text');
@@ -154,7 +188,9 @@ function Studio() {
   const addStamp = async () => {
     const dim = file?.pages[0];
     try {
-      const bg = dim ? await sampleBackground(`/api/campaigns/${c.id}/document/page/1.png`, { x: 40, y: dim.h - 44, w: dim.w - 80, h: 16 }, dim.w) : '#ffffff';
+      const bg = dim
+        ? await sampleBackground(`/api/campaigns/${c.id}/document/page/1.png`, { x: 40, y: dim.h - 44, w: dim.w - 80, h: 16 }, dim.w)
+        : '#ffffff';
       const r = await api.post<{ field: PdfField }>(`/campaigns/${c.id}/document/stamp`, { page: 1, bg });
       setPageNo(1);
       addField(r.field);
@@ -164,7 +200,15 @@ function Studio() {
   };
 
   const upload = async (f: File) => {
-    if (doc.fields.length && !(await confirm({ title: 'Replace the PDF?', body: `The ${doc.fields.length} field${doc.fields.length === 1 ? '' : 's'} you set up will be removed, because the layout of a new file can be different.`, confirm: 'Replace PDF' }))) return;
+    if (
+      doc.fields.length &&
+      !(await confirm({
+        title: 'Replace the PDF?',
+        body: `The ${doc.fields.length} field${doc.fields.length === 1 ? '' : 's'} you set up will be removed, because the layout of a new file can be different.`,
+        confirm: 'Replace PDF',
+      }))
+    )
+      return;
     setUploading(true);
     try {
       await c.save.flush();
@@ -183,7 +227,15 @@ function Studio() {
   };
 
   const remove = async () => {
-    if (!(await confirm({ title: 'Remove the PDF?', body: 'Prospects will no longer get a personalised PDF, and the download button disappears from the page.', confirm: 'Remove PDF', danger: true }))) return;
+    if (
+      !(await confirm({
+        title: 'Remove the PDF?',
+        body: 'Prospects will no longer get a personalised PDF, and the download button disappears from the page.',
+        confirm: 'Remove PDF',
+        danger: true,
+      }))
+    )
+      return;
     try {
       await c.save.flush();
       await api.del(`/campaigns/${c.id}/document`);
@@ -194,7 +246,12 @@ function Studio() {
   };
 
   // ── preview ───────────────────────────────────────────────────────────────
-  const [pv, setPv] = useState<{ url: string | null; busy: boolean; warnings: string[]; error: string }>({ url: null, busy: false, warnings: [], error: '' });
+  const [pv, setPv] = useState<{ url: string | null; busy: boolean; warnings: string[]; error: string }>({
+    url: null,
+    busy: false,
+    warnings: [],
+    error: '',
+  });
   const req = useRef(0);
   const urlRef = useRef<string | null>(null);
   const pvKey = JSON.stringify([mode, doc, c.previewSource, page]);
@@ -233,7 +290,12 @@ function Studio() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pvKey]);
-  useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    },
+    [],
+  );
 
   // ── keyboard ──────────────────────────────────────────────────────────────
   const stateRef = useRef({ selected, tool, mode });
@@ -294,7 +356,11 @@ function Studio() {
         selectedId={selectedId}
         uploading={uploading}
         onPage={(n) => setPageNo(n)}
-        onSelect={(id, p) => { setSelectedId(id); setPageNo(p); setMode('edit'); }}
+        onSelect={(id, p) => {
+          setSelectedId(id);
+          setPageNo(p);
+          setMode('edit');
+        }}
         onFilename={(filename) => c.setDocument((d) => (d ? { ...d, filename } : d))}
         onReplace={upload}
         onRemove={remove}
@@ -306,24 +372,61 @@ function Studio() {
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'edit', label: <><PenLine size={13} /> Edit</> },
-              { value: 'preview', label: <><Eye size={13} /> Preview</> },
+              {
+                value: 'edit',
+                label: (
+                  <>
+                    <PenLine size={13} /> Edit
+                  </>
+                ),
+              },
+              {
+                value: 'preview',
+                label: (
+                  <>
+                    <Eye size={13} /> Preview
+                  </>
+                ),
+              },
             ]}
           />
           {mode === 'edit' && editable ? (
             <>
               <span className="sep" />
-              <button type="button" className="tool-btn" aria-pressed={tool === 'select'} onClick={() => setTool('select')} title="Select and click text (V)"><MousePointer2 size={14} /> <span className="lbl">Select</span></button>
+              <button
+                type="button"
+                className="tool-btn"
+                aria-pressed={tool === 'select'}
+                onClick={() => setTool('select')}
+                title="Select and click text (V)"
+              >
+                <MousePointer2 size={14} /> <span className="lbl">Select</span>
+              </button>
               {(Object.keys(FIELD_META) as FieldType[]).map((t) => {
                 const Icon = FIELD_META[t].icon;
                 return (
-                  <button key={t} type="button" className="tool-btn" aria-pressed={tool === t} onClick={() => setTool(tool === t ? 'select' : t)} title={`${FIELD_META[t].hint} (${({ text: 'T', image: 'I', qr: 'Q', link: 'L' })[t]})`}>
+                  <button
+                    key={t}
+                    type="button"
+                    className="tool-btn"
+                    aria-pressed={tool === t}
+                    onClick={() => setTool(tool === t ? 'select' : t)}
+                    title={`${FIELD_META[t].hint} (${{ text: 'T', image: 'I', qr: 'Q', link: 'L' }[t]})`}
+                  >
                     <Icon size={14} /> <span className="lbl">{FIELD_META[t].label}</span>
                   </button>
                 );
               })}
               <span className="sep" />
-              <button type="button" className="tool-btn" aria-pressed={showAll} onClick={() => setShowAll((v) => !v)} title="Outline all the text you can click"><Highlighter size={14} /> <span className="lbl">Show text</span></button>
+              <button
+                type="button"
+                className="tool-btn"
+                aria-pressed={showAll}
+                onClick={() => setShowAll((v) => !v)}
+                title="Outline all the text you can click"
+              >
+                <Highlighter size={14} /> <span className="lbl">Show text</span>
+              </button>
             </>
           ) : null}
           <div className="grow" />
@@ -332,49 +435,70 @@ function Studio() {
 
         {mode === 'preview' ? (
           <div style={{ padding: '8px 14px 0', background: '#e9ebf3' }}>
-            {pv.error ? <Alert tone="bad">{pv.error}</Alert> : pv.warnings.length ? (
+            {pv.error ? (
+              <Alert tone="bad">{pv.error}</Alert>
+            ) : pv.warnings.length ? (
               <Alert tone="warn">
                 <b>Heads up for this person:</b>
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{pv.warnings.slice(0, 4).map((w, i) => <li key={i}>{w}</li>)}</ul>
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                  {pv.warnings.slice(0, 4).map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
               </Alert>
             ) : (
-              <div className="small muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Hand size={13} /> This is exactly what this person’s PDF looks like. Switch to Edit to change it.</div>
+              <div className="small muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Hand size={13} /> This is exactly what this person’s PDF looks like. Switch to Edit to change it.
+              </div>
             )}
           </div>
         ) : null}
 
         <div className="st-stage-wrap">
-        <div className="st-stage" ref={stage}>
-          {pageQ.isLoading || !pageData ? (
-            <div style={{ margin: 'auto' }}>{pageQ.error ? <Alert tone="bad">{(pageQ.error as Error).message}</Alert> : <CenterSpinner />}</div>
-          ) : (
-            <div className="pdf-holder">
-              <PageCanvas
-                page={pageData}
-                pageNo={page}
-                imageUrl={imageUrl}
-                scale={scale}
-                fields={doc.fields}
-                mode={mode}
-                previewUrl={pv.url}
-                previewBusy={pv.busy}
-                tool={editable ? tool : 'select'}
-                showAllText={showAll}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onRunClick={editable ? onRunClick : () => undefined}
-                onCreate={onCreate}
-                onRect={(id, rect) => updateField(id, (f) => ({ ...f, rect }) as PdfField)}
-              />
-            </div>
-          )}
-        </div>
-        <div className="zoom zoom-float">
-          <Button size="sm" variant="ghost" icon aria-label="Zoom out" onClick={() => stepZoom(-1)}><Minus size={14} /></Button>
-          <span>{Math.round(scale * 100)}%</span>
-          <Button size="sm" variant="ghost" icon aria-label="Zoom in" onClick={() => stepZoom(1)}><Plus size={14} /></Button>
-          <Button size="xs" variant={zoom === 'fit' ? 'default' : 'ghost'} onClick={() => setZoom('fit')} title="Fit the whole page in the window">Fit</Button>
-        </div>
+          <div className="st-stage" ref={stage}>
+            {pageQ.isLoading || !pageData ? (
+              <div style={{ margin: 'auto' }}>
+                {pageQ.error ? <Alert tone="bad">{(pageQ.error as Error).message}</Alert> : <CenterSpinner />}
+              </div>
+            ) : (
+              <div className="pdf-holder">
+                <PageCanvas
+                  page={pageData}
+                  pageNo={page}
+                  imageUrl={imageUrl}
+                  scale={scale}
+                  fields={doc.fields}
+                  mode={mode}
+                  previewUrl={pv.url}
+                  previewBusy={pv.busy}
+                  tool={editable ? tool : 'select'}
+                  showAllText={showAll}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onRunClick={editable ? onRunClick : () => undefined}
+                  onCreate={onCreate}
+                  onRect={(id, rect) => updateField(id, (f) => ({ ...f, rect }) as PdfField)}
+                />
+              </div>
+            )}
+          </div>
+          <div className="zoom zoom-float">
+            <Button size="sm" variant="ghost" icon aria-label="Zoom out" onClick={() => stepZoom(-1)}>
+              <Minus size={14} />
+            </Button>
+            <span>{Math.round(scale * 100)}%</span>
+            <Button size="sm" variant="ghost" icon aria-label="Zoom in" onClick={() => stepZoom(1)}>
+              <Plus size={14} />
+            </Button>
+            <Button
+              size="xs"
+              variant={zoom === 'fit' ? 'default' : 'ghost'}
+              onClick={() => setZoom('fit')}
+              title="Fit the whole page in the window"
+            >
+              Fit
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -395,24 +519,52 @@ function Studio() {
             <div className="st-sec">
               <h4>Make this PDF personal</h4>
               <ol className="st-steps">
-                <li><span><b>Click any text</b> in the PDF, such as a name placeholder or a company, to swap it for a merge field.</span></li>
-                <li><span><b>Draw a box</b> with Text, Image, QR code or Link to add something new, like a logo or a QR code to their page.</span></li>
-                <li><span>Hit <b>Preview</b> and pick someone to see exactly what they’ll get.</span></li>
+                <li>
+                  <span>
+                    <b>Click any text</b> in the PDF, such as a name placeholder or a company, to swap it for a merge field.
+                  </span>
+                </li>
+                <li>
+                  <span>
+                    <b>Draw a box</b> with Text, Image, QR code or Link to add something new, like a logo or a QR code to their page.
+                  </span>
+                </li>
+                <li>
+                  <span>
+                    Hit <b>Preview</b> and pick someone to see exactly what they’ll get.
+                  </span>
+                </li>
               </ol>
             </div>
             <div className="st-sec">
               <h4>Quick adds</h4>
-              <Button size="sm" onClick={addStamp} disabled={!editable}><Sparkles size={14} /> Add a “Prepared for …” line</Button>
-              <Button size="sm" disabled={!editable || !pageData} onClick={() => pageData && addField(makeField('qr', page, { x: pageData.width - 110, y: pageData.height - 110, w: 72, h: 72 }))}>{(() => { const I = FIELD_META.qr.icon; return <I size={14} />; })()} Add a QR code to their page</Button>
+              <Button size="sm" onClick={addStamp} disabled={!editable}>
+                <Sparkles size={14} /> Add a “Prepared for …” line
+              </Button>
+              <Button
+                size="sm"
+                disabled={!editable || !pageData}
+                onClick={() =>
+                  pageData && addField(makeField('qr', page, { x: pageData.width - 110, y: pageData.height - 110, w: 72, h: 72 }))
+                }
+              >
+                {(() => {
+                  const I = FIELD_META.qr.icon;
+                  return <I size={14} />;
+                })()}{' '}
+                Add a QR code to their page
+              </Button>
               <p className="hint">Quick adds land on {page === 1 ? 'this page' : 'page 1 or this page'}; drag them wherever you like.</p>
             </div>
             <div className="st-sec">
               <h4>Good to know</h4>
               <div className="st-help">
-                <b>Long names fit.</b> Text shrinks to fit its box, so “Montgomery-Featherstonehaugh” doesn’t break your layout. Set the fallback for blanks, for example <code>{'{{first_name|there}}'}</code>.
+                <b>Long names fit.</b> Text shrinks to fit its box, so “Montgomery-Featherstonehaugh” doesn’t break your layout. Set the
+                fallback for blanks, for example <code>{'{{first_name|there}}'}</code>.
               </div>
               <div className="st-help">
-                <b>Covering text</b> paints over the original so only the new text shows. The original is still inside the file, so it isn’t suitable for hiding secrets.
+                <b>Covering text</b> paints over the original so only the new text shows. The original is still inside the file, so it isn’t
+                suitable for hiding secrets.
               </div>
             </div>
           </>

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, extractTokens, hasTokens, normKey, parseTemplate, renderTemplate, renderUrl, safeUrl, titleCase } from '@shared/template';
+import {
+  escapeHtml,
+  extractTokens,
+  hasTokens,
+  normKey,
+  parseTemplate,
+  renderTemplate,
+  renderUrl,
+  safeUrl,
+  titleCase,
+} from '@shared/template';
 
 const ctx = { first_name: 'Jane', company: 'Acme Inc', job_title: 'vp of marketing', empty: '', n: 42, tags: ['a', 'b'] };
 
@@ -37,7 +47,7 @@ describe('renderTemplate', () => {
 
   it('treats quoted pipe segments as literal fallbacks even if they look like filters', () => {
     expect(renderTemplate('{{nope|"title"}}', ctx)).toBe('title');
-    expect(renderTemplate('{{nope|\'upper\'}}', ctx)).toBe('upper');
+    expect(renderTemplate("{{nope|'upper'}}", ctx)).toBe('upper');
   });
 
   it('allows pipes inside quoted fallbacks', () => {
@@ -132,7 +142,9 @@ describe('renderUrl', () => {
     expect(renderUrl('{{page_url}}?src=pdf', { page_url: 'https://go.test/p/abc' })).toBe('https://go.test/p/abc?src=pdf');
     expect(renderUrl('{{page_url}}?n={{name}}', { page_url: 'https://go.test/p/abc', name: 'A B' })).toBe('https://go.test/p/abc?n=A%20B');
     // only the FIRST token gets this treatment
-    expect(renderUrl('https://x.com/?u={{page_url}}', { page_url: 'https://go.test/p/abc' })).toBe('https://x.com/?u=https%3A%2F%2Fgo.test%2Fp%2Fabc');
+    expect(renderUrl('https://x.com/?u={{page_url}}', { page_url: 'https://go.test/p/abc' })).toBe(
+      'https://x.com/?u=https%3A%2F%2Fgo.test%2Fp%2Fabc',
+    );
   });
   it('refuses a token that resolves to a dangerous scheme', () => {
     expect(renderUrl('{{website}}', { website: 'javascript:alert(1)' })).toBe('');

@@ -9,7 +9,15 @@ import { safeRequest } from '../lib/safe-fetch';
 import { pageUrl, pdfUrl } from './links';
 import { publicProspect, stageOf, type Prospect } from './prospects';
 
-export const EVENT_NAMES = ['prospect.created', 'page.first_viewed', 'page.viewed', 'link.clicked', 'pdf.downloaded', 'form.submitted', 'meeting.booked'] as const;
+export const EVENT_NAMES = [
+  'prospect.created',
+  'page.first_viewed',
+  'page.viewed',
+  'link.clicked',
+  'pdf.downloaded',
+  'form.submitted',
+  'meeting.booked',
+] as const;
 export type WebhookEvent = (typeof EVENT_NAMES)[number];
 export const DEFAULT_EVENTS: WebhookEvent[] = ['page.first_viewed', 'link.clicked', 'pdf.downloaded', 'form.submitted', 'meeting.booked'];
 
@@ -47,7 +55,10 @@ export interface Webhook {
 const SECRET = 'webhook';
 
 function toWebhook(ctx: AppContext, r: WebhookRow): Webhook {
-  const counts = ctx.db.all<{ status: string; n: number }>('SELECT status, COUNT(*) AS n FROM webhook_deliveries WHERE webhook_id = ? GROUP BY status', r.id);
+  const counts = ctx.db.all<{ status: string; n: number }>(
+    'SELECT status, COUNT(*) AS n FROM webhook_deliveries WHERE webhook_id = ? GROUP BY status',
+    r.id,
+  );
   const n = (s: string) => counts.find((c) => c.status === s)?.n ?? 0;
   return {
     id: r.id,
@@ -122,7 +133,16 @@ export function deleteWebhook(ctx: AppContext, id: string): void {
 }
 
 export function recentDeliveries(ctx: AppContext, webhookId: string, limit = 25) {
-  return ctx.db.all<{ id: string; event: string; status: string; attempts: number; last_status: number | null; last_error: string | null; created_at: number; delivered_at: number | null }>(
+  return ctx.db.all<{
+    id: string;
+    event: string;
+    status: string;
+    attempts: number;
+    last_status: number | null;
+    last_error: string | null;
+    created_at: number;
+    delivered_at: number | null;
+  }>(
     'SELECT id, event, status, attempts, last_status, last_error, created_at, delivered_at FROM webhook_deliveries WHERE webhook_id = ? ORDER BY created_at DESC LIMIT ?',
     webhookId,
     limit,
@@ -177,14 +197,30 @@ const SLACK_TEXT: Record<string, (who: string, c: Campaign, props: Record<string
 };
 
 /** Slack reads <…> as links and mentions (<!channel>), so text that came from a prospect's profile must not carry any. */
-export const slackSafe = (s: unknown): string => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const slackSafe = (s: unknown): string =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
-function buildPayload(ctx: AppContext, kind: WebhookKind, event: string, campaign: Campaign, p: Prospect, props: Record<string, unknown>, deliveryId: string) {
+function buildPayload(
+  ctx: AppContext,
+  kind: WebhookKind,
+  event: string,
+  campaign: Campaign,
+  p: Prospect,
+  props: Record<string, unknown>,
+  deliveryId: string,
+) {
   if (kind === 'clay') return flatPayload(ctx, event, campaign, p, props);
   if (kind === 'slack') {
     const who = slackSafe([p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'A prospect');
     const at = p.company ? ` (${slackSafe(p.company)})` : '';
-    const text = (SLACK_TEXT[event] ?? ((w: string) => `${event}: ${w}`))(who + at, { ...campaign, name: slackSafe(campaign.name) }, { ...props, label: props.label ? slackSafe(props.label) : undefined });
+    const text = (SLACK_TEXT[event] ?? ((w: string) => `${event}: ${w}`))(
+      who + at,
+      { ...campaign, name: slackSafe(campaign.name) },
+      { ...props, label: props.label ? slackSafe(props.label) : undefined },
+    );
     return { text: `${text}\n<${pageUrl(ctx, campaign, p.token)}|Open their page>` };
   }
   return {
@@ -200,9 +236,18 @@ function buildPayload(ctx: AppContext, kind: WebhookKind, event: string, campaig
 // ── Emit (enqueue) ──────────────────────────────────────────────────────────
 
 /** Queue a delivery for every active webhook subscribed to this event. Never throws into request handling. */
-export function emitEvent(ctx: AppContext, event: string, campaign: Campaign, prospect: Prospect, props: Record<string, unknown> = {}): number {
+export function emitEvent(
+  ctx: AppContext,
+  event: string,
+  campaign: Campaign,
+  prospect: Prospect,
+  props: Record<string, unknown> = {},
+): number {
   try {
-    const hooks = ctx.db.all<WebhookRow>('SELECT * FROM webhooks WHERE active = 1 AND (campaign_id IS NULL OR campaign_id = ?)', campaign.id);
+    const hooks = ctx.db.all<WebhookRow>(
+      'SELECT * FROM webhooks WHERE active = 1 AND (campaign_id IS NULL OR campaign_id = ?)',
+      campaign.id,
+    );
     let queued = 0;
     for (const h of hooks) {
       const events = parseJson<string[]>(h.events, []);
@@ -242,9 +287,17 @@ interface DeliveryRow {
   attempts: number;
 }
 
-async function send(ctx: AppContext, hook: WebhookRow, d: DeliveryRow): Promise<{ ok: boolean; status: number | null; error: string | null }> {
+async function send(
+  ctx: AppContext,
+  hook: WebhookRow,
+  d: DeliveryRow,
+): Promise<{ ok: boolean; status: number | null; error: string | null }> {
   const body = d.payload;
-  const headers: Record<string, string> = { 'content-type': 'application/json', 'x-multiplier-event': d.event, 'x-multiplier-delivery': d.id };
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'x-multiplier-event': d.event,
+    'x-multiplier-delivery': d.id,
+  };
   if (hook.auth_header && hook.auth_value) {
     const v = decryptSecret(ctx.config.secret, SECRET, hook.auth_value);
     if (v) headers[hook.auth_header.toLowerCase()] = v;
@@ -267,7 +320,9 @@ async function send(ctx: AppContext, hook: WebhookRow, d: DeliveryRow): Promise<
       allowPrivate: ctx.config.allowPrivateFetch,
       httpsOnly: ctx.config.env === 'production' && !ctx.config.allowPrivateFetch,
     });
-    return res.status >= 200 && res.status < 300 ? { ok: true, status: res.status, error: null } : { ok: false, status: res.status, error: `HTTP ${res.status}` };
+    return res.status >= 200 && res.status < 300
+      ? { ok: true, status: res.status, error: null }
+      : { ok: false, status: res.status, error: `HTTP ${res.status}` };
   } catch (e) {
     return { ok: false, status: null, error: (e as Error).message.slice(0, 300) };
   }
@@ -279,11 +334,30 @@ async function deliverOne(ctx: AppContext, d: DeliveryRow): Promise<void> {
   const r = await send(ctx, hook, d);
   const attempts = d.attempts + 1;
   if (r.ok) {
-    ctx.db.run(`UPDATE webhook_deliveries SET status = 'delivered', attempts = ?, last_status = ?, last_error = NULL, delivered_at = ? WHERE id = ?`, attempts, r.status, Date.now(), d.id);
+    ctx.db.run(
+      `UPDATE webhook_deliveries SET status = 'delivered', attempts = ?, last_status = ?, last_error = NULL, delivered_at = ? WHERE id = ?`,
+      attempts,
+      r.status,
+      Date.now(),
+      d.id,
+    );
   } else if (attempts > BACKOFF_MS.length) {
-    ctx.db.run(`UPDATE webhook_deliveries SET status = 'failed', attempts = ?, last_status = ?, last_error = ? WHERE id = ?`, attempts, r.status, r.error, d.id);
+    ctx.db.run(
+      `UPDATE webhook_deliveries SET status = 'failed', attempts = ?, last_status = ?, last_error = ? WHERE id = ?`,
+      attempts,
+      r.status,
+      r.error,
+      d.id,
+    );
   } else {
-    ctx.db.run(`UPDATE webhook_deliveries SET attempts = ?, last_status = ?, last_error = ?, next_attempt_at = ? WHERE id = ?`, attempts, r.status, r.error, Date.now() + BACKOFF_MS[attempts - 1], d.id);
+    ctx.db.run(
+      `UPDATE webhook_deliveries SET attempts = ?, last_status = ?, last_error = ?, next_attempt_at = ? WHERE id = ?`,
+      attempts,
+      r.status,
+      r.error,
+      Date.now() + BACKOFF_MS[attempts - 1],
+      d.id,
+    );
   }
 }
 
@@ -294,13 +368,26 @@ export async function processDeliveries(ctx: AppContext, limit = 25): Promise<nu
     Date.now(),
     limit,
   );
-  const claimed = due.filter((d) => ctx.db.run(`UPDATE webhook_deliveries SET next_attempt_at = ? WHERE id = ? AND next_attempt_at <= ?`, Date.now() + 120_000, d.id, Date.now()).changes > 0);
+  const claimed = due.filter(
+    (d) =>
+      ctx.db.run(
+        `UPDATE webhook_deliveries SET next_attempt_at = ? WHERE id = ? AND next_attempt_at <= ?`,
+        Date.now() + 120_000,
+        d.id,
+        Date.now(),
+      ).changes > 0,
+  );
   for (let i = 0; i < claimed.length; i += 4) await Promise.all(claimed.slice(i, i + 4).map((d) => deliverOne(ctx, d)));
   return claimed.length;
 }
 
 /** "Send test event" button: builds a sample payload and delivers it immediately. */
-export async function sendTest(ctx: AppContext, webhookId: string, campaign: Campaign, prospect: Prospect): Promise<{ ok: boolean; status: number | null; error: string | null }> {
+export async function sendTest(
+  ctx: AppContext,
+  webhookId: string,
+  campaign: Campaign,
+  prospect: Prospect,
+): Promise<{ ok: boolean; status: number | null; error: string | null }> {
   const hook = ctx.db.get<WebhookRow>('SELECT * FROM webhooks WHERE id = ?', webhookId);
   if (!hook) throw notFound('Webhook');
   const id = newId('dlv');

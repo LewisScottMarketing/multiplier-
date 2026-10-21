@@ -63,10 +63,7 @@ export const PreviewSourceSchema = z.union([
   z.object({ kind: z.literal('empty') }),
 ]);
 
-export type PreviewSource =
-  | { kind: 'sample'; index: number }
-  | { kind: 'prospect'; id: string }
-  | { kind: 'empty' };
+export type PreviewSource = { kind: 'sample'; index: number } | { kind: 'prospect'; id: string } | { kind: 'empty' };
 
 /** `sample:1`, `prospect:prs_x`, `empty` — the compact form used in query strings. */
 export function parsePreviewSource(raw: string | undefined | null): PreviewSource {
@@ -102,7 +99,8 @@ export function previewContext(app: AppContext, campaign: Campaign, src: Preview
   return { ctx, prospect };
 }
 
-export const previewSourceString = (src: PreviewSource): string => (src.kind === 'empty' ? 'empty' : src.kind === 'sample' ? `sample:${src.index}` : `prospect:${src.id}`);
+export const previewSourceString = (src: PreviewSource): string =>
+  src.kind === 'empty' ? 'empty' : src.kind === 'sample' ? `sample:${src.index}` : `prospect:${src.id}`;
 
 export function renderPreview(app: AppContext, campaign: Campaign, src: PreviewSource, host: string): PageOutput & { context: Ctx } {
   const { ctx } = previewContext(app, campaign, src);

@@ -7,9 +7,20 @@ import { renderInline, renderRich } from '../../src/server/render/rich';
 
 const settings = CampaignSettingsSchema.parse({});
 
-function render(page: Page, data: Record<string, unknown> = {}, opts: { token?: string | null; document?: boolean; mode?: 'live' | 'preview' } = {}) {
+function render(
+  page: Page,
+  data: Record<string, unknown> = {},
+  opts: { token?: string | null; document?: boolean; mode?: 'live' | 'preview' } = {},
+) {
   return renderPage({
-    campaign: { id: 'cmp_1', name: 'Camp', slug: 'camp', page, document: opts.document ? ({ asset_id: 'ast_x', page_count: 1, filename: 'x.pdf', fields: [] } as never) : null, settings },
+    campaign: {
+      id: 'cmp_1',
+      name: 'Camp',
+      slug: 'camp',
+      page,
+      document: opts.document ? ({ asset_id: 'ast_x', page_count: 1, filename: 'x.pdf', fields: [] } as never) : null,
+      settings,
+    },
     ctx: buildContext(data),
     mode: opts.mode ?? 'live',
     token: opts.token === undefined ? 'tok1234567' : opts.token,
@@ -71,7 +82,11 @@ describe('renderPage', () => {
     const page = PageSchema.parse({
       seo: { title: 'Page for {{company}}', description: 'About {{company}}' },
       footer: { text: 'For {{company}}' },
-      blocks: [newBlock('hero', { headline: '{{company}}', badge: '{{company}}' }), newBlock('features', { items: [{ icon: 'zap', title: '{{company}}', text: '{{company}}' }] }), newBlock('form')],
+      blocks: [
+        newBlock('hero', { headline: '{{company}}', badge: '{{company}}' }),
+        newBlock('features', { items: [{ icon: 'zap', title: '{{company}}', text: '{{company}}' }] }),
+        newBlock('form'),
+      ],
     });
     const { html } = render(page, { company: evil, first_name: evil, email: evil });
     expect(html).not.toContain('<script>alert(1)</script>');
@@ -81,8 +96,16 @@ describe('renderPage', () => {
 
   it('shows persona-specific blocks only to the matching segment', () => {
     const page = pageWith(
-      newBlock('text', { id: 'a', body: 'MARKETING ONLY', rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'marketing' }] } }),
-      newBlock('text', { id: 'b', body: 'SALES ONLY', rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] } }),
+      newBlock('text', {
+        id: 'a',
+        body: 'MARKETING ONLY',
+        rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'marketing' }] },
+      }),
+      newBlock('text', {
+        id: 'b',
+        body: 'SALES ONLY',
+        rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] },
+      }),
       newBlock('text', { id: 'c', body: 'EVERYONE' }),
     );
     const m = render(page, { job_title: 'VP of Marketing' });
@@ -115,21 +138,30 @@ describe('renderPage', () => {
   });
 
   it('omits buttons that would go nowhere', () => {
-    const page = pageWith(newBlock('hero', { primary: { label: 'Form', action: { type: 'form' } }, secondary: { label: 'PDF', action: { type: 'document' } } }));
+    const page = pageWith(
+      newBlock('hero', { primary: { label: 'Form', action: { type: 'form' } }, secondary: { label: 'PDF', action: { type: 'document' } } }),
+    );
     const html = render(page, {}).html;
     expect(html).not.toContain('>Form<');
     expect(html).not.toContain('>PDF<');
   });
 
   it('wires "form" and "document" buttons when targets exist', () => {
-    const page = pageWith(newBlock('hero', { primary: { label: 'Form', action: { type: 'form' } }, secondary: { label: 'PDF', action: { type: 'document' } } }), newBlock('form', { id: 'f1' }));
+    const page = pageWith(
+      newBlock('hero', { primary: { label: 'Form', action: { type: 'form' } }, secondary: { label: 'PDF', action: { type: 'document' } } }),
+      newBlock('form', { id: 'f1' }),
+    );
     const html = render(page, {}, { document: true }).html;
     expect(html).toContain('href="#f1"');
     expect(html).toContain('href="/p/tok1234567.pdf"');
   });
 
   it('sanitises custom HTML after merging data', () => {
-    const page = pageWith(newBlock('html', { html: '<p onclick="x()">Hi {{name}}</p><script>alert(1)</script><a href="{{site}}">go</a><iframe src="https://evil.com/x"></iframe><iframe src="https://player.vimeo.com/video/1"></iframe>' }));
+    const page = pageWith(
+      newBlock('html', {
+        html: '<p onclick="x()">Hi {{name}}</p><script>alert(1)</script><a href="{{site}}">go</a><iframe src="https://evil.com/x"></iframe><iframe src="https://player.vimeo.com/video/1"></iframe>',
+      }),
+    );
     const { html } = render(page, { name: '<img src=x onerror=alert(1)>', site: 'javascript:alert(1)' });
     expect(html).not.toContain('onclick');
     expect(html).not.toContain('<script>alert(1)');
@@ -145,7 +177,12 @@ describe('renderPage', () => {
     expect(ok.html).toContain('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
     const bad = render(pageWith(newBlock('video', { url: 'https://evil.com/video.mp4' })));
     expect(bad.html).not.toContain('evil.com');
-    const cal = render(pageWith(newBlock('calendar', { url: 'https://calendly.com/acme/intro' })), { full_name: 'Jane Doe', email: 'j@acme.com', first_name: 'Jane', last_name: 'Doe' });
+    const cal = render(pageWith(newBlock('calendar', { url: 'https://calendly.com/acme/intro' })), {
+      full_name: 'Jane Doe',
+      email: 'j@acme.com',
+      first_name: 'Jane',
+      last_name: 'Doe',
+    });
     expect(cal.html).toContain('calendly.com/acme/intro?');
     expect(cal.html).toContain('name=Jane+Doe');
   });
@@ -180,7 +217,10 @@ describe('renderPage', () => {
   });
 
   it('puts personalised values in the page title and social tags', () => {
-    const page = PageSchema.parse({ seo: { title: 'Plan for {{company}}', description: 'Prepared for {{first_name}}' }, blocks: [newBlock('text')] });
+    const page = PageSchema.parse({
+      seo: { title: 'Plan for {{company}}', description: 'Prepared for {{first_name}}' },
+      blocks: [newBlock('text')],
+    });
     const { html } = render(page, { company: 'Acme', first_name: 'Jane' });
     expect(html).toContain('<title>Plan for Acme</title>');
     expect(html).toContain('og:title" content="Plan for Acme"');

@@ -93,7 +93,8 @@ describe('tracking', () => {
 
   it('accumulates engaged time per session using the maximum, not the sum of heartbeats', async () => {
     const p = await mk({ email: 'jane@acme.com' });
-    const beat = (sid: string, s: number, i = 1) => t.req('POST', `/t/${p.token}`, { type: 'engaged', sid, s, scroll: 40, i }, publicHeaders());
+    const beat = (sid: string, s: number, i = 1) =>
+      t.req('POST', `/t/${p.token}`, { type: 'engaged', sid, s, scroll: 40, i }, publicHeaders());
     await t.req('POST', `/t/${p.token}`, { type: 'view', sid: 'sess1' }, publicHeaders());
     await beat('sess1', 15);
     await beat('sess1', 30);
@@ -163,7 +164,7 @@ describe('forms', () => {
 
   it('ignores fields the form never declared', async () => {
     const p = await mk({ first_name: 'Jane' });
-    await submit(p.token, { _block: 'form1', name: 'J', email: 'a@b.co', admin: 'true', '__proto__': 'x' });
+    await submit(p.token, { _block: 'form1', name: 'J', email: 'a@b.co', admin: 'true', __proto__: 'x' });
     const one = await t.json('GET', `/api/prospects/${p.id}`);
     expect(Object.keys(one.body.submissions[0].data).sort()).toEqual(['email', 'name']);
   });
@@ -242,11 +243,24 @@ describe('outbound webhooks (the Clay feedback loop)', () => {
 
   it('pushes a flat row to a Clay table webhook when a prospect first opens their page, with the auth header', async () => {
     const rx = await receiver();
-    const created = await t.json('POST', '/api/webhooks', { name: 'Clay table', kind: 'clay', url: rx.url, auth_header: 'x-clay-webhook-auth', auth_value: 'secret-token' });
+    const created = await t.json('POST', '/api/webhooks', {
+      name: 'Clay table',
+      kind: 'clay',
+      url: rx.url,
+      auth_header: 'x-clay-webhook-auth',
+      auth_value: 'secret-token',
+    });
     expect(created.status).toBe(201);
     expect(JSON.stringify(created.body)).not.toContain('secret-token');
 
-    const p = await mk({ email: 'jane@acme.com', external_id: 'ext-9', first_name: 'Jane', last_name: 'Doe', company: 'Acme', job_title: 'CMO' });
+    const p = await mk({
+      email: 'jane@acme.com',
+      external_id: 'ext-9',
+      first_name: 'Jane',
+      last_name: 'Doe',
+      company: 'Acme',
+      job_title: 'CMO',
+    });
     await t.req('POST', `/t/${p.token}`, { type: 'view', sid: 'sess1' }, publicHeaders());
     await t.req('POST', `/t/${p.token}`, { type: 'view', sid: 'sess2' }, publicHeaders()); // second view: not "first"
     expect(await processDeliveries(t.ctx)).toBe(1);
@@ -271,7 +285,12 @@ describe('outbound webhooks (the Clay feedback loop)', () => {
     const rx = await receiver();
     await t.json('POST', '/api/webhooks', { name: 'Clay', kind: 'clay', url: rx.url, events: ['form.submitted'] });
     const p = await mk({ email: 'jane@acme.com', first_name: 'Jane' });
-    await t.req('POST', `/p/${p.token}/submit`, { _block: 'form1', name: 'Jane Doe', email: 'jane@acme.com', message: 'Call me' }, { ...publicHeaders(), accept: 'application/json' });
+    await t.req(
+      'POST',
+      `/p/${p.token}/submit`,
+      { _block: 'form1', name: 'Jane Doe', email: 'jane@acme.com', message: 'Call me' },
+      { ...publicHeaders(), accept: 'application/json' },
+    );
     await processDeliveries(t.ctx);
     expect(rx.received[0].body).toMatchObject({ event: 'form.submitted', form_name: 'Jane Doe', form_message: 'Call me' });
     await rx.close();

@@ -71,7 +71,8 @@ export function recordEvent(ctx: AppContext, e: EventInput): boolean {
 
   // one `view` per browser session (the beacon can be retried)
   if (e.type === 'view' && e.sessionId && e.prospectId) {
-    if (ctx.db.get(`SELECT 1 FROM events WHERE prospect_id = ? AND type = 'view' AND session_id = ?`, e.prospectId, e.sessionId)) return false;
+    if (ctx.db.get(`SELECT 1 FROM events WHERE prospect_id = ? AND type = 'view' AND session_id = ?`, e.prospectId, e.sessionId))
+      return false;
   }
 
   ctx.db.run(
@@ -92,7 +93,12 @@ export function recordEvent(ctx: AppContext, e: EventInput): boolean {
   const before = ctx.db.get<{ views: number }>('SELECT views FROM prospects WHERE id = ?', e.prospectId);
   switch (e.type) {
     case 'view':
-      ctx.db.run('UPDATE prospects SET views = views + 1, first_seen_at = COALESCE(first_seen_at, ?), last_seen_at = ? WHERE id = ?', now, now, e.prospectId);
+      ctx.db.run(
+        'UPDATE prospects SET views = views + 1, first_seen_at = COALESCE(first_seen_at, ?), last_seen_at = ? WHERE id = ?',
+        now,
+        now,
+        e.prospectId,
+      );
       break;
     case 'click':
       ctx.db.run('UPDATE prospects SET clicks = clicks + 1, last_seen_at = ? WHERE id = ?', now, e.prospectId);
@@ -117,7 +123,15 @@ export function recordEvent(ctx: AppContext, e: EventInput): boolean {
   ctx.db.run('UPDATE prospects SET score = ? WHERE id = ?', score(p), e.prospectId);
 
   // tell the outside world (Clay, Slack, …)
-  const name = ({ view: before && before.views === 0 ? 'page.first_viewed' : 'page.viewed', click: 'link.clicked', download: 'pdf.downloaded', submit: 'form.submitted', booked: 'meeting.booked' } as Record<string, string>)[e.type];
+  const name = (
+    {
+      view: before && before.views === 0 ? 'page.first_viewed' : 'page.viewed',
+      click: 'link.clicked',
+      download: 'pdf.downloaded',
+      submit: 'form.submitted',
+      booked: 'meeting.booked',
+    } as Record<string, string>
+  )[e.type];
   if (name) {
     const campaign = getCampaign(ctx, e.campaignId);
     const prospect = getProspect(ctx, e.prospectId);

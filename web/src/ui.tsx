@@ -26,8 +26,21 @@ interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   block?: boolean;
 }
 
-export function Button({ variant = 'default', size = 'md', icon, loading, block, className = '', children, disabled, type = 'button', ...rest }: BtnProps) {
-  const cls = ['btn', variant !== 'default' ? variant : '', size !== 'md' ? size : '', icon ? 'icon' : '', block ? 'block' : '', className].filter(Boolean).join(' ');
+export function Button({
+  variant = 'default',
+  size = 'md',
+  icon,
+  loading,
+  block,
+  className = '',
+  children,
+  disabled,
+  type = 'button',
+  ...rest
+}: BtnProps) {
+  const cls = ['btn', variant !== 'default' ? variant : '', size !== 'md' ? size : '', icon ? 'icon' : '', block ? 'block' : '', className]
+    .filter(Boolean)
+    .join(' ');
   return (
     <button type={type} className={cls} disabled={disabled || loading} {...rest}>
       {loading ? <Loader2 size={15} className="spin" /> : null}
@@ -50,13 +63,29 @@ export function CenterSpinner() {
 
 // ── Form controls ───────────────────────────────────────────────────────────
 
-export function Field({ label, hint, error, children, right }: { label?: ReactNode; hint?: ReactNode; error?: ReactNode; children: ReactNode; right?: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  error,
+  children,
+  right,
+}: {
+  label?: ReactNode;
+  hint?: ReactNode;
+  error?: ReactNode;
+  children: ReactNode;
+  right?: ReactNode;
+}) {
   return (
     <div className="field">
       {label ? (
         <label>
           {label}
-          {right ? <span className="right" style={{ fontWeight: 400 }}>{right}</span> : null}
+          {right ? (
+            <span className="right" style={{ fontWeight: 400 }}>
+              {right}
+            </span>
+          ) : null}
         </label>
       ) : null}
       {children}
@@ -81,11 +110,41 @@ export function Select({ className = '', small, children, ...rest }: SelectHTMLA
   );
 }
 
-export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }) {
-  return <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} className="switch" onClick={() => onChange(!checked)} />;
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      className="switch"
+      onClick={() => onChange(!checked)}
+    />
+  );
 }
 
-export function SwitchRow({ label, hint, checked, onChange }: { label: ReactNode; hint?: ReactNode; checked: boolean; onChange: (v: boolean) => void }) {
+export function SwitchRow({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <div className="switch-row">
       <div>
@@ -102,7 +161,13 @@ export function ColorField({ value, onChange }: { value: string; onChange: (v: s
   useEffect(() => setText(value), [value]);
   return (
     <div className="color-field">
-      <input type="color" className="swatch" value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'} onChange={(e) => onChange(e.target.value)} aria-label="Pick a colour" />
+      <input
+        type="color"
+        className="swatch"
+        value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Pick a colour"
+      />
       <Input
         small
         value={text}
@@ -118,7 +183,15 @@ export function ColorField({ value, onChange }: { value: string; onChange: (v: s
   );
 }
 
-export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: Array<{ value: T; label: ReactNode; title?: string }>; onChange: (v: T) => void }) {
+export function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: Array<{ value: T; label: ReactNode; title?: string }>;
+  onChange: (v: T) => void;
+}) {
   return (
     <div className="segmented" role="group">
       {options.map((o) => (
@@ -142,7 +215,9 @@ export function Badge({ tone, children, dot }: { tone?: 'ok' | 'warn' | 'bad' | 
 }
 
 export function Alert({ tone, children, icon }: { tone?: 'warn' | 'bad' | 'ok'; children: ReactNode; icon?: ReactNode }) {
-  const ic = icon ?? (tone === 'warn' || tone === 'bad' ? <AlertTriangle size={16} /> : tone === 'ok' ? <CheckCircle2 size={16} /> : <Info size={16} />);
+  const ic =
+    icon ??
+    (tone === 'warn' || tone === 'bad' ? <AlertTriangle size={16} /> : tone === 'ok' ? <CheckCircle2 size={16} /> : <Info size={16} />);
   return (
     <div className={`alert ${tone ?? ''}`} role={tone === 'bad' ? 'alert' : undefined}>
       {ic}
@@ -151,7 +226,17 @@ export function Alert({ tone, children, icon }: { tone?: 'warn' | 'bad' | 'ok'; 
   );
 }
 
-export function EmptyState({ icon, title, children, action }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+export function EmptyState({
+  icon,
+  title,
+  children,
+  action,
+}: {
+  icon: ReactNode;
+  title: string;
+  children?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
     <div className="empty">
       <div className="icon-bubble">{icon}</div>
@@ -181,7 +266,17 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function CopyButton({ text, label, size = 'sm', variant = 'default' }: { text: string; label?: string; size?: 'xs' | 'sm'; variant?: 'default' | 'ghost' }) {
+export function CopyButton({
+  text,
+  label,
+  size = 'sm',
+  variant = 'default',
+}: {
+  text: string;
+  label?: string;
+  size?: 'xs' | 'sm';
+  variant?: 'default' | 'ghost';
+}) {
   const [done, setDone] = useState(false);
   return (
     <Button
@@ -224,7 +319,17 @@ export function CodeBlock({ text }: { text: string }) {
 
 // ── Menu ────────────────────────────────────────────────────────────────────
 
-export function Menu({ trigger, children, align = 'right', up }: { trigger: (open: boolean, toggle: () => void) => ReactNode; children: (close: () => void) => ReactNode; align?: 'left' | 'right'; up?: boolean }) {
+export function Menu({
+  trigger,
+  children,
+  align = 'right',
+  up,
+}: {
+  trigger: (open: boolean, toggle: () => void) => ReactNode;
+  children: (close: () => void) => ReactNode;
+  align?: 'left' | 'right';
+  up?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -248,7 +353,21 @@ export function Menu({ trigger, children, align = 'right', up }: { trigger: (ope
 
 // ── Modal & drawer ──────────────────────────────────────────────────────────
 
-export function Modal({ title, onClose, children, footer, size, description }: { title: ReactNode; onClose: () => void; children: ReactNode; footer?: ReactNode; size?: 'wide' | 'xwide'; description?: ReactNode }) {
+export function Modal({
+  title,
+  onClose,
+  children,
+  footer,
+  size,
+  description,
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  size?: 'wide' | 'xwide';
+  description?: ReactNode;
+}) {
   const titleId = useId();
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -261,7 +380,11 @@ export function Modal({ title, onClose, children, footer, size, description }: {
         <div className="modal-head">
           <div className="grow">
             <h2 id={titleId}>{title}</h2>
-            {description ? <p className="muted" style={{ marginTop: 4 }}>{description}</p> : null}
+            {description ? (
+              <p className="muted" style={{ marginTop: 4 }}>
+                {description}
+              </p>
+            ) : null}
           </div>
           <Button variant="ghost" size="sm" icon onClick={onClose} aria-label="Close">
             <X size={16} />
@@ -275,7 +398,17 @@ export function Modal({ title, onClose, children, footer, size, description }: {
   );
 }
 
-export function Drawer({ title, onClose, children, actions }: { title: ReactNode; onClose: () => void; children: ReactNode; actions?: ReactNode }) {
+export function Drawer({
+  title,
+  onClose,
+  children,
+  actions,
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', key);
@@ -385,7 +518,15 @@ export function UiProvider({ children }: { children: ReactNode }) {
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
     <span className="logo-mark" style={{ width: size, height: size }}>
-      <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round">
+      <svg
+        width={size * 0.55}
+        height={size * 0.55}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+      >
         <path d="M5 5l14 14M19 5L5 19" />
       </svg>
     </span>

@@ -14,6 +14,5 @@ export const unauthorized = (message = 'Authentication required') => new HttpErr
 export const forbidden = (message = 'Forbidden') => new HttpError(403, 'forbidden', message);
 export const notFound = (what = 'Resource') => new HttpError(404, 'not_found', `${what} not found`);
 export const conflict = (message: string, details?: unknown) => new HttpError(409, 'conflict', message, details);
-export const unprocessable = (message: string, details?: unknown) =>
-  new HttpError(422, 'unprocessable', message, details);
+export const unprocessable = (message: string, details?: unknown) => new HttpError(422, 'unprocessable', message, details);
 export const tooLarge = (message: string) => new HttpError(413, 'payload_too_large', message);

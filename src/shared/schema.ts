@@ -91,9 +91,34 @@ const blockBase = {
 };
 
 export const ICON_NAMES = [
-  'check', 'zap', 'target', 'users', 'clock', 'shield', 'star', 'rocket', 'chart', 'trending-up',
-  'mail', 'phone', 'globe', 'lock', 'sparkles', 'calendar', 'file-text', 'heart', 'lightbulb',
-  'layers', 'handshake', 'search', 'settings', 'puzzle', 'award', 'banknote', 'briefcase', 'compass',
+  'check',
+  'zap',
+  'target',
+  'users',
+  'clock',
+  'shield',
+  'star',
+  'rocket',
+  'chart',
+  'trending-up',
+  'mail',
+  'phone',
+  'globe',
+  'lock',
+  'sparkles',
+  'calendar',
+  'file-text',
+  'heart',
+  'lightbulb',
+  'layers',
+  'handshake',
+  'search',
+  'settings',
+  'puzzle',
+  'award',
+  'banknote',
+  'briefcase',
+  'compass',
 ] as const;
 export type IconName = (typeof ICON_NAMES)[number];
 
@@ -157,7 +182,10 @@ export const StatsBlock = z.object({
   ...blockBase,
   type: z.literal('stats'),
   heading: text(240).optional(),
-  items: z.array(z.object({ value: text(24).default(''), label: text(160).default('') })).max(6).default([]),
+  items: z
+    .array(z.object({ value: text(24).default(''), label: text(160).default('') }))
+    .max(6)
+    .default([]),
 });
 
 export const StepsBlock = z.object({
@@ -165,7 +193,10 @@ export const StepsBlock = z.object({
   type: z.literal('steps'),
   heading: text(240).optional(),
   intro: text(600).optional(),
-  items: z.array(z.object({ title: text(160).default(''), text: text(500).optional() })).max(8).default([]),
+  items: z
+    .array(z.object({ title: text(160).default(''), text: text(500).optional() }))
+    .max(8)
+    .default([]),
 });
 
 export const TestimonialBlock = z.object({
@@ -229,7 +260,10 @@ export const FaqBlock = z.object({
   ...blockBase,
   type: z.literal('faq'),
   heading: text(240).optional(),
-  items: z.array(z.object({ q: text(300).default(''), a: text(2000).default('') })).max(15).default([]),
+  items: z
+    .array(z.object({ q: text(300).default(''), a: text(2000).default('') }))
+    .max(15)
+    .default([]),
 });
 
 export const CalendarBlock = z.object({
@@ -339,7 +373,10 @@ export const PageSchema = z.object({
   footer: z
     .object({
       text: text(600).default(''),
-      links: z.array(z.object({ label: text(60), url: text(2000) })).max(8).default([]),
+      links: z
+        .array(z.object({ label: text(60), url: text(2000) }))
+        .max(8)
+        .default([]),
     })
     .prefault({}),
   blocks: z.array(BlockSchema).max(80).default([]),

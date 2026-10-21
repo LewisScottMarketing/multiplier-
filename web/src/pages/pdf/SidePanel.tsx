@@ -49,18 +49,41 @@ export function SidePanel({
       <div className="st-sec">
         <h4>PDF</h4>
         <div className="row" style={{ alignItems: 'flex-start' }}>
-          <span className="bl-ico"><FileText size={15} /></span>
+          <span className="bl-ico">
+            <FileText size={15} />
+          </span>
           <div style={{ minWidth: 0 }}>
-            <div className="truncate" title={file?.filename} style={{ fontWeight: 600, fontSize: 13 }}>{file?.filename ?? 'document.pdf'}</div>
-            <div className="muted tiny">{doc.page_count} page{doc.page_count === 1 ? '' : 's'}{file ? ` · ${fmtSize(file.size)}` : ''}</div>
+            <div className="truncate" title={file?.filename} style={{ fontWeight: 600, fontSize: 13 }}>
+              {file?.filename ?? 'document.pdf'}
+            </div>
+            <div className="muted tiny">
+              {doc.page_count} page{doc.page_count === 1 ? '' : 's'}
+              {file ? ` · ${fmtSize(file.size)}` : ''}
+            </div>
           </div>
         </div>
         <div className="row" style={{ gap: 6 }}>
-          <Button size="xs" loading={uploading} onClick={() => input.current?.click()}><Replace size={12} /> Replace</Button>
-          <Button size="xs" variant="ghost" className="danger" onClick={onRemove}><Trash2 size={12} /> Remove</Button>
-          <input ref={input} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onReplace(f); e.target.value = ''; }} />
+          <Button size="xs" loading={uploading} onClick={() => input.current?.click()}>
+            <Replace size={12} /> Replace
+          </Button>
+          <Button size="xs" variant="ghost" className="danger" onClick={onRemove}>
+            <Trash2 size={12} /> Remove
+          </Button>
+          <input
+            ref={input}
+            type="file"
+            accept="application/pdf,.pdf"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onReplace(f);
+              e.target.value = '';
+            }}
+          />
         </div>
-        {file && !file.editable ? <Alert tone="warn">This PDF can’t be edited, so each prospect gets the original file. The landing page still personalises.</Alert> : null}
+        {file && !file.editable ? (
+          <Alert tone="warn">This PDF can’t be edited, so each prospect gets the original file. The landing page still personalises.</Alert>
+        ) : null}
         <TokenField
           label="Name of each person’s file"
           value={doc.filename}
@@ -76,13 +99,24 @@ export function SidePanel({
           {pages.map((n) => {
             const dim = file?.pages[n - 1];
             return (
-              <button key={n} type="button" className={`thumb ${n === pageNo ? 'on' : ''}`} onClick={() => onPage(n)} aria-label={`Page ${n}`} aria-current={n === pageNo}>
+              <button
+                key={n}
+                type="button"
+                className={`thumb ${n === pageNo ? 'on' : ''}`}
+                onClick={() => onPage(n)}
+                aria-label={`Page ${n}`}
+                aria-current={n === pageNo}
+              >
                 <div className="im" style={{ aspectRatio: dim ? `${dim.w} / ${dim.h}` : '0.77' }}>
                   <img src={`/api/campaigns/${campaignId}/document/page/${n}.png`} alt="" loading="lazy" draggable={false} />
                 </div>
                 <div className="n">
                   <span>Page {n}</span>
-                  {count(n) ? <Badge tone="brand">{count(n)} field{count(n) === 1 ? '' : 's'}</Badge> : null}
+                  {count(n) ? (
+                    <Badge tone="brand">
+                      {count(n)} field{count(n) === 1 ? '' : 's'}
+                    </Badge>
+                  ) : null}
                 </div>
               </button>
             );
@@ -99,9 +133,18 @@ export function SidePanel({
             {doc.fields.map((f) => {
               const Icon = FIELD_META[f.type].icon;
               return (
-                <button key={f.id} type="button" className={`frow ${f.id === selectedId ? 'on' : ''}`} onClick={() => onSelect(f.id, f.page)}>
-                  <span className="ic"><Icon size={13} /></span>
-                  <span className="grow truncate small" style={{ fontWeight: 560 }}>{fieldTitle(f)}</span>
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`frow ${f.id === selectedId ? 'on' : ''}`}
+                  onClick={() => onSelect(f.id, f.page)}
+                >
+                  <span className="ic">
+                    <Icon size={13} />
+                  </span>
+                  <span className="grow truncate small" style={{ fontWeight: 560 }}>
+                    {fieldTitle(f)}
+                  </span>
                   {f.rule?.conditions.length ? <Badge tone="brand">Targeted</Badge> : null}
                   <span className="muted tiny">p{f.page}</span>
                 </button>

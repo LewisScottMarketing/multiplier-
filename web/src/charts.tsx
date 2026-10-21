@@ -32,8 +32,10 @@ function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] 
   return [ref, w];
 }
 
-const shortDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const longDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+const shortDate = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const longDate = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 
 // ── chart card with a table twin ────────────────────────────────────────────
 
@@ -42,7 +44,21 @@ export interface TableSpec {
   rows: Array<Array<string | number>>;
 }
 
-export function ChartCard({ title, subtitle, actions, table, children, stale }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; table?: TableSpec; children: ReactNode; stale?: boolean }) {
+export function ChartCard({
+  title,
+  subtitle,
+  actions,
+  table,
+  children,
+  stale,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  table?: TableSpec;
+  children: ReactNode;
+  stale?: boolean;
+}) {
   const [view, setView] = useState<'chart' | 'table'>('chart');
   return (
     <section className="viz viz-card">
@@ -67,11 +83,19 @@ export function ChartCard({ title, subtitle, actions, table, children, stale }: 
         {view === 'table' && table ? (
           <table className="viz-table">
             <thead>
-              <tr>{table.columns.map((c) => <th key={c}>{c}</th>)}</tr>
+              <tr>
+                {table.columns.map((c) => (
+                  <th key={c}>{c}</th>
+                ))}
+              </tr>
             </thead>
             <tbody>
               {table.rows.map((r, i) => (
-                <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>
+                <tr key={i}>
+                  {r.map((c, j) => (
+                    <td key={j}>{c}</td>
+                  ))}
+                </tr>
               ))}
             </tbody>
           </table>
@@ -94,14 +118,34 @@ export function Sparkline({ values }: { values: number[] }) {
   return (
     <div ref={ref} className="spark" aria-hidden="true">
       <svg width={w} height={h} style={{ display: 'block' }}>
-        <polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke="var(--s1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />
+        <polyline
+          points={pts.map((p) => p.join(',')).join(' ')}
+          fill="none"
+          stroke="var(--s1)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.55"
+        />
         {last ? <circle cx={last[0]} cy={last[1]} r="4" fill="var(--s1)" stroke="var(--v-surface)" strokeWidth="2" /> : null}
       </svg>
     </div>
   );
 }
 
-export function StatTile({ label, value, sub, spark, hero }: { label: string; value: ReactNode; sub?: ReactNode; spark?: number[]; hero?: boolean }) {
+export function StatTile({
+  label,
+  value,
+  sub,
+  spark,
+  hero,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  spark?: number[];
+  hero?: boolean;
+}) {
   return (
     <div className={`viz tile ${hero ? 'hero' : ''}`}>
       <div className="lbl">{label}</div>
@@ -114,7 +158,15 @@ export function StatTile({ label, value, sub, spark, hero }: { label: string; va
 
 // ── time series (single series: area + line, snapping crosshair) ────────────
 
-export function TimeSeries({ data, label, height = 220 }: { data: Array<{ date: string; value: number }>; label: string; height?: number }) {
+export function TimeSeries({
+  data,
+  label,
+  height = 220,
+}: {
+  data: Array<{ date: string; value: number }>;
+  label: string;
+  height?: number;
+}) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const id = useId();
@@ -164,12 +216,18 @@ export function TimeSeries({ data, label, height = 220 }: { data: Array<{ date: 
         {ticks.map((t) => (
           <g key={t}>
             <line className={t === 0 ? 'axis' : 'grid'} x1={m.l} x2={m.l + plotW} y1={y(t)} y2={y(t)} />
-            <text x={m.l - 8} y={y(t) + 4} textAnchor="end">{fmtNum(t)}</text>
+            <text x={m.l - 8} y={y(t) + 4} textAnchor="end">
+              {fmtNum(t)}
+            </text>
           </g>
         ))}
-        {data.map((d, i) => (i % labelEvery === 0 || i === data.length - 1) && (data.length - 1 - i >= labelEvery * 0.6 || i === data.length - 1) ? (
-          <text key={d.date} x={x(i)} y={height - 7} textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'}>{shortDate(d.date)}</text>
-        ) : null)}
+        {data.map((d, i) =>
+          (i % labelEvery === 0 || i === data.length - 1) && (data.length - 1 - i >= labelEvery * 0.6 || i === data.length - 1) ? (
+            <text key={d.date} x={x(i)} y={height - 7} textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'}>
+              {shortDate(d.date)}
+            </text>
+          ) : null,
+        )}
         <g clipPath={`url(#${id}-c)`}>
           <path className="area" d={area} />
           <path className="line" d={line} />
@@ -185,7 +243,11 @@ export function TimeSeries({ data, label, height = 220 }: { data: Array<{ date: 
       </svg>
       {idx !== null && data[idx] ? (
         <div className="viz-tip" style={{ left: Math.min(Math.max(pts[idx][0] - 60, 0), width - 150), top: Math.max(pts[idx][1] - 62, 0) }}>
-          <div className="v"><i />{fmtNum(data[idx].value)} <span style={{ fontWeight: 500, color: 'var(--v-ink-2)', fontSize: 12.5 }}>{label.toLowerCase()}</span></div>
+          <div className="v">
+            <i />
+            {fmtNum(data[idx].value)}{' '}
+            <span style={{ fontWeight: 500, color: 'var(--v-ink-2)', fontSize: 12.5 }}>{label.toLowerCase()}</span>
+          </div>
           <div className="d">{longDate(data[idx].date)}</div>
         </div>
       ) : null}
@@ -205,7 +267,17 @@ export interface BarRow {
   color?: string;
 }
 
-export function HBars({ rows, format = fmtNum, max, className = '' }: { rows: BarRow[]; format?: (n: number) => string; max?: number; className?: string }) {
+export function HBars({
+  rows,
+  format = fmtNum,
+  max,
+  className = '',
+}: {
+  rows: BarRow[];
+  format?: (n: number) => string;
+  max?: number;
+  className?: string;
+}) {
   const [tip, setTip] = useState<{ row: BarRow; x: number; y: number } | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const top = max ?? Math.max(...rows.map((r) => r.value), 1);
@@ -227,16 +299,24 @@ export function HBars({ rows, format = fmtNum, max, className = '' }: { rows: Ba
           onPointerLeave={() => setTip(null)}
           onBlur={() => setTip(null)}
         >
-          <div className="name" title={r.label}>{r.label}</div>
+          <div className="name" title={r.label}>
+            {r.label}
+          </div>
           <div className="plot">
             <div className="bar" style={{ width: `calc(${Math.max((r.value / top) * 100, 0)}% * 0.82)`, background: r.color }} />
-            <div className="num">{format(r.value)}{r.sub ? <small>{r.sub}</small> : null}</div>
+            <div className="num">
+              {format(r.value)}
+              {r.sub ? <small>{r.sub}</small> : null}
+            </div>
           </div>
         </div>
       ))}
       {tip ? (
         <div className="viz-tip" style={{ left: tip.x, top: Math.max(tip.y, -4) }}>
-          <div className="v">{format(tip.row.value)} {tip.row.sub ? <span style={{ fontWeight: 500, color: 'var(--v-ink-2)', fontSize: 12.5 }}>{tip.row.sub}</span> : null}</div>
+          <div className="v">
+            {format(tip.row.value)}{' '}
+            {tip.row.sub ? <span style={{ fontWeight: 500, color: 'var(--v-ink-2)', fontSize: 12.5 }}>{tip.row.sub}</span> : null}
+          </div>
           <div className="d">{tip.row.detail ?? tip.row.label}</div>
         </div>
       ) : null}
@@ -272,8 +352,14 @@ export function SplitBar({ a, b }: { a: { label: string; value: number }; b: { l
         <i style={{ width: `${(b.value / total) * 100}%`, background: 'var(--s2)' }} title={`${b.label}: ${b.value}`} />
       </div>
       <div className="legend">
-        <span><i style={{ background: 'var(--s1)' }} />{a.label} <b style={{ color: 'var(--v-ink)' }}>{Math.round((a.value / total) * 100)}%</b></span>
-        <span><i style={{ background: 'var(--s2)' }} />{b.label} <b style={{ color: 'var(--v-ink)' }}>{Math.round((b.value / total) * 100)}%</b></span>
+        <span>
+          <i style={{ background: 'var(--s1)' }} />
+          {a.label} <b style={{ color: 'var(--v-ink)' }}>{Math.round((a.value / total) * 100)}%</b>
+        </span>
+        <span>
+          <i style={{ background: 'var(--s2)' }} />
+          {b.label} <b style={{ color: 'var(--v-ink)' }}>{Math.round((b.value / total) * 100)}%</b>
+        </span>
       </div>
     </div>
   );

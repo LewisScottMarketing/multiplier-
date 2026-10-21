@@ -78,9 +78,7 @@ const list = (v: string | undefined) =>
 /** A missing or empty rule always matches. */
 export function evalRule(rule: Rule | undefined | null, ctx: Ctx): boolean {
   if (!rule || rule.conditions.length === 0) return true;
-  return rule.match === 'any'
-    ? rule.conditions.some((c) => evalCondition(c, ctx))
-    : rule.conditions.every((c) => evalCondition(c, ctx));
+  return rule.match === 'any' ? rule.conditions.some((c) => evalCondition(c, ctx)) : rule.conditions.every((c) => evalCondition(c, ctx));
 }
 
 export const OP_LABELS: Record<Condition['op'], string> = {

@@ -1,12 +1,4 @@
-import {
-  escapeHtml,
-  evalToken,
-  parseTemplate,
-  safeUrl,
-  type Ctx,
-  type Segment,
-  type TokenResult,
-} from '@shared/template';
+import { escapeHtml, evalToken, parseTemplate, safeUrl, type Ctx, type Segment, type TokenResult } from '@shared/template';
 
 /**
  * "Markdown-lite" + merge tokens → safe HTML.
@@ -68,9 +60,7 @@ function makeExpanders(p: Protected, ctx: Ctx, opts: RichOptions) {
   /** URL part of a link: a lone token is a whole URL, otherwise values are percent-encoded. */
   const url = (s: string): string => {
     const only = s.match(new RegExp(`^${OPEN}(\\d+)${CLOSE}$`));
-    const resolved = only
-      ? value(Number(only[1]))
-      : s.replace(PLACEHOLDER_RE, (_m, i: string) => encodeURIComponent(value(Number(i))));
+    const resolved = only ? value(Number(only[1])) : s.replace(PLACEHOLDER_RE, (_m, i: string) => encodeURIComponent(value(Number(i))));
     return safeUrl(resolved);
   };
   return { leaf, url };

@@ -18,9 +18,7 @@ export type Ctx = Record<string, unknown>;
 
 export type Pipe = { kind: 'filter'; name: string; args: string[] } | { kind: 'fallback'; value: string };
 
-export type Segment =
-  | { kind: 'text'; value: string }
-  | { kind: 'token'; raw: string; field: string; pipes: Pipe[] };
+export type Segment = { kind: 'text'; value: string } | { kind: 'token'; raw: string; field: string; pipes: Pipe[] };
 
 export const normKey = (s: string): string =>
   s
@@ -66,7 +64,10 @@ const FILTERS: Record<string, (v: string, args: string[]) => string> = {
     return v.length > n ? `${v.slice(0, n - 1).trimEnd()}…` : v;
   },
   domain: (v) => {
-    const m = v.trim().toLowerCase().match(/^(?:[a-z]+:\/\/)?(?:[^@/]*@)?(?:www\.)?([^/:?#\s]+)/);
+    const m = v
+      .trim()
+      .toLowerCase()
+      .match(/^(?:[a-z]+:\/\/)?(?:[^@/]*@)?(?:www\.)?([^/:?#\s]+)/);
     return m?.[1] ?? v;
   },
 };
@@ -85,7 +86,7 @@ function splitPipes(body: string): string[] {
     if (quote) {
       cur += ch;
       if (ch === quote) quote = null;
-    } else if (ch === '"' || ch === '\'') {
+    } else if (ch === '"' || ch === "'") {
       quote = ch;
       cur += ch;
     } else if (ch === '|') {
@@ -104,7 +105,16 @@ function parsePipe(seg: string): Pipe | null {
   if (q) return { kind: 'fallback', value: q[2] };
   const [name, ...rest] = s.split(':');
   const fname = name.trim().toLowerCase();
-  if (FILTERS[fname]) return { kind: 'filter', name: fname, args: rest.join(':').split(',').map((a) => a.trim()).filter(Boolean) };
+  if (FILTERS[fname])
+    return {
+      kind: 'filter',
+      name: fname,
+      args: rest
+        .join(':')
+        .split(',')
+        .map((a) => a.trim())
+        .filter(Boolean),
+    };
   return { kind: 'fallback', value: s };
 }
 
@@ -231,7 +241,7 @@ export function extractTokens(tpl: string | undefined | null): Array<{ field: st
 
 // ── Escaping & URLs ─────────────────────────────────────────────────────────
 
-const HTML_ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
+const HTML_ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => HTML_ESC[c]);
 
 const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);

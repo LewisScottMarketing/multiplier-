@@ -16,23 +16,34 @@ async function readPdfUpload(c: C): Promise<{ data: Buffer; filename: string; na
   if (!(file instanceof File)) throw badRequest('Attach a PDF as "file".');
   const max = c.get('app').config.maxUploadBytes;
   if (file.size > max) throw badRequest(`PDFs can be up to ${Math.round(max / 1024 / 1024)} MB.`);
-  return { data: Buffer.from(await file.arrayBuffer()), filename: file.name || 'document.pdf', name: typeof form.name === 'string' ? form.name : undefined, ai: form.ai === '0' ? false : undefined };
+  return {
+    data: Buffer.from(await file.arrayBuffer()),
+    filename: file.name || 'document.pdf',
+    name: typeof form.name === 'string' ? form.name : undefined,
+    ai: form.ai === '0' ? false : undefined,
+  };
 }
 
 const png = (bytes: Uint8Array | Buffer, extra: Record<string, string> = {}) =>
-  new Response(Buffer.from(bytes), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=60', 'X-Content-Type-Options': 'nosniff', ...extra } });
+  new Response(Buffer.from(bytes), {
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=60', 'X-Content-Type-Options': 'nosniff', ...extra },
+  });
 
 export function documentRoutes() {
   const r = new Hono<Env>();
   r.use('*', requireUser);
 
   /** The headline feature: upload a PDF, get a campaign with a landing page built from it. */
-  r.post('/import-pdf', rateLimit('import-pdf', 20, 3600_000, (c) => c.get('user').id), async (c) => {
-    const app = c.get('app');
-    const upload = await readPdfUpload(c);
-    const { campaign, report } = await importPdfCampaign(app, upload);
-    return c.json({ campaign, report }, 201);
-  });
+  r.post(
+    '/import-pdf',
+    rateLimit('import-pdf', 20, 3600_000, (c) => c.get('user').id),
+    async (c) => {
+      const app = c.get('app');
+      const upload = await readPdfUpload(c);
+      const { campaign, report } = await importPdfCampaign(app, upload);
+      return c.json({ campaign, report }, 201);
+    },
+  );
 
   const withDocument = (c: C): { campaign: Campaign; doc: NonNullable<Campaign['document']> } => {
     const campaign = requireCampaign(c.get('app'), c.req.param('id') ?? '');
@@ -45,19 +56,33 @@ export function documentRoutes() {
     const campaign = requireCampaign(app, c.req.param('id'));
     if (!campaign.document) return c.json({ document: null });
     const asset = getAsset(app, campaign.document.asset_id);
-    const meta = asset ? (JSON.parse(asset.meta) as { pages?: Array<{ w: number; h: number }>; tokens?: string[]; editable?: boolean }) : {};
+    const meta = asset
+      ? (JSON.parse(asset.meta) as { pages?: Array<{ w: number; h: number }>; tokens?: string[]; editable?: boolean })
+      : {};
     return c.json({
       document: campaign.document,
-      file: asset ? { filename: asset.filename, size: asset.size, pages: meta.pages ?? [], tokens: meta.tokens ?? [], editable: meta.editable !== false } : null,
+      file: asset
+        ? {
+            filename: asset.filename,
+            size: asset.size,
+            pages: meta.pages ?? [],
+            tokens: meta.tokens ?? [],
+            editable: meta.editable !== false,
+          }
+        : null,
     });
   });
 
-  r.post('/:id/document/upload', rateLimit('import-pdf', 20, 3600_000, (c) => c.get('user').id), async (c) => {
-    const app = c.get('app');
-    requireCampaign(app, c.req.param('id'));
-    const upload = await readPdfUpload(c);
-    return c.json(await attachPdf(app, c.req.param('id'), upload));
-  });
+  r.post(
+    '/:id/document/upload',
+    rateLimit('import-pdf', 20, 3600_000, (c) => c.get('user').id),
+    async (c) => {
+      const app = c.get('app');
+      requireCampaign(app, c.req.param('id'));
+      const upload = await readPdfUpload(c);
+      return c.json(await attachPdf(app, c.req.param('id'), upload));
+    },
+  );
 
   r.delete('/:id/document', async (c) => {
     const app = c.get('app');
@@ -84,7 +109,10 @@ export function documentRoutes() {
 
   r.post('/:id/document/field-from-run', async (c) => {
     const { doc } = withDocument(c);
-    const body = await jsonBody(c, z.object({ page: z.number().int().min(1), run_id: z.string().max(40), template: z.string().max(1500).optional() }));
+    const body = await jsonBody(
+      c,
+      z.object({ page: z.number().int().min(1), run_id: z.string().max(40), template: z.string().max(1500).optional() }),
+    );
     const { page } = await studioPage(c.get('app'), doc, body.page);
     const run = page.runs.find((x) => x.id === body.run_id);
     if (!run) throw notFound('Text');
@@ -93,7 +121,16 @@ export function documentRoutes() {
 
   r.post('/:id/document/stamp', async (c) => {
     const { doc } = withDocument(c);
-    const body = await jsonBody(c, z.object({ page: z.number().int().min(1).default(1), bg: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ffffff') }));
+    const body = await jsonBody(
+      c,
+      z.object({
+        page: z.number().int().min(1).default(1),
+        bg: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .default('#ffffff'),
+      }),
+    );
     const { page } = await studioPage(c.get('app'), doc, body.page);
     return c.json({ field: stampField(page, body.bg) });
   });
@@ -102,7 +139,14 @@ export function documentRoutes() {
   r.post('/:id/document/preview', async (c) => {
     const app = c.get('app');
     const { campaign } = withDocument(c);
-    const body = await jsonBody(c, z.object({ document: DocumentSchema, source: PreviewSourceSchema.default({ kind: 'sample', index: 0 }), page: z.number().int().min(1).max(500).default(1) }));
+    const body = await jsonBody(
+      c,
+      z.object({
+        document: DocumentSchema,
+        source: PreviewSourceSchema.default({ kind: 'sample', index: 0 }),
+        page: z.number().int().min(1).max(500).default(1),
+      }),
+    );
     const src = parsePreviewSource(previewSourceString(body.source));
     const { ctx } = previewContext(app, campaign, src);
     const { png: bytes, warnings } = await previewPage(app, campaign, body.document, ctx, body.page, 2);
@@ -118,7 +162,11 @@ export function documentRoutes() {
     const { ctx } = previewContext(app, campaign, previewSource(c));
     const built = await buildPdf(app, campaign, ctx, null);
     return new Response(Buffer.from(built.bytes), {
-      headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${built.filename.replace(/[^\w.\- ()]+/g, '_')}"`, 'Cache-Control': 'no-store' },
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${built.filename.replace(/[^\w.\- ()]+/g, '_')}"`,
+        'Cache-Control': 'no-store',
+      },
     });
   });
 

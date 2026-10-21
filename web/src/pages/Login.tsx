@@ -18,7 +18,10 @@ export function Login({ setup }: { setup: boolean }) {
     setBusy(true);
     setError('');
     try {
-      const r = await api.post<{ user: User }>(setup ? '/auth/setup' : '/auth/login', setup ? { email, name, password } : { email, password });
+      const r = await api.post<{ user: User }>(
+        setup ? '/auth/setup' : '/auth/login',
+        setup ? { email, name, password } : { email, password },
+      );
       qc.setQueryData(['me'], r.user);
       qc.invalidateQueries({ queryKey: ['auth-status'] });
     } catch (err) {
@@ -46,10 +49,25 @@ export function Login({ setup }: { setup: boolean }) {
             </Field>
           ) : null}
           <Field label="Work email">
-            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@company.com" autoFocus />
+            <Input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              placeholder="you@company.com"
+              autoFocus
+            />
           </Field>
           <Field label="Password" hint={setup ? 'At least 10 characters.' : undefined}>
-            <Input type="password" required minLength={setup ? 10 : 1} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={setup ? 'new-password' : 'current-password'} />
+            <Input
+              type="password"
+              required
+              minLength={setup ? 10 : 1}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={setup ? 'new-password' : 'current-password'}
+            />
           </Field>
           {error ? <Alert tone="bad">{error}</Alert> : null}
           <Button variant="primary" type="submit" loading={busy} block>
@@ -59,12 +77,22 @@ export function Login({ setup }: { setup: boolean }) {
       </form>
       <div className="auth-art">
         <h2>One PDF in. A page and a PDF for every prospect out.</h2>
-        <p>Turn the collateral you already have into outreach that reads like it was written for each person, straight from your Clay table.</p>
+        <p>
+          Turn the collateral you already have into outreach that reads like it was written for each person, straight from your Clay table.
+        </p>
         <div className="auth-points">
-          <div><FileText size={18} /> Upload a PDF and get a landing page built from it in seconds.</div>
-          <div><Sparkles size={18} /> Name, company and job title change the copy, the PDF and who sees which section.</div>
-          <div><Link2 size={18} /> Clay calls one endpoint per row and gets a unique link back.</div>
-          <div><Zap size={18} /> See who opened, clicked and booked, and push it back into Clay.</div>
+          <div>
+            <FileText size={18} /> Upload a PDF and get a landing page built from it in seconds.
+          </div>
+          <div>
+            <Sparkles size={18} /> Name, company and job title change the copy, the PDF and who sees which section.
+          </div>
+          <div>
+            <Link2 size={18} /> Clay calls one endpoint per row and gets a unique link back.
+          </div>
+          <div>
+            <Zap size={18} /> See who opened, clicked and booked, and push it back into Clay.
+          </div>
         </div>
       </div>
     </div>

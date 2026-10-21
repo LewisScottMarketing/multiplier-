@@ -54,7 +54,11 @@ function lookup(c: C, app: AppContext, token: string): { prospect: Prospect; cam
 
 const BeaconSchema = z.object({
   type: z.enum(['view', 'engaged', 'booked']),
-  sid: z.string().min(4).max(24).regex(/^[a-z0-9]+$/),
+  sid: z
+    .string()
+    .min(4)
+    .max(24)
+    .regex(/^[a-z0-9]+$/),
   w: z.number().optional(),
   wd: z.number().optional(),
   ref: z.string().max(120).optional(),
@@ -89,7 +93,8 @@ async function readForm(c: C): Promise<Record<string, unknown>> {
   return (await c.req.parseBody()) as Record<string, unknown>;
 }
 
-const wantsJson = (c: C) => (c.req.header('accept') ?? '').includes('application/json') || (c.req.header('content-type') ?? '').includes('application/json');
+const wantsJson = (c: C) =>
+  (c.req.header('accept') ?? '').includes('application/json') || (c.req.header('content-type') ?? '').includes('application/json');
 
 export function publicRoutes() {
   const r = new Hono<Env>();
@@ -108,7 +113,15 @@ export function publicRoutes() {
       if (!campaign.document) return gone(c);
       const { bytes, filename } = await personalizedPdf(app, campaign, contextFor(app, campaign, prospect), prospect.id);
       if (c.req.method !== 'HEAD') {
-        recordEvent(app, { campaignId: campaign.id, prospectId: prospect.id, type: 'download', props: { disposition: c.req.query('dl') ? 'attachment' : 'inline' }, isBot: isBotUa(ua), ip: c.get('ip'), ua });
+        recordEvent(app, {
+          campaignId: campaign.id,
+          prospectId: prospect.id,
+          type: 'download',
+          props: { disposition: c.req.query('dl') ? 'attachment' : 'inline' },
+          isBot: isBotUa(ua),
+          ip: c.get('ip'),
+          ua,
+        });
       }
       const safeName = filename.replace(/[^\w.\- ()]+/g, '_');
       return new Response(Buffer.from(bytes), {
@@ -124,7 +137,15 @@ export function publicRoutes() {
 
     const out = renderProspectPage(app, campaign, prospect, hostOf(c));
     if (c.req.method !== 'HEAD') {
-      recordEvent(app, { campaignId: campaign.id, prospectId: prospect.id, type: 'hit', props: { ref: c.req.header('referer') ? new URL(c.req.header('referer')!, 'http://x').hostname : undefined }, isBot: isBotUa(ua), ip: c.get('ip'), ua });
+      recordEvent(app, {
+        campaignId: campaign.id,
+        prospectId: prospect.id,
+        type: 'hit',
+        props: { ref: c.req.header('referer') ? new URL(c.req.header('referer')!, 'http://x').hostname : undefined },
+        isBot: isBotUa(ua),
+        ip: c.get('ip'),
+        ua,
+      });
     }
     return new Response(out.html, { headers: out.headers });
   });
@@ -134,29 +155,35 @@ export function publicRoutes() {
     const found = lookup(c, app, c.req.param('token'));
     if (!found || !found.campaign.document) return gone(c);
     const png = await personalizedCover(app, found.campaign, contextFor(app, found.campaign, found.prospect), found.prospect.id);
-    return new Response(Buffer.from(png), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' } });
+    return new Response(Buffer.from(png), {
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' },
+    });
   });
 
   // ── Tracking beacon (sendBeacon from the page) ────────────────────────────
-  r.post('/t/:token', rateLimit('beacon', 240, 60_000, (c) => `${c.req.param('token')}:${c.get('ip')}`), async (c) => {
-    const app = c.get('app');
-    const prospect = getProspectByToken(app, c.req.param('token'));
-    if (!prospect) return c.body(null, 204);
-    const b = await readBeacon(c);
-    const ua = c.req.header('user-agent') ?? '';
-    recordEvent(app, {
-      campaignId: prospect.campaign_id,
-      prospectId: prospect.id,
-      type: b.type,
-      sessionId: b.sid,
-      props: b.type === 'view' ? { w: b.w, ref: b.ref } : b.type === 'engaged' ? { s: b.s, scroll: b.scroll, i: b.i } : { provider: b.p },
-      // headless browsers announce themselves via navigator.webdriver
-      isBot: isBotUa(ua) || b.wd === 1,
-      ip: c.get('ip'),
-      ua,
-    });
-    return c.body(null, 204);
-  });
+  r.post(
+    '/t/:token',
+    rateLimit('beacon', 240, 60_000, (c) => `${c.req.param('token')}:${c.get('ip')}`),
+    async (c) => {
+      const app = c.get('app');
+      const prospect = getProspectByToken(app, c.req.param('token'));
+      if (!prospect) return c.body(null, 204);
+      const b = await readBeacon(c);
+      const ua = c.req.header('user-agent') ?? '';
+      recordEvent(app, {
+        campaignId: prospect.campaign_id,
+        prospectId: prospect.id,
+        type: b.type,
+        sessionId: b.sid,
+        props: b.type === 'view' ? { w: b.w, ref: b.ref } : b.type === 'engaged' ? { s: b.s, scroll: b.scroll, i: b.i } : { provider: b.p },
+        // headless browsers announce themselves via navigator.webdriver
+        isBot: isBotUa(ua) || b.wd === 1,
+        ip: c.get('ip'),
+        ua,
+      });
+      return c.body(null, 204);
+    },
+  );
 
   r.post('/tc/:campaignId', rateLimit('beacon-anon', 120, 60_000), async (c) => {
     const app = c.get('app');
@@ -164,7 +191,16 @@ export function publicRoutes() {
     if (!campaign || campaign.status !== 'live') return c.body(null, 204);
     const b = await readBeacon(c);
     const ua = c.req.header('user-agent') ?? '';
-    recordEvent(app, { campaignId: campaign.id, prospectId: null, type: b.type, sessionId: b.sid, props: b.type === 'engaged' ? { s: b.s, scroll: b.scroll } : { ref: b.ref }, isBot: isBotUa(ua) || b.wd === 1, ip: c.get('ip'), ua });
+    recordEvent(app, {
+      campaignId: campaign.id,
+      prospectId: null,
+      type: b.type,
+      sessionId: b.sid,
+      props: b.type === 'engaged' ? { s: b.s, scroll: b.scroll } : { ref: b.ref },
+      isBot: isBotUa(ua) || b.wd === 1,
+      ip: c.get('ip'),
+      ua,
+    });
     return c.body(null, 204);
   });
 
@@ -189,23 +225,35 @@ export function publicRoutes() {
     const ua = c.req.header('user-agent') ?? '';
     // a HEAD probe (link checkers do this) must not count as a click
     if (c.req.method !== 'HEAD') {
-      recordEvent(app, { campaignId: campaign.id, prospectId: prospect.id, type: 'click', props: { block: blockId, slot, label: button.label, host: safeHost(dest) }, isBot: isBotUa(ua), ip: c.get('ip'), ua });
+      recordEvent(app, {
+        campaignId: campaign.id,
+        prospectId: prospect.id,
+        type: 'click',
+        props: { block: blockId, slot, label: button.label, host: safeHost(dest) },
+        isBot: isBotUa(ua),
+        ip: c.get('ip'),
+        ua,
+      });
     }
     return c.redirect(dest, 302);
   });
 
   // ── Forms ─────────────────────────────────────────────────────────────────
-  r.post('/p/:token/submit', rateLimit('submit', 20, 10 * 60_000, (c) => `${c.req.param('token')}:${c.get('ip')}`), async (c) => {
-    const app = c.get('app');
-    const found = lookup(c, app, c.req.param('token'));
-    if (!found) return gone(c);
-    const { prospect, campaign } = found;
-    const ua = c.req.header('user-agent') ?? '';
-    const ctx = contextFor(app, campaign, prospect);
-    const result = handleSubmission(app, campaign, prospect, ctx, await readForm(c), { ip: c.get('ip'), ua, isBot: isBotUa(ua) });
-    if (wantsJson(c)) return c.json(result);
-    return c.redirect(result.redirect ?? `/p/${prospect.token}?sent=1`, 303);
-  });
+  r.post(
+    '/p/:token/submit',
+    rateLimit('submit', 20, 10 * 60_000, (c) => `${c.req.param('token')}:${c.get('ip')}`),
+    async (c) => {
+      const app = c.get('app');
+      const found = lookup(c, app, c.req.param('token'));
+      if (!found) return gone(c);
+      const { prospect, campaign } = found;
+      const ua = c.req.header('user-agent') ?? '';
+      const ctx = contextFor(app, campaign, prospect);
+      const result = handleSubmission(app, campaign, prospect, ctx, await readForm(c), { ip: c.get('ip'), ua, isBot: isBotUa(ua) });
+      if (wantsJson(c)) return c.json(result);
+      return c.redirect(result.redirect ?? `/p/${prospect.token}?sent=1`, 303);
+    },
+  );
 
   // ── Generic (non-personalised) campaign page ──────────────────────────────
   const genericCampaign = (c: C, slug: string) => {
@@ -244,7 +292,9 @@ export function publicRoutes() {
     limitBuilds(c);
     const params = Object.fromEntries(Object.entries(c.req.query()).slice(0, 30)) as Record<string, string>;
     const png = await personalizedCover(c.get('app'), campaign, anonymousContext(campaign, params), null);
-    return new Response(Buffer.from(png), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300', 'X-Content-Type-Options': 'nosniff' } });
+    return new Response(Buffer.from(png), {
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300', 'X-Content-Type-Options': 'nosniff' },
+    });
   });
 
   r.post('/c/:slug/submit', rateLimit('submit-anon', 10, 10 * 60_000), async (c) => {
@@ -252,7 +302,11 @@ export function publicRoutes() {
     const campaign = genericCampaign(c, c.req.param('slug'));
     if (!campaign) return gone(c);
     const ua = c.req.header('user-agent') ?? '';
-    const result = handleSubmission(app, campaign, null, anonymousContext(campaign, {}), await readForm(c), { ip: c.get('ip'), ua, isBot: isBotUa(ua) });
+    const result = handleSubmission(app, campaign, null, anonymousContext(campaign, {}), await readForm(c), {
+      ip: c.get('ip'),
+      ua,
+      isBot: isBotUa(ua),
+    });
     if (wantsJson(c)) return c.json(result);
     return c.redirect(result.redirect ?? `/c/${campaign.slug}?sent=1`, 303);
   });
@@ -260,7 +314,10 @@ export function publicRoutes() {
   // ── Images uploaded in the dashboard (logos, avatars, PDF figures) ─────────
   r.get('/a/:id', async (c) => {
     const app = c.get('app');
-    const row = app.db.get<{ storage_key: string; mime: string; kind: string }>('SELECT storage_key, mime, kind FROM assets WHERE id = ?', c.req.param('id'));
+    const row = app.db.get<{ storage_key: string; mime: string; kind: string }>(
+      'SELECT storage_key, mime, kind FROM assets WHERE id = ?',
+      c.req.param('id'),
+    );
     if (!row || row.kind !== 'image') throw notFound('Image');
     const data = await app.storage.get(row.storage_key);
     if (!data) throw notFound('Image');
@@ -305,4 +362,3 @@ function safeHost(u: string): string {
     return '';
   }
 }
-

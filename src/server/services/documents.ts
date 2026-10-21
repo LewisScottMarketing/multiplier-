@@ -94,7 +94,8 @@ export function documentFilename(doc: DocumentConfig, ctx: Ctx): string {
   return `${base || 'Document'}.pdf`;
 }
 
-const hashOf = (assetSha: string, instructions: Instruction[]) => createHash('sha256').update(assetSha).update(JSON.stringify(instructions)).digest('hex').slice(0, 24);
+const hashOf = (assetSha: string, instructions: Instruction[]) =>
+  createHash('sha256').update(assetSha).update(JSON.stringify(instructions)).digest('hex').slice(0, 24);
 
 /** One in-flight build per output, so a burst of identical requests only renders once. */
 const inflight = new Map<string, Promise<unknown>>();
@@ -123,7 +124,13 @@ export interface BuiltPdf {
  *
  * `owner` is the prospect id; anonymous (URL-parameter) renders are only cached in memory.
  */
-export async function buildPdf(app: AppContext, campaign: Pick<Campaign, 'id' | 'document'>, ctx: Ctx, owner: string | null, docOverride?: DocumentConfig): Promise<BuiltPdf> {
+export async function buildPdf(
+  app: AppContext,
+  campaign: Pick<Campaign, 'id' | 'document'>,
+  ctx: Ctx,
+  owner: string | null,
+  docOverride?: DocumentConfig,
+): Promise<BuiltPdf> {
   const doc = docOverride ?? campaign.document;
   if (!doc) throw notFound('Document');
   const { bytes: source, asset } = await loadSource(app, doc);
@@ -158,7 +165,12 @@ export async function buildPdf(app: AppContext, campaign: Pick<Campaign, 'id' | 
   });
 }
 
-export async function personalizedPdf(app: AppContext, campaign: Campaign, ctx: Ctx, owner: string | null): Promise<{ bytes: Uint8Array; filename: string }> {
+export async function personalizedPdf(
+  app: AppContext,
+  campaign: Campaign,
+  ctx: Ctx,
+  owner: string | null,
+): Promise<{ bytes: Uint8Array; filename: string }> {
   const { bytes, filename } = await buildPdf(app, campaign, ctx, owner);
   return { bytes, filename };
 }
@@ -189,7 +201,14 @@ export async function personalizedCover(app: AppContext, campaign: Campaign, ctx
 }
 
 /** A rendered page of the personalised PDF, for the studio's "preview as" view. */
-export async function previewPage(app: AppContext, campaign: Campaign, doc: DocumentConfig, ctx: Ctx, pageNo: number, scale = 2): Promise<{ png: Buffer; warnings: string[] }> {
+export async function previewPage(
+  app: AppContext,
+  campaign: Campaign,
+  doc: DocumentConfig,
+  ctx: Ctx,
+  pageNo: number,
+  scale = 2,
+): Promise<{ png: Buffer; warnings: string[] }> {
   if (!Number.isInteger(pageNo) || pageNo < 1 || pageNo > doc.page_count) throw unprocessable('That page doesn’t exist.');
   const built = await buildPdf(app, { id: campaign.id, document: doc }, ctx, null, doc);
   const r = await pdfGate.run(() => withTimeout(renderPageRaster(built.bytes, pageNo, scale), 20_000, 'Rendering the preview'));

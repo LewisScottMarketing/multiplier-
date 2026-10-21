@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildContext, classifyDepartment, classifySeniority, cleanPersonName, domainOf, shortCompany, splitFullName } from '@shared/derive';
+import {
+  buildContext,
+  classifyDepartment,
+  classifySeniority,
+  cleanPersonName,
+  domainOf,
+  shortCompany,
+  splitFullName,
+} from '@shared/derive';
 
 describe('classifySeniority', () => {
   const cases: Array<[string, string]> = [

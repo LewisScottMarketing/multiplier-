@@ -27,7 +27,8 @@ export function ActivityFeed({ items, showCampaign }: { items: ActivityItem[]; s
           <div className={`tl-ico ${a.type}`}>{ICON[a.type] ?? <Eye size={14} />}</div>
           <div style={{ minWidth: 0 }}>
             <div>
-              <b>{a.name}</b>{a.company ? <span className="muted"> · {a.company}</span> : null} {VERB[a.type] ?? a.type}
+              <b>{a.name}</b>
+              {a.company ? <span className="muted"> · {a.company}</span> : null} {VERB[a.type] ?? a.type}
               {a.detail ? <span className="muted"> “{a.detail}”</span> : null}
             </div>
             {showCampaign ? <div className="muted tiny">{a.campaign_name}</div> : null}
@@ -44,15 +45,24 @@ export function TopList({ items, empty }: { items: TopProspect[]; empty: string 
   return (
     <div className="col" style={{ gap: 4 }}>
       {items.map((p) => (
-        <Link key={p.id} to={`/campaigns/${p.campaign_id}/audience?prospect=${p.id}`} className="row" style={{ color: 'inherit', padding: '7px 6px', borderRadius: 8, margin: '0 -6px' }}>
+        <Link
+          key={p.id}
+          to={`/campaigns/${p.campaign_id}/audience?prospect=${p.id}`}
+          className="row"
+          style={{ color: 'inherit', padding: '7px 6px', borderRadius: 8, margin: '0 -6px' }}
+        >
           <span className="avatar">{initials(p.name)}</span>
           <div className="grow" style={{ minWidth: 0 }}>
-            <div className="truncate"><b>{p.name}</b></div>
+            <div className="truncate">
+              <b>{p.name}</b>
+            </div>
             <div className="muted tiny truncate">{[p.job_title, p.company].filter(Boolean).join(' · ') || '—'}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontWeight: 700 }}>{p.score}</div>
-            <div className="muted tiny">{p.views} view{p.views === 1 ? '' : 's'}</div>
+            <div className="muted tiny">
+              {p.views} view{p.views === 1 ? '' : 's'}
+            </div>
           </div>
         </Link>
       ))}

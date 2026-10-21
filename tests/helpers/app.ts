@@ -12,7 +12,12 @@ export interface TestApp {
   /** Call the app. Cookies from `login()` are sent automatically. */
   req: (method: string, url: string, body?: unknown, headers?: Record<string, string>) => Promise<Response>;
   /** Parsed JSON convenience wrapper. */
-  json: <T = any>(method: string, url: string, body?: unknown, headers?: Record<string, string>) => Promise<{ status: number; body: T; res: Response }>;
+  json: <T = any>(
+    method: string,
+    url: string,
+    body?: unknown,
+    headers?: Record<string, string>,
+  ) => Promise<{ status: number; body: T; res: Response }>;
   /** Creates the owner account (first run) and keeps the session cookie. */
   login: () => Promise<void>;
   cookie: string;

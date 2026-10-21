@@ -70,14 +70,27 @@ export function createApp(ctx: AppContext) {
   // ── Public pages (no auth; every response is tightly scoped) ──────────────
   // Public endpoints accept tiny bodies (beacons, forms). Scope the limit to THEIR paths only: a
   // catch-all here would also cap dashboard uploads.
-  const tiny = bodyLimit({ maxSize: 64 * 1024, onError: () => { throw Object.assign(new Error('Request too large'), { status: 413 }); } });
+  const tiny = bodyLimit({
+    maxSize: 64 * 1024,
+    onError: () => {
+      throw Object.assign(new Error('Request too large'), { status: 413 });
+    },
+  });
   for (const prefix of ['/p/*', '/t/*', '/tc/*', '/r/*', '/c/*']) app.use(prefix, tiny);
   app.route('/', publicRoutes());
   app.route('/', previewRoutes());
 
   // ── Machine API (API key auth) ────────────────────────────────────────────
   const v1 = new Hono<Env>();
-  v1.use('*', bodyLimit({ maxSize: 6 * 1024 * 1024, onError: () => { throw Object.assign(new Error('Request too large'), { status: 413 }); } }));
+  v1.use(
+    '*',
+    bodyLimit({
+      maxSize: 6 * 1024 * 1024,
+      onError: () => {
+        throw Object.assign(new Error('Request too large'), { status: 413 });
+      },
+    }),
+  );
   v1.route('/', v1Routes());
   app.route('/api/v1', v1);
 
@@ -85,7 +98,15 @@ export function createApp(ctx: AppContext) {
   const api = new Hono<Env>();
   api.use('*', dashboardHeaders);
   const apiLimit = Math.max(ctx.config.maxUploadBytes + 1024 * 1024, 12 * 1024 * 1024);
-  api.use('*', bodyLimit({ maxSize: apiLimit, onError: () => { throw Object.assign(new Error('Request too large'), { status: 413 }); } }));
+  api.use(
+    '*',
+    bodyLimit({
+      maxSize: apiLimit,
+      onError: () => {
+        throw Object.assign(new Error('Request too large'), { status: 413 });
+      },
+    }),
+  );
   api.route('/auth', authRoutes());
   api.route('/campaigns', documentRoutes()); // /import-pdf must be matched before /:id
   api.route('/campaigns', aiRoutes());
@@ -102,7 +123,10 @@ export function createApp(ctx: AppContext) {
     if (rel && !rel.startsWith('api/')) {
       const file = safeJoin(webDir, rel);
       if (file) {
-        const res = await sendFile(c, file, { immutable: rel.startsWith('assets/'), headers: file.endsWith('.html') ? SHELL_HEADERS : undefined });
+        const res = await sendFile(c, file, {
+          immutable: rel.startsWith('assets/'),
+          headers: file.endsWith('.html') ? SHELL_HEADERS : undefined,
+        });
         if (res) return res;
       }
     }

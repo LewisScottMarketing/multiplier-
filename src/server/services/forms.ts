@@ -30,7 +30,8 @@ export function handleSubmission(
   if (toStr(raw._hp)) return { ok: true };
 
   const form = campaign.page.blocks.find(
-    (b): b is Extract<typeof b, { type: 'form' }> => b.type === 'form' && !b.hidden && (raw._block ? b.id === raw._block : true) && evalRule(b.rule, ctx),
+    (b): b is Extract<typeof b, { type: 'form' }> =>
+      b.type === 'form' && !b.hidden && (raw._block ? b.id === raw._block : true) && evalRule(b.rule, ctx),
   );
   if (!form) throw new HttpError(400, 'bad_request', 'This form is no longer available.');
 
@@ -39,7 +40,11 @@ export function handleSubmission(
   for (const f of form.fields as FormField[]) {
     let v = toStr(raw[f.key]).slice(0, 2000);
     if (f.type === 'checkbox') v = v ? 'yes' : '';
-    if (f.type === 'textarea') v = String(raw[f.key] ?? '').replace(/\r\n?/g, '\n').trim().slice(0, 4000);
+    if (f.type === 'textarea')
+      v = String(raw[f.key] ?? '')
+        .replace(/\r\n?/g, '\n')
+        .trim()
+        .slice(0, 4000);
     if (!v && f.required) errors[f.key] = `${f.label} is required`;
     else if (v && f.type === 'email' && !EMAIL_RE.test(v)) errors[f.key] = 'Enter a valid email address';
     else if (v && f.type === 'select' && f.options?.length && !f.options.includes(v)) errors[f.key] = 'Choose one of the options';
@@ -47,12 +52,24 @@ export function handleSubmission(
   }
   if (Object.keys(errors).length) throw new HttpError(422, 'validation_error', Object.values(errors)[0], { fields: errors });
 
-  app.db.run('INSERT INTO submissions (id, campaign_id, prospect_id, data, created_at) VALUES (?, ?, ?, ?, ?)', newId('sub'), campaign.id, prospect?.id ?? null, JSON.stringify(values), Date.now());
+  app.db.run(
+    'INSERT INTO submissions (id, campaign_id, prospect_id, data, created_at) VALUES (?, ?, ?, ?, ?)',
+    newId('sub'),
+    campaign.id,
+    prospect?.id ?? null,
+    JSON.stringify(values),
+    Date.now(),
+  );
 
   // If the prospect had no email and the form collected one, remember it.
   if (prospect && !prospect.email && values.email) {
     try {
-      app.db.run('UPDATE prospects SET email = ?, updated_at = ? WHERE id = ? AND email IS NULL', values.email.toLowerCase(), Date.now(), prospect.id);
+      app.db.run(
+        'UPDATE prospects SET email = ?, updated_at = ? WHERE id = ? AND email IS NULL',
+        values.email.toLowerCase(),
+        Date.now(),
+        prospect.id,
+      );
     } catch {
       /* unique clash with another prospect: leave as is */
     }

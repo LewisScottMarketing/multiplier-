@@ -25,10 +25,20 @@ describe('analytics', () => {
     const view = (token: string, sid: string, w = 1280) => t.req('POST', `/t/${token}`, { type: 'view', sid, w }, publicHeaders());
     await view(jane.token, 'jane1abc');
     await t.req('GET', `/r/${jane.token}/hero1.primary`, undefined, publicHeaders());
-    await t.req('POST', `/p/${jane.token}/submit`, { _block: 'form1', name: 'Jane', email: 'jane@acme.com' }, { ...publicHeaders(), accept: 'application/json' });
+    await t.req(
+      'POST',
+      `/p/${jane.token}/submit`,
+      { _block: 'form1', name: 'Jane', email: 'jane@acme.com' },
+      { ...publicHeaders(), accept: 'application/json' },
+    );
     await view(sam.token, 'sam1abcd', 390);
     // a scanner "opens" Lee's page; it must not count
-    await t.req('POST', `/t/${(await mk({ email: 'bot@x.com', first_name: 'Bot' })).token}`, { type: 'view', sid: 'bot1abcd' }, publicHeaders('Mozilla/5.0 (compatible; Proofpoint URL Defense)'));
+    await t.req(
+      'POST',
+      `/t/${(await mk({ email: 'bot@x.com', first_name: 'Bot' })).token}`,
+      { type: 'view', sid: 'bot1abcd' },
+      publicHeaders('Mozilla/5.0 (compatible; Proofpoint URL Defense)'),
+    );
 
     const res = await t.json('GET', `/api/campaigns/${c.id}/analytics?days=7`);
     expect(res.status).toBe(200);
@@ -39,7 +49,11 @@ describe('analytics', () => {
     const today = series[series.length - 1];
     expect(today).toMatchObject({ views: 2, clicks: 1, submissions: 1 });
     expect(top[0]).toMatchObject({ name: 'Jane Doe', company: 'Acme' }); // converted + clicked outranks a plain open
-    expect(segments.departments.find((d: { key: string }) => d.key === 'marketing')).toMatchObject({ prospects: 2, opened: 1, converted: 1 });
+    expect(segments.departments.find((d: { key: string }) => d.key === 'marketing')).toMatchObject({
+      prospects: 2,
+      opened: 1,
+      converted: 1,
+    });
     expect(segments.departments.find((d: { key: string }) => d.key === 'sales')).toMatchObject({ prospects: 2, opened: 1, converted: 0 });
     expect(devices).toEqual({ mobile: 1, desktop: 1 });
     expect(clicks[0]).toMatchObject({ block: 'hero1', slot: 'primary', label: 'Book a call', n: 1 });
@@ -67,12 +81,24 @@ describe('analytics', () => {
 describe('audience', () => {
   it('imports a CSV in two steps, auto-mapping columns, and exports it with links and spreadsheet-safe cells', async () => {
     const c = await createLiveCampaign(t);
-    const csv = ['First Name,Last Name,Work Email,Company Name,Title,Industry', 'Jane,Doe,jane@acme.com,Acme,VP of Marketing,Fintech', '=HYPERLINK("http://evil"),X,x@y.co,"Bad, Co",CEO,SaaS', ',,,,,'].join('\n');
+    const csv = [
+      'First Name,Last Name,Work Email,Company Name,Title,Industry',
+      'Jane,Doe,jane@acme.com,Acme,VP of Marketing,Fintech',
+      '=HYPERLINK("http://evil"),X,x@y.co,"Bad, Co",CEO,SaaS',
+      ',,,,,',
+    ].join('\n');
     const form = new FormData();
     form.set('file', new File([csv], 'leads.csv', { type: 'text/csv' }));
     const preview = await t.json('POST', `/api/campaigns/${c.id}/prospects/import/preview`, form);
     expect(preview.status).toBe(200);
-    expect(preview.body.suggested_mapping).toMatchObject({ 'First Name': 'first_name', 'Last Name': 'last_name', 'Work Email': 'email', 'Company Name': 'company', Title: 'job_title', Industry: 'industry' });
+    expect(preview.body.suggested_mapping).toMatchObject({
+      'First Name': 'first_name',
+      'Last Name': 'last_name',
+      'Work Email': 'email',
+      'Company Name': 'company',
+      Title: 'job_title',
+      Industry: 'industry',
+    });
     expect(preview.body.total).toBe(2); // blank lines skipped
 
     // the dashboard applies the mapping and sends rows
@@ -95,7 +121,9 @@ describe('audience', () => {
 
   it('reports per-row import errors without aborting the batch', async () => {
     const c = await createLiveCampaign(t, { settings: { required_fields: ['company'] } });
-    const res = await t.json('POST', `/api/campaigns/${c.id}/prospects/import`, { rows: [{ email: 'a@b.co', company: 'A' }, { email: 'c@d.co' }, { company: 'No identity' }] });
+    const res = await t.json('POST', `/api/campaigns/${c.id}/prospects/import`, {
+      rows: [{ email: 'a@b.co', company: 'A' }, { email: 'c@d.co' }, { company: 'No identity' }],
+    });
     expect(res.body).toMatchObject({ created: 1, failed: 2 });
     expect(res.body.errors).toHaveLength(2);
     expect(res.body.errors[0].row).toBe(2);
