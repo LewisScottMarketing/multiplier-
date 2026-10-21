@@ -73,7 +73,7 @@ export function Overview() {
           subtitle="Last 14 days, people only (link scanners are filtered out)"
           table={{ columns: ['Date', 'Views'], rows: d.series.map((p) => [p.date, p.views]) }}
         >
-          <TimeSeries label="Views" data={d.series.map((p) => ({ date: p.date, value: p.views }))} />
+          <TimeSeries label="Views" data={d.series.map((p) => ({ date: p.date, value: p.views }))} height={340} />
         </ChartCard>
         <div className="card">
           <div className="card-head"><h2>Hot prospects</h2><MousePointerClick size={15} className="muted right" /></div>

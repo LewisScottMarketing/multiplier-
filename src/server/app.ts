@@ -28,8 +28,11 @@ export function createApp(ctx: AppContext) {
   // domain) may serve personalised pages and nothing else, so page content can never reach the
   // dashboard's cookies or API.
   const appHost = new URL(ctx.config.appUrl).host;
-  const publicPrefixes = ['/p/', '/t/', '/tc/', '/r/', '/c/', '/a/', '/f/', '/internal/tls-check'];
+  const publicPrefixes = ['/p/', '/t/', '/tc/', '/r/', '/c/', '/a/', '/f/'];
   app.use('*', async (c, next) => {
+    // the reverse proxy's certificate check arrives under the proxy's own internal hostname; the route
+    // itself only answers callers on the internal network
+    if (c.req.path === '/internal/tls-check') return next();
     const host = (c.req.header('x-forwarded-host') ?? c.req.header('host') ?? '').split(',')[0].trim();
     if (!host || host === appHost) return next();
     const allowed = host === new URL(ctx.config.publicUrl).host || getWorkspace(ctx).domains.includes(host.split(':')[0].toLowerCase());

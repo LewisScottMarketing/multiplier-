@@ -1,0 +1,16 @@
+node_modules
+dist
+web/dist
+.data
+.git
+.github
+.env
+.scratch
+docs
+tests
+*.log
+coverage
+test-results
+NEEDS-STACK.md
+skills-lock.json
+.claude

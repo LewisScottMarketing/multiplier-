@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  smoke:
+    name: Production build + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # run the bundle the way the container does: production dependencies only
+      - name: Install runtime dependencies only
+        run: |
+          mkdir -p /tmp/app/web
+          cp package.json package-lock.json /tmp/app/
+          cp -r dist assets /tmp/app/
+          cp -r web/dist /tmp/app/web/dist
+          cd /tmp/app && npm ci --omit=dev
+      - name: Start server
+        run: |
+          cd /tmp/app
+          NODE_ENV=production DATA_DIR=/tmp/app-data APP_SECRET=ci-secret-ci-secret-ci-secret PORT=3000 APP_URL=http://localhost:3000 \
+            node --disable-warning=ExperimentalWarning dist/server/index.js > /tmp/server.log 2>&1 &
+      - name: Smoke test
+        run: node scripts/smoke.mjs http://localhost:3000
+      - name: Server log
+        if: failure()
+        run: cat /tmp/server.log
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: multiplier:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Container starts and answers its health check
+        run: |
+          docker run -d --name mpl -p 3000:3000 -e APP_SECRET=ci-secret-ci-secret-ci-secret multiplier:ci
+          for i in $(seq 1 40); do curl -fs http://localhost:3000/api/health && exit 0; sleep 1; done
+          docker logs mpl
+          exit 1

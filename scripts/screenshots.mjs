@@ -54,5 +54,35 @@ await shot('analytics', async () => { await page.goto(`${BASE}/campaigns/${campa
 await shot('campaign-settings', async () => { await page.goto(`${BASE}/campaigns/${campaignId}/settings`); await page.waitForTimeout(800); });
 await shot('integrations', async () => { await page.goto(`${BASE}/integrations`); await page.waitForTimeout(1000); });
 await shot('integrations-webhooks', async () => { await page.goto(`${BASE}/integrations`); await page.waitForTimeout(800); await page.locator('text=Send engagement back').scrollIntoViewIfNeeded(); await page.evaluate(() => document.querySelector('.main').scrollBy(0, 560)); });
+await shot('ai-try-it', async () => {
+  await page.goto(`${BASE}/campaigns/${campaignId}/settings`);
+  await page.waitForSelector('text=AI-written fields');
+  await page.locator('button', { hasText: 'Try it' }).first().click();
+  await page.waitForSelector('.badge.ok >> text=AI-written', { timeout: 15000 });
+  await page.locator('.badge.ok >> text=AI-written').scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollBy(0, 200)).catch(() => undefined);
+});
+await shot('ai-variant', async () => {
+  await page.goto(`${BASE}/campaigns/${campaignId}/page`);
+  await page.waitForSelector('.bl-row');
+  const rows = page.locator('.bl-row');
+  for (let i = 0; i < (await rows.count()); i++) if (/Why personalisation wins/i.test(await rows.nth(i).innerText())) { await rows.nth(i).click(); break; }
+  await page.locator('button', { hasText: 'Write a version for' }).click();
+  await page.locator('.option-card', { hasText: 'Marketing' }).click();
+  await page.waitForSelector('text=Shown only to people whose job title matches', { timeout: 20000 });
+});
 await shot('settings', async () => { await page.goto(`${BASE}/settings`); await page.waitForTimeout(800); });
+// the personalised landing page a prospect sees, on a laptop and on a phone
+const prospects = (await (await ctx.request.get(`${BASE}/api/campaigns/${campaignId}/prospects?limit=60`)).json()).prospects;
+const target = prospects.find((p) => /marketing/i.test(p.job_title ?? '')) ?? prospects[0];
+await shot('landing', async () => { await page.goto(target.url.replace(/^https?:\/\/[^/]+/, BASE)); await page.waitForSelector('main'); await page.waitForTimeout(800); });
+const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' });
+const mp = await phone.newPage();
+if (!only || only.includes('landing-mobile')) {
+  await mp.goto(target.url.replace(/^https?:\/\/[^/]+/, BASE));
+  await mp.waitForSelector('main');
+  await mp.waitForTimeout(900);
+  await mp.screenshot({ path: path.join(OUT, 'landing-mobile.png') });
+  console.log('✓ landing-mobile');
+}
 await browser.close();

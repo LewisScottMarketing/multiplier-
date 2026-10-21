@@ -116,7 +116,7 @@ function hero(b: BlockOf<'hero'>, r: R): string {
   const badge = r.inline(b.badge);
   const img = b.show_document && r.env.urls.cover && r.env.hasDocument ? { src: r.env.urls.cover, alt: '' } : r.img(b.image);
   const media = img
-    ? `<div class="hero-media${b.show_document ? ' doc' : ''}"><img src="${esc(img.src)}" alt="${esc(img.alt)}" fetchpriority="high"></div>`
+    ? `<div class="hero-media${b.show_document ? ' is-cover' : ''}"><img src="${esc(img.src)}" alt="${esc(img.alt)}" fetchpriority="high"></div>`
     : '';
   const text = `<div class="hero-text">
 ${badge ? `<span class="badge">${badge}</span><br>` : ''}

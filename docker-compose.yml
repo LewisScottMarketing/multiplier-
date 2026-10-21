@@ -1,0 +1,49 @@
+# Multiplier, self-hosted.
+#
+#   cp .env.example .env        # set APP_URL, PUBLIC_URL, ADMIN_EMAIL/ADMIN_PASSWORD, optionally ANTHROPIC_API_KEY
+#   docker compose up -d        # dashboard on http://localhost:3000
+#
+# For HTTPS on your own domain (recommended before sending real links), add the bundled Caddy proxy:
+#
+#   docker compose --profile proxy up -d
+#
+# Caddy gets certificates automatically for the dashboard host and for every link domain you add under
+# Settings → Your own domains (it asks the app first, so it only issues certificates for domains you own).
+services:
+  app:
+    build: .
+    image: multiplier:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+      PORT: "3000"
+    volumes:
+      - multiplier-data:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  caddy:
+    image: caddy:2
+    profiles: ["proxy"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      APP_HOST: ${APP_HOST:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  multiplier-data:
+  caddy-data:
+  caddy-config:

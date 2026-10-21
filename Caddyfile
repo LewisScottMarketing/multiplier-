@@ -1,0 +1,27 @@
+# Used by `docker compose --profile proxy up -d`.
+# Set APP_HOST (for example app.yourbrand.com) and ACME_EMAIL in your .env, and set TRUST_PROXY=1 so
+# the app reads visitors' real IP addresses from the proxy.
+{
+	email {$ACME_EMAIL}
+
+	# Only issue certificates for hostnames this workspace owns: the dashboard host, the default links
+	# host and any domain added under Settings. The app answers this check for the proxy alone.
+	on_demand_tls {
+		ask http://app:3000/internal/tls-check
+	}
+}
+
+# Dashboard and API
+{$APP_HOST} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+# Personalised links on your own domains (go.yourbrand.com, …)
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	reverse_proxy app:3000
+}

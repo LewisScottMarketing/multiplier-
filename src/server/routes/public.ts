@@ -14,6 +14,7 @@ import { isBotUa, recordEvent } from '../services/events';
 import { handleSubmission } from '../services/forms';
 import { anonymousContext, contextFor, getProspectByToken, type Prospect } from '../services/prospects';
 import { renderGenericPage, renderProspectPage } from '../services/render';
+import { isBlockedAddress } from '../lib/safe-fetch';
 import { getWorkspace } from '../services/settings';
 
 const hostOf = (c: C) => (c.req.header('x-forwarded-host') ?? c.req.header('host') ?? 'localhost').split(',')[0].trim();
@@ -262,6 +263,8 @@ export function publicRoutes() {
   /** For Caddy's on-demand TLS `ask` hook: only issue certificates for domains this workspace owns. */
   r.get('/internal/tls-check', rateLimit('tls', 60, 60_000), (c) => {
     const app = c.get('app');
+    // only the proxy on the internal network may ask; anyone reaching it through a public domain gets nothing
+    if (!isBlockedAddress(c.get('ip'))) return c.text('Not found', 404);
     const domain = (c.req.query('domain') ?? '').toLowerCase();
     const known = new Set([...getWorkspace(app).domains, new URL(app.config.appUrl).hostname, new URL(app.config.publicUrl).hostname]);
     return known.has(domain) ? c.text('ok') : c.text('unknown domain', 404);
