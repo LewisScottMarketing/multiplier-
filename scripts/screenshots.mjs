@@ -65,6 +65,25 @@ await shot('builder-mobile', async () => {
   await page.click('[title="Phone"]');
   await page.waitForTimeout(1800);
 });
+await shot('templates', async () => {
+  await page.goto(`${BASE}/campaigns`);
+  await page.waitForSelector('.camp');
+  await page.locator('button', { hasText: 'New campaign' }).first().click();
+  await page.locator('.option-card', { hasText: 'From a template' }).click();
+  await page.waitForSelector('.tpl');
+  await page.waitForTimeout(4000); // the live thumbnails load their own fonts
+});
+// a throwaway campaign, so trying looks never touches the demo one
+let stylesId = '';
+await shot('styles', async () => {
+  const made = await (await ctx.request.post(`${BASE}/api/campaigns`, { data: { name: 'Styles', template: 'case-study' } })).json();
+  stylesId = made.campaign.id;
+  await page.goto(`${BASE}/campaigns/${stylesId}/page`);
+  await page.waitForSelector('.pv-frame iframe');
+  await page.click('text=Design');
+  await page.waitForTimeout(2500);
+});
+if (stylesId) await ctx.request.delete(`${BASE}/api/campaigns/${stylesId}`).catch(() => undefined);
 await shot('pdf', async () => {
   await page.goto(`${BASE}/campaigns/${campaignId}/pdf`);
   await page.waitForSelector('.pdf-page');

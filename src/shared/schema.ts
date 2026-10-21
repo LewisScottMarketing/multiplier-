@@ -147,7 +147,15 @@ export const HeroBlock = z.object({
   image: ImageSchema.optional(),
   /** Use the prospect's personalised PDF cover as the hero image. */
   show_document: z.boolean().optional(),
-  layout: z.enum(['split', 'centered']).default('split'),
+  /**
+   * split: text beside the picture. centered: text above the picture. cover: the picture fills the whole hero.
+   * minimal: big type, no picture. spotlight: centered on a soft glow with the picture in a window frame.
+   */
+  layout: z.enum(['split', 'centered', 'cover', 'minimal', 'spotlight']).default('split'),
+  /** How the picture is presented. `auto` tilts a PDF cover and lifts any other picture with a shadow. */
+  media: z.enum(['auto', 'tilt', 'flat', 'frame', 'stack', 'bare']).default('auto'),
+  /** Put the picture on the left in the split layout. */
+  flip: z.boolean().optional(),
 });
 
 export const TextBlock = z.object({
@@ -332,7 +340,7 @@ export type BlockOf<T extends BlockType> = Extract<Block, { type: T }>;
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-export const FONT_CHOICES = ['inter', 'system', 'serif', 'mono'] as const;
+export const FONT_CHOICES = ['inter', 'manrope', 'fraunces', 'space-grotesk', 'system', 'serif', 'mono'] as const;
 
 export const ThemeSchema = z.object({
   brand: hex.default('#4f46e5'),
@@ -346,6 +354,14 @@ export const ThemeSchema = z.object({
   heading_font: z.enum(FONT_CHOICES).optional(),
   radius: z.enum(['sharp', 'soft', 'round']).default('soft'),
   width: z.enum(['narrow', 'normal', 'wide']).default('normal'),
+  /** How heavy headings are. */
+  heading_weight: z.enum(['medium', 'semibold', 'bold', 'extrabold']).default('bold'),
+  /** Cards (feature boxes, notes, forms): hairline border, tinted fill, or lifted with a shadow. */
+  cards: z.enum(['outlined', 'flat', 'raised']).default('outlined'),
+  /** Space between sections. */
+  density: z.enum(['compact', 'comfortable', 'spacious']).default('comfortable'),
+  /** Brand and dark sections use a soft gradient instead of a flat colour. */
+  gradient: z.boolean().default(false),
 });
 export type Theme = z.infer<typeof ThemeSchema>;
 
@@ -506,6 +522,8 @@ export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
 export interface CampaignSource {
   type: 'scratch' | 'pdf';
+  /** The starter template a scratch campaign was begun from. */
+  template?: string;
   asset_id?: string;
   filename?: string;
   imported_at?: number;

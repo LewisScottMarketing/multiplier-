@@ -30,6 +30,8 @@ flowchart LR
 |---|---|
 | **PDF → landing page** | Upload a PDF; headings, lists, stats, quotes, images, steps and a call to action are detected and laid out as an editable page in your brand colour. Scanned PDFs get a sensible fallback. |
 | **Edit PDFs in place, per prospect** | In the PDF studio, click any text to swap it for a merge field (`Prepared for {{company}}`), or draw text, logo, QR code and link boxes. Each prospect gets their own copy; long names shrink to fit, the original text is covered, and you can preview as any person. |
+| **Pages that look designed** | Seven one-click styles (clean, editorial, bold, soft, midnight, gradient, corporate), seven typefaces served from your own server (no Google Fonts: a prospect's browser contacts nobody else), five hero layouts, and text colours that stay legible on any background. An imported PDF gets the style that suits it; a document set in a serif typeface becomes an editorial page. |
+| **Templates when there's no PDF** | Six designed starter pages: personal pitch, meeting request, customer story, event invitation, proposal and free audit. Pick one, swap in your words, send. |
 | **Merge fields that don't break** | `{{first_name\|there}}` fallbacks, filters (`upper`, `title`, `possessive`…), derived fields (seniority, department and a clean company name from the job title and company), tidy-up of ALL-CAPS names. |
 | **Persona targeting** | Show a block only to marketers, executives or any rule you write, based on job title or any field Clay sends. |
 | **Built for Clay** | One HTTP API column returns each row's link (idempotent, with warnings for anything missing). Engagement flows back into a Clay table, Slack, or your own endpoint. |
@@ -39,6 +41,11 @@ flowchart LR
 <p align="center">
   <img src="docs/screenshots/builder.png" alt="The page builder with a live, personalised preview" width="49%">
   <img src="docs/screenshots/pdf-field.png" alt="Clicking text in the PDF to personalise it" width="49%">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/templates.png" alt="Starting a campaign from one of six designed templates" width="49%">
+  <img src="docs/screenshots/styles.png" alt="One-click styles in the Design panel, with a live preview" width="49%">
 </p>
 
 ## Quick start
@@ -57,7 +64,7 @@ No git? On the repository page choose **Code → Download ZIP**, unzip it, and o
 
 To start with an empty workspace instead (you'll be asked to create your account), use the [production build](#production-build) below, which doesn't load demo data.
 
-Then: **New campaign → drop a PDF → publish.** The Integrations screen walks through connecting Clay.
+Then: **New campaign → drop a PDF (or pick a template) → publish.** The Integrations screen walks through connecting Clay.
 
 <details>
 <summary>It didn't work?</summary>

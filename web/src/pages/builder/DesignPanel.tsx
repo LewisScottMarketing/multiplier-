@@ -1,10 +1,14 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { contrast, shiftHue } from '@shared/color';
+import { withPreset } from '@shared/presets';
 import { useCampaign } from '../../campaign';
 import { ImagePicker } from '../../components/ImagePicker';
 import { TokenField } from '../../components/TokenField';
-import { Button, ColorField, Field, Input, Select, SwitchRow } from '../../ui';
+import { FONT_OPTIONS } from '../../lib/fonts';
+import { Button, ColorField, Field, Input, Segmented, Select, SwitchRow } from '../../ui';
 import { ButtonEditor } from './blockForms';
+import { StyleGallery } from './StyleGallery';
 
 function Group({ title, children, open: initial = false }: { title: string; children: ReactNode; open?: boolean }) {
   const [open, setOpen] = useState(initial);
@@ -28,63 +32,27 @@ export function DesignPanel() {
   const { theme, header, footer, seo } = c.draft.page;
   const set = <K extends 'theme' | 'header' | 'footer' | 'seo'>(k: K, patch: Partial<(typeof c.draft.page)[K]>) =>
     c.setPage((p) => ({ ...p, [k]: { ...p[k], ...patch } }), { coalesce: `design:${k}:${Object.keys(patch)[0]}` });
-  const FONTS = [
-    ['inter', 'Inter (modern)'],
-    ['system', 'System'],
-    ['serif', 'Serif'],
-    ['mono', 'Monospace'],
-  ];
+  const lowText = contrast(theme.text, theme.bg) < 4.5;
+  const lowMuted = contrast(theme.muted, theme.bg) < 4.5;
 
   return (
     <div>
-      <Group title="Colours & style" open>
-        <Field label="Brand colour" hint="Buttons, accents and highlights.">
-          <ColorField value={theme.brand} onChange={(v) => set('theme', { brand: v })} />
-        </Field>
-        <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}>
-          <Field label="Font">
-            <Select small value={theme.font} onChange={(e) => set('theme', { font: e.target.value as typeof theme.font })}>
-              {FONTS.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Corners">
-            <Select small value={theme.radius} onChange={(e) => set('theme', { radius: e.target.value as typeof theme.radius })}>
-              <option value="sharp">Sharp</option>
-              <option value="soft">Soft</option>
-              <option value="round">Round</option>
-            </Select>
-          </Field>
+      <Group title="Style" open>
+        <div className="hint" style={{ marginTop: -4 }}>
+          One click changes the type, colours, corners and spacing together. Your brand colour stays.
         </div>
-        <Field label="Page width">
-          <Select small value={theme.width} onChange={(e) => set('theme', { width: e.target.value as typeof theme.width })}>
-            <option value="narrow">Narrow</option>
-            <option value="normal">Standard</option>
-            <option value="wide">Wide</option>
-          </Select>
-        </Field>
-        <Field label="Heading font">
-          <Select
-            small
-            value={theme.heading_font ?? ''}
-            onChange={(e) => set('theme', { heading_font: (e.target.value || undefined) as typeof theme.heading_font })}
-          >
-            <option value="">Same as body</option>
-            {FONTS.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </Select>
+        <StyleGallery theme={theme} onPick={(preset) => c.setPage((p) => withPreset(p, preset))} />
+      </Group>
+
+      <Group title="Colours" open>
+        <Field label="Brand colour" hint="Buttons, links and highlights.">
+          <ColorField value={theme.brand} onChange={(v) => set('theme', { brand: v })} />
         </Field>
         <div className="row wrap" style={{ gap: 12 }}>
           <Field label="Page background">
             <ColorField value={theme.bg} onChange={(v) => set('theme', { bg: v })} />
           </Field>
-          <Field label="Soft tint">
+          <Field label="Soft tint" hint="Alternate sections.">
             <ColorField value={theme.alt_bg} onChange={(v) => set('theme', { alt_bg: v })} />
           </Field>
           <Field label="Dark sections">
@@ -97,6 +65,115 @@ export function DesignPanel() {
             <ColorField value={theme.muted} onChange={(v) => set('theme', { muted: v })} />
           </Field>
         </div>
+        {lowText || lowMuted ? (
+          <div className="hint" style={{ color: 'var(--warn)' }}>
+            {lowText ? 'The text colour is hard to read on this background. ' : 'The muted text is hard to read on this background. '}
+            Aim for a contrast of 4.5 or more.
+          </div>
+        ) : null}
+        <SwitchRow
+          label="Blend into a gradient"
+          hint="Buttons and coloured sections flow from your brand colour into a second one."
+          checked={theme.gradient}
+          onChange={(v) => set('theme', { gradient: v })}
+        />
+        {theme.gradient ? (
+          <Field label="Gradient ends at" hint="Leave it to pick a neighbouring hue automatically.">
+            <div className="row" style={{ gap: 8 }}>
+              <ColorField value={theme.accent ?? shiftHue(theme.brand, 32)} onChange={(v) => set('theme', { accent: v })} />
+              {theme.accent ? (
+                <Button size="xs" variant="ghost" onClick={() => c.setPage((p) => ({ ...p, theme: { ...p.theme, accent: undefined } }))}>
+                  Automatic
+                </Button>
+              ) : null}
+            </div>
+          </Field>
+        ) : null}
+      </Group>
+
+      <Group title="Type">
+        <Field label="Body font">
+          <Select small value={theme.font} onChange={(e) => set('theme', { font: e.target.value as typeof theme.font })}>
+            {FONT_OPTIONS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Heading font">
+          <Select
+            small
+            value={theme.heading_font ?? ''}
+            onChange={(e) => set('theme', { heading_font: (e.target.value || undefined) as typeof theme.heading_font })}
+          >
+            <option value="">Same as body</option>
+            {FONT_OPTIONS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Heading weight">
+          <Segmented
+            value={theme.heading_weight}
+            onChange={(v) => set('theme', { heading_weight: v })}
+            options={[
+              { value: 'medium', label: 'Light' },
+              { value: 'semibold', label: 'Medium' },
+              { value: 'bold', label: 'Bold' },
+              { value: 'extrabold', label: 'Heavy' },
+            ]}
+          />
+        </Field>
+      </Group>
+
+      <Group title="Shape & spacing">
+        <Field label="Corners">
+          <Segmented
+            value={theme.radius}
+            onChange={(v) => set('theme', { radius: v })}
+            options={[
+              { value: 'sharp', label: 'Sharp' },
+              { value: 'soft', label: 'Soft' },
+              { value: 'round', label: 'Round' },
+            ]}
+          />
+        </Field>
+        <Field label="Cards" hint="Feature boxes, the note and the form.">
+          <Segmented
+            value={theme.cards}
+            onChange={(v) => set('theme', { cards: v })}
+            options={[
+              { value: 'outlined', label: 'Outlined' },
+              { value: 'flat', label: 'Flat' },
+              { value: 'raised', label: 'Raised' },
+            ]}
+          />
+        </Field>
+        <Field label="Space between sections">
+          <Segmented
+            value={theme.density}
+            onChange={(v) => set('theme', { density: v })}
+            options={[
+              { value: 'compact', label: 'Compact' },
+              { value: 'comfortable', label: 'Roomy' },
+              { value: 'spacious', label: 'Airy' },
+            ]}
+          />
+        </Field>
+        <Field label="Page width">
+          <Segmented
+            value={theme.width}
+            onChange={(v) => set('theme', { width: v })}
+            options={[
+              { value: 'narrow', label: 'Narrow' },
+              { value: 'normal', label: 'Standard' },
+              { value: 'wide', label: 'Wide' },
+            ]}
+          />
+        </Field>
       </Group>
 
       <Group title="Header">

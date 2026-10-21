@@ -7,7 +7,7 @@ import type { AppContext } from '../context';
 import { badRequest, HttpError, notFound } from '../lib/errors';
 import { safeJoin, sendFile } from '../lib/static';
 import { rateLimit, requestHost, type C, type Env } from '../http';
-import { interFontDir } from '../render/css';
+import { fontFilesDir } from '../render/fonts';
 import { getCampaign, getCampaignBySlug } from '../services/campaigns';
 import { personalizedCover, personalizedPdf } from '../services/documents';
 import { isBotUa, recordEvent } from '../services/events';
@@ -332,10 +332,11 @@ export function publicRoutes() {
   });
 
   // ── Self-hosted fonts ─────────────────────────────────────────────────────
-  r.get('/f/inter/files/:file', async (c) => {
-    const dir = interFontDir();
+  r.get('/f/:family/files/:file', async (c) => {
+    const family = c.req.param('family');
     const file = c.req.param('file');
-    if (!dir || !/^inter-[a-z-]+-wght-normal\.woff2$/.test(file)) throw notFound('Font');
+    const dir = fontFilesDir(family);
+    if (!dir || !file.startsWith(`${family}-`) || !/^[a-z0-9-]+-wght-normal\.woff2$/.test(file)) throw notFound('Font');
     const full = safeJoin(dir, file);
     const res = full ? await sendFile(c, full, { immutable: true }) : null;
     if (!res) throw notFound('Font');

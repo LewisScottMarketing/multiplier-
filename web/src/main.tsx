@@ -1,5 +1,8 @@
 import './zod-config';
 import '@fontsource-variable/inter/wght.css';
+import '@fontsource-variable/manrope/wght.css';
+import '@fontsource-variable/fraunces/wght.css';
+import '@fontsource-variable/space-grotesk/wght.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';

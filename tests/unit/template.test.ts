@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  afterValue,
   escapeHtml,
   extractTokens,
   hasTokens,
@@ -151,5 +152,34 @@ describe('renderUrl', () => {
   });
   it('cannot be tricked into a different scheme by data in the host position', () => {
     expect(renderUrl('https://{{domain}}/x', { domain: 'evil.com/@' })).toBe('https://evil.com%2F%40/x');
+  });
+});
+
+describe('a value that already ends in a full stop', () => {
+  const inc = { company: 'Northwind Traders, Inc.', name: 'Acme Ltd.' };
+
+  it('does not print the template’s own full stop twice', () => {
+    expect(renderTemplate('I looked at {{company}}. Have a skim.', inc)).toBe('I looked at Northwind Traders, Inc. Have a skim.');
+    expect(renderTemplate('Prepared for {{name}}.', inc)).toBe('Prepared for Acme Ltd.');
+  });
+
+  it('leaves everything else alone', () => {
+    expect(renderTemplate('For {{company}}, with love', inc)).toBe('For Northwind Traders, Inc., with love');
+    expect(renderTemplate('Acme Inc. is {{company}}.', { company: 'Acme' })).toBe('Acme Inc. is Acme.');
+    expect(renderTemplate('{{company}}...', inc)).toBe('Northwind Traders, Inc....');
+    expect(renderTemplate('{{company}}!', inc)).toBe('Northwind Traders, Inc.!');
+    expect(renderTemplate('Hi {{nope}}.', inc)).toBe('Hi .');
+  });
+
+  it('only looks at the text right after the value', () => {
+    expect(renderTemplate('{{company}} and {{name}}.', inc)).toBe('Northwind Traders, Inc. and Acme Ltd.');
+    expect(renderTemplate('{{company}} x.', inc)).toBe('Northwind Traders, Inc. x.');
+  });
+
+  it('is available to anything that joins a value to template text', () => {
+    expect(afterValue('Acme Inc.', '. Next')).toBe(' Next');
+    expect(afterValue('Acme Inc.', '.. Next')).toBe('.. Next');
+    expect(afterValue('Acme Inc', '. Next')).toBe('. Next');
+    expect(afterValue('', '. Next')).toBe('. Next');
   });
 });

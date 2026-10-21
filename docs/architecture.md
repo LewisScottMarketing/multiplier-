@@ -39,12 +39,15 @@ src/
     derive.ts          seniority / department / clean company & names from raw data
     conditions.ts      persona rules (evaluate, describe, invert)
     lint.ts            "checks" shown in the builder (missing fallbacks, unknown fields…)
+    color.ts           colour maths: tints, contrast, "readable on", hue shifts
+    presets.ts         the seven one-click styles, each a function of the brand colour
+    templates.ts       the six starter pages offered by "new campaign"
     blocks.ts, fields.ts, personas.ts, block-text.ts
   server/
     app.ts, http.ts    wiring, middleware, CSRF, rate limiting, host guard
     routes/            auth, campaigns, documents (PDF studio), prospects, analytics, settings, ai, v1, public
     services/          campaigns, prospects, events, analytics, webhooks, importer, documents, ai, …
-    render/            server-side page rendering: blocks, CSS, rich text, icons, embeds, CSP
+    render/            server-side page rendering: blocks, CSS, fonts, rich text, icons, embeds, CSP
     pdf/               extract (pdf.js), raster, import (PDF → page), apply (edit PDFs), fonts, fields
     auth/              users (scrypt), sessions, API keys
     lib/               crypto, safe-fetch (SSRF guard), storage, rate limiter, logging
@@ -89,6 +92,14 @@ Pages and PDF fields live as validated JSON inside the campaign row. The schema 
 3. Each block's targeting rule is evaluated; blocks that don't match are never rendered.
 4. Text is processed in a fixed order that makes injection structurally impossible: the author's own formatting (`**bold**`, links) is parsed **first**, and only then are merge values substituted into the already-parsed text and HTML-escaped. Data can never become markup. URLs are built with merge values percent-encoded and checked against a scheme allow-list. Custom HTML blocks are merged then sanitised.
 5. The page ships with a per-response CSP nonce, a tiny tracking script, and fonts served from the same origin.
+
+### How a page is styled
+
+A page's `theme` (brand colour, neutrals, typefaces, corners, card style, spacing, gradient) becomes a short block of CSS variables (`render/css.ts`), and one fixed stylesheet reads them. Nothing in the theme is free text: colours are 6-digit hex and everything else is an enum, so no theme value can break out of a CSS declaration. A few derived values keep pages legible whatever the author picks: button text switches between white and near-black by contrast (`inkFor`), the brand colour used for links and small labels is nudged lighter or darker only as far as it must be to read on the page (`readableOn`), and cards, borders and shadows adapt when the page background is dark.
+
+Typefaces (Inter, Manrope, Fraunces, Space Grotesk, plus system stacks) are self-hosted from the `@fontsource-variable` packages and served from `/f/<family>/files/<file>` with a one-year immutable cache, so a prospect's browser never contacts a third-party font service. A page only includes the `@font-face` rules, and the preload, for the fonts its theme uses. The file route accepts only the exact `<family>-<subset>-wght-normal.woff2` names of the packages we ship.
+
+A *style preset* (`shared/presets.ts`) is a function from the brand colour to the rest of the theme, so applying one keeps your brand colour and any accent and re-derives the tints and dark shades to suit it. The PDF importer picks one for you: a document set mostly in a serif face becomes *Editorial*, a dark document becomes *Midnight*, anything else *Clean*.
 
 The dashboard's live preview posts the *unsaved draft* to `/api/campaigns/:id/preview`, which renders it with the same code and returns a short-lived URL that is loaded in a double-buffered iframe (so edits swap in without flicker). Clicking a block in the preview selects it in the editor.
 

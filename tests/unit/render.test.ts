@@ -53,6 +53,13 @@ describe('rich text', () => {
     expect(renderRich('**{{company}}** rocks', { company: 'Acme' })).toContain('<strong>Acme</strong>');
   });
 
+  it('does not double the full stop after a company name that ends in one', () => {
+    const data = { company: 'Northwind Traders, Inc.' };
+    expect(renderRich('I looked at {{company}}. Have a skim.', data)).toBe('<p>I looked at Northwind Traders, Inc. Have a skim.</p>');
+    expect(renderInline('Prepared for {{company}}.', data)).toBe('Prepared for Northwind Traders, Inc.');
+    expect(renderRich('{{company}}...', data)).toBe('<p>Northwind Traders, Inc....</p>');
+  });
+
   it('drops links whose destination is unsafe, keeping the label', () => {
     const html = renderRich('[click](javascript:alert(1))', {});
     expect(html).not.toContain('href');
@@ -115,6 +122,12 @@ describe('renderPage', () => {
     expect(m.blocks).toEqual(['a', 'c']);
     expect(render(page, { job_title: 'Account Executive' }).blocks).toEqual(['b', 'c']);
     expect(render(page, {}).blocks).toEqual(['c']);
+  });
+
+  it('does not count an unfilled form box as an empty field', () => {
+    const out = render(pageWith(newBlock('form')), {});
+    expect(summariseTokens(out.tokens).missing).toEqual([]);
+    expect(out.html).toContain('name="email"');
   });
 
   it('skips hidden blocks', () => {
@@ -236,5 +249,106 @@ describe('renderPage', () => {
   it('escapes </style> in custom CSS so it cannot close the style element', () => {
     const page = PageSchema.parse({ blocks: [newBlock('text')], custom_css: 'a{color:red}</style><script>alert(1)</script>' });
     expect(render(page).html).not.toContain('</style><script>alert(1)');
+  });
+});
+
+describe('how sections sit together', () => {
+  const classes = (html: string, id: string) => html.match(new RegExp(`<section class="([^"]*)" id="[^"]*" data-b="${id}"`))?.[1] ?? '';
+
+  it('runs content sections together when they share a background, so the gap does not double up', () => {
+    const html = render(
+      pageWith(
+        newBlock('hero', { id: 'h' }),
+        newBlock('text', { id: 'a' }),
+        newBlock('text', { id: 'b' }),
+        newBlock('text', { id: 'c', bg: 'alt' }),
+        newBlock('features', { id: 'd', bg: 'alt' }),
+        newBlock('cta', { id: 'e', bg: 'alt' }),
+        newBlock('text', { id: 'f', bg: 'alt' }),
+        newBlock('text', { id: 'g', bg: 'alt', pad: 'lg' }),
+      ),
+    ).html;
+    const joined = (id: string) => classes(html, id).split(' ').includes('join');
+    expect(joined('h')).toBe(false); // nothing before it
+    expect(joined('a')).toBe(false); // follows a hero
+    expect(joined('b')).toBe(true); // same background as the text above
+    expect(joined('c')).toBe(false); // the background changes
+    expect(joined('d')).toBe(true);
+    expect(joined('e')).toBe(false); // a banner is its own thing
+    expect(joined('f')).toBe(false); // follows one
+    expect(joined('g')).toBe(false); // asked for particular spacing
+  });
+
+  it('only counts the blocks a prospect can actually see', () => {
+    const hidden = newBlock('text', {
+      id: 'mid',
+      bg: 'alt',
+      rule: { match: 'all', conditions: [{ field: 'department', op: 'equals', value: 'sales' }] },
+    });
+    const html = render(pageWith(newBlock('text', { id: 'x' }), hidden, newBlock('text', { id: 'y' })), {
+      job_title: 'Marketing Manager',
+    }).html;
+    expect(html).not.toContain('data-b="mid"');
+    expect(classes(html, 'y').split(' ')).toContain('join');
+  });
+
+  it('keeps each section’s own class only, so one block’s styles never leak onto another', () => {
+    const html = render(pageWith(newBlock('stats', { id: 's' }), newBlock('steps', { id: 'p' }), newBlock('note', { id: 'n' }))).html;
+    expect(classes(html, 's')).toMatch(/^blk blk-stats\b/);
+    expect(classes(html, 's').split(' ')).not.toContain('stats');
+    expect(classes(html, 'p').split(' ')).not.toContain('steps');
+    expect(classes(html, 'n').split(' ')).not.toContain('note');
+  });
+
+  it('centres a testimonial’s attribution only when there is no photo beside it', () => {
+    const bare = render(pageWith(newBlock('testimonial', { id: 't' }))).html;
+    expect(bare).toContain('class="who no-av"');
+    const withPhoto = render(pageWith(newBlock('testimonial', { id: 't', avatar: { src: 'ast_abc123', alt: '' } }))).html;
+    expect(withPhoto).toContain('class="who"');
+  });
+});
+
+describe('the first screen', () => {
+  // the stylesheet names every class too, so look at the page's markup only
+  const heroHtml = (hero: Record<string, unknown>, opts: Parameters<typeof render>[2] = {}) =>
+    render(pageWith(newBlock('hero', { id: 'h', ...hero } as never)), {}, opts).html.replace(/<style[\s\S]*?<\/style>/g, '');
+
+  it('has a layout for each kind of hero, and says when there is no picture', () => {
+    for (const layout of ['split', 'centered', 'cover', 'minimal', 'spotlight']) {
+      expect(heroHtml({ layout })).toContain(`l-${layout}`);
+    }
+    expect(heroHtml({ layout: 'split' })).toContain('no-media');
+    expect(heroHtml({ layout: 'split', image: { src: 'ast_abc123', alt: 'x' } })).not.toContain('no-media');
+  });
+
+  it('dresses the picture as asked, or sensibly when left on automatic', () => {
+    const img = { image: { src: 'ast_abc123', alt: 'x' } };
+    expect(heroHtml({ layout: 'split', ...img })).toContain('m-flat');
+    expect(heroHtml({ layout: 'spotlight', ...img })).toContain('m-frame');
+    expect(heroHtml({ layout: 'spotlight', ...img })).toContain('class="fbar"');
+    expect(heroHtml({ layout: 'split', media: 'stack', ...img })).toContain('m-stack');
+    expect(heroHtml({ layout: 'split', media: 'bare', ...img })).toContain('m-bare');
+    // a PDF cover leans like a page on a desk
+    expect(heroHtml({ layout: 'split', show_document: true }, { document: true })).toContain('m-tilt');
+  });
+
+  it('paints a cover picture behind the text, and uses the author’s picture rather than the PDF for it', () => {
+    const html = heroHtml({ layout: 'cover', show_document: true, image: { src: 'ast_abc123', alt: '' } }, { document: true });
+    expect(html).toContain('class="hero-bg"');
+    expect(html).toContain('has-img');
+    expect(html).toContain('/a/ast_abc123');
+    expect(html).not.toContain('class="hero-media');
+    // with no picture it falls back to the brand colour rather than leaving a hole
+    expect(heroHtml({ layout: 'cover' })).not.toContain('hero-bg');
+  });
+
+  it('flips a split hero when asked, and ignores that for the other layouts', () => {
+    expect(heroHtml({ layout: 'split', flip: true })).toContain(' flip');
+    expect(heroHtml({ layout: 'split' })).not.toContain(' flip');
+  });
+
+  it('keeps a picture that is not on our server or an https address out of the page', () => {
+    expect(heroHtml({ layout: 'split', image: { src: 'http://evil.test/x.png', alt: '' } })).not.toContain('evil.test');
+    expect(heroHtml({ layout: 'split', image: { src: 'javascript:alert(1)', alt: '' } })).not.toContain('javascript:');
   });
 });

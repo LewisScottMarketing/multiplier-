@@ -77,8 +77,16 @@ export type FieldDef =
   | { kind: 'text'; key: string; label: string; hint?: string; multiline?: boolean; rows?: number; placeholder?: string; mono?: boolean }
   | { kind: 'button'; key: string; label: string; optional?: boolean }
   | { kind: 'image'; key: string; label: string; optional?: boolean; hint?: string; showIf?: (b: Record<string, unknown>) => boolean }
-  | { kind: 'select'; key: string; label: string; options: Array<[string | number, string]>; number?: boolean }
-  | { kind: 'switch'; key: string; label: string; hint?: string }
+  | {
+      kind: 'select';
+      key: string;
+      label: string;
+      options: Array<[string | number, string]>;
+      number?: boolean;
+      hint?: string;
+      showIf?: (b: Record<string, unknown>) => boolean;
+    }
+  | { kind: 'switch'; key: string; label: string; hint?: string; showIf?: (b: Record<string, unknown>) => boolean }
   | { kind: 'number'; key: string; label: string; min: number; max: number }
   | { kind: 'icon'; key: string; label: string }
   | {
@@ -109,20 +117,52 @@ export const FORMS: Record<BlockType, FieldDef[]> = {
     { kind: 'button', key: 'primary', label: 'Main button' },
     { kind: 'button', key: 'secondary', label: 'Second button', optional: true },
     {
-      kind: 'switch',
-      key: 'show_document',
-      label: 'Show the PDF cover',
-      hint: 'Uses the first page of their personalised PDF as the picture.',
-    },
-    { kind: 'image', key: 'image', label: 'Picture', optional: true, showIf: (b) => !b.show_document },
-    {
       kind: 'select',
       key: 'layout',
       label: 'Layout',
       options: [
-        ['split', 'Text left, picture right'],
-        ['centered', 'Centered'],
+        ['split', 'Split: text beside the picture'],
+        ['centered', 'Centred: picture underneath'],
+        ['spotlight', 'Spotlight: soft glow, picture in a window'],
+        ['cover', 'Cover: the picture fills the section'],
+        ['minimal', 'Statement: big type, no picture'],
       ],
+    },
+    {
+      kind: 'switch',
+      key: 'show_document',
+      label: 'Show the PDF cover',
+      hint: 'Uses the first page of their personalised PDF as the picture.',
+      showIf: (b) => b.layout !== 'minimal' && b.layout !== 'cover',
+    },
+    {
+      kind: 'image',
+      key: 'image',
+      label: 'Picture',
+      optional: true,
+      hint: 'In the cover layout this is the background; text sits over a dark wash so it stays readable.',
+      showIf: (b) => b.layout === 'cover' || (b.layout !== 'minimal' && !b.show_document),
+    },
+    {
+      kind: 'select',
+      key: 'media',
+      label: 'Picture style',
+      options: [
+        ['auto', 'Automatic'],
+        ['tilt', 'Tilted, like a page on a desk'],
+        ['stack', 'A stack of pages'],
+        ['frame', 'In a window frame'],
+        ['flat', 'Plain with a shadow'],
+        ['bare', 'Bare: no shadow or corners'],
+      ],
+      showIf: (b) =>
+        b.layout !== 'minimal' && b.layout !== 'cover' && (!!b.show_document || !!(b.image as { src?: string } | undefined)?.src),
+    },
+    {
+      kind: 'switch',
+      key: 'flip',
+      label: 'Picture on the left',
+      showIf: (b) => !b.layout || b.layout === 'split',
     },
     t('eyebrow', 'Small label above the headline'),
   ],
@@ -701,6 +741,7 @@ export function FieldRenderer({
   onChange: (v: unknown) => void;
   block: Record<string, unknown>;
 }): ReactNode {
+  if ('showIf' in def && def.showIf && !def.showIf(block)) return null;
   switch (def.kind) {
     case 'text':
       return (
@@ -718,13 +759,12 @@ export function FieldRenderer({
     case 'button':
       return <ButtonEditor label={def.label} optional={def.optional} value={value as ButtonT | undefined} onChange={onChange} />;
     case 'image':
-      if (def.showIf && !def.showIf(block)) return null;
       return (
         <ImagePicker label={def.label} optional={def.optional} hint={def.hint} value={value as ImageRef | undefined} onChange={onChange} />
       );
     case 'select':
       return (
-        <Field label={def.label}>
+        <Field label={def.label} hint={def.hint}>
           <Select small value={String(value ?? '')} onChange={(e) => onChange(def.number ? Number(e.target.value) : e.target.value)}>
             {def.options.map(([v, l]) => (
               <option key={v} value={v}>

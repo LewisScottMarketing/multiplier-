@@ -6,8 +6,8 @@ import { DocumentSchema } from '../../src/shared/schema';
 import { renderPdf, resolveInstructions } from '../../src/server/pdf/apply';
 import { detrack, extractDocument, extractImagePng, type ExtractedDoc } from '../../src/server/pdf/extract';
 import { fieldFromRun, fieldsForTokenRuns } from '../../src/server/pdf/fields';
-import { importToPage } from '../../src/server/pdf/import';
-import { extractPalette, renderPageRaster, sampleRunColors } from '../../src/server/pdf/raster';
+import { importToPage, lookFor, type Line } from '../../src/server/pdf/import';
+import { extractPalette, renderPageRaster, sampleRunColors, type Palette } from '../../src/server/pdf/raster';
 
 const fixture = (name: string) => new Uint8Array(fs.readFileSync(path.resolve('tests/fixtures', name)));
 const ctxOf = (o: Record<string, string>) => buildContext(o);
@@ -331,5 +331,48 @@ describe('editing a PDF', () => {
     const a = JSON.stringify(resolveInstructions(doc, ctxOf({ company: 'A' })));
     expect(JSON.stringify(resolveInstructions(doc, ctxOf({ company: 'A' })))).toBe(a);
     expect(JSON.stringify(resolveInstructions(doc, ctxOf({ company: 'B' })))).not.toBe(a);
+  });
+});
+
+describe('the look an imported page is given', () => {
+  const palette = (o: Partial<Palette> = {}): Palette => ({
+    brand: '#4f46e5',
+    dominant: '#ffffff',
+    dark: false,
+    brandCover: false,
+    found: true,
+    ...o,
+  });
+  const lineOf = (family: string, chars: number) => ({ runs: [{ family, text: 'x'.repeat(chars) }] }) as unknown as Line;
+
+  it('keeps a dark document dark, but not one that is merely dark because its cover is the brand colour', () => {
+    expect(lookFor([lineOf('inter', 100)], palette({ dark: true })).id).toBe('midnight');
+    expect(lookFor([lineOf('inter', 100)], palette({ dark: true, brandCover: true })).id).toBe('clean');
+  });
+
+  it('sets a serif document in an editorial style, and anything else in the clean one', () => {
+    expect(lookFor([lineOf('serif', 300), lineOf('inter', 100)], palette()).id).toBe('editorial');
+    expect(lookFor([lineOf('serif', 100), lineOf('helvetica', 300)], palette()).id).toBe('clean');
+    expect(lookFor([], palette()).id).toBe('clean');
+  });
+
+  it('is applied to the page, and the report says so', async () => {
+    const run = async (file: string) => {
+      const bytes = fixture(file);
+      const doc = await extractDocument(bytes);
+      const pal = extractPalette(await Promise.all([1, 2, 3].filter((n) => n <= doc.page_count).map((n) => renderPageRaster(bytes, n, 1))));
+      return importToPage(doc, pal, { filename: file, saveImage: async () => 'ast_img' });
+    };
+    const playbook = await run('playbook.pdf');
+    expect(playbook.page.theme).toMatchObject({ brand: '#4f46e5', font: 'inter', bg: '#ffffff' });
+    expect(playbook.report.join(' ')).toContain('Styled “Clean”');
+
+    const report = await run('report.pdf');
+    expect(report.page.theme).toMatchObject({ heading_font: 'fraunces', bg: '#fbf8f3', cards: 'flat' });
+    expect(report.report.join(' ')).toContain('Styled “Editorial”');
+
+    const caseStudy = await run('case-study.pdf');
+    expect(caseStudy.page.theme.bg).not.toBe('#ffffff');
+    expect(caseStudy.report.join(' ')).toContain('Styled “Midnight”');
   });
 });

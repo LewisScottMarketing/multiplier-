@@ -2,8 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { evalRule } from '@shared/conditions';
 import type { Block, CampaignSettings, DocumentConfig, Page } from '@shared/schema';
 import { escapeHtml as esc, safeUrl, type Ctx, type TokenResult } from '@shared/template';
-import { blockAnchor, makeR, renderBlock, type RenderEnv } from './blocks';
-import { BASE_CSS, interFontFaceCss, themeCss } from './css';
+import { blockAnchor, joinsPrevious, makeR, renderBlock, type RenderEnv } from './blocks';
+import { BASE_CSS, themeCss } from './css';
+import { fontFaceCss, fontsUsed, preloadPath } from './fonts';
 import { FRAME_HOSTS } from './embeds';
 
 export interface PageInput {
@@ -49,7 +50,7 @@ export function renderPage(input: PageInput): PageOutput {
     tokens: [],
   };
 
-  const body = visible.map((b) => renderBlock(b, makeR(env, b.id))).join('\n');
+  const body = visible.map((b, i) => renderBlock(b, makeR(env, b.id), { join: joinsPrevious(b, visible[i - 1]) })).join('\n');
   const header = renderHeader(env, page);
   const footer = renderFooter(env, page);
 
@@ -65,8 +66,9 @@ export function renderPage(input: PageInput): PageOutput {
   const bodyScripts = input.scripts?.body_end ?? '';
   const hasCustomScripts = !!(headScripts.trim() || bodyScripts.trim());
 
+  const fonts = fontsUsed(page.theme);
   const css = [
-    page.theme.font === 'inter' || page.theme.heading_font === 'inter' ? interFontFaceCss() : '',
+    ...fonts.map(fontFaceCss),
     themeCss(page.theme),
     BASE_CSS,
     mode === 'preview' ? PREVIEW_CSS : '',
@@ -89,6 +91,11 @@ ${page.seo.noindex || mode === 'preview' ? '<meta name="robots" content="noindex
 ${description ? `<meta property="og:description" content="${esc(description)}">` : ''}
 ${ogImage ? `<meta property="og:image" content="${esc(abs(ogImage))}"><meta name="twitter:card" content="summary_large_image">` : ''}
 <link rel="icon" href="${esc(favicon)}">
+${fonts
+  .map(preloadPath)
+  .filter(Boolean)
+  .map((href) => `<link rel="preload" href="${esc(href!)}" as="font" type="font/woff2" crossorigin>`)
+  .join('\n')}
 <style nonce="${nonce}">${css}</style>
 ${withNonce(headScripts, nonce)}
 </head>

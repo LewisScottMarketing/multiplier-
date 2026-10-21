@@ -25,7 +25,8 @@ export interface R {
   env: RenderEnv;
   rich(tpl: string | undefined): string;
   inline(tpl: string | undefined): string;
-  plain(tpl: string | undefined): string;
+  /** `report: false` keeps the tokens out of the "empty field" warnings, for places where blank is the right answer. */
+  plain(tpl: string | undefined, opts?: { report?: boolean }): string;
   url(tpl: string | undefined): string;
   img(ref: ImageRef | undefined): { src: string; alt: string } | null;
   button(btn: Button | undefined, slot: string, kind?: 'primary' | 'secondary', size?: 'sm'): string;
@@ -48,7 +49,7 @@ export function makeR(env: RenderEnv, blockId: string): R {
     env,
     rich: (t) => renderRich(t, env.ctx, { onToken }),
     inline: (t) => renderInline(t, env.ctx, { onToken }),
-    plain: (t) => renderPlain(t, env.ctx, { onToken }),
+    plain: (t, o) => renderPlain(t, env.ctx, o?.report === false ? {} : { onToken }),
     url: (t) => (t ? renderUrl(t, env.ctx, { onToken }) : ''),
     img(ref) {
       const raw = ref?.src?.trim();
@@ -96,7 +97,7 @@ export function makeR(env: RenderEnv, blockId: string): R {
   return r;
 }
 
-const wrap = (inner: string, narrow = false) => `<div class="wrap${narrow ? ' narrow' : ''}">${inner}</div>`;
+const wrap = (inner: string, narrow = false) => `<div class="wrap">${narrow ? `<div class="col-narrow">${inner}</div>` : inner}</div>`;
 
 const heading = (r: R, text: string | undefined, tag: 'h1' | 'h2' = 'h2') => {
   const t = r.inline(text);
@@ -117,12 +118,21 @@ const buttons = (...btns: string[]) => {
 // ── Individual blocks ───────────────────────────────────────────────────────
 
 function hero(b: BlockOf<'hero'>, r: R): string {
-  const align = b.align ?? (b.layout === 'centered' ? 'center' : 'left');
+  const layout = b.layout;
+  const align = b.align ?? (layout === 'centered' || layout === 'spotlight' ? 'center' : 'left');
   const badge = r.inline(b.badge);
-  const img = b.show_document && r.env.urls.cover && r.env.hasDocument ? { src: r.env.urls.cover, alt: '' } : r.img(b.image);
-  const media = img
-    ? `<div class="hero-media${b.show_document ? ' is-cover' : ''}"><img src="${esc(img.src)}" alt="${esc(img.alt)}" fetchpriority="high"></div>`
+  // a portrait PDF cover makes a poor full-bleed background, so the cover layout always uses the picture the author chose
+  const isDoc = !!(b.show_document && layout !== 'cover' && r.env.urls.cover && r.env.hasDocument);
+  const img = isDoc ? { src: r.env.urls.cover!, alt: '' } : r.img(b.image);
+  // how the picture is dressed: a PDF cover leans like a page on a desk, a window frame suits the glowing layout
+  const style = b.media !== 'auto' ? b.media : isDoc ? 'tilt' : layout === 'spotlight' ? 'frame' : 'flat';
+  const frameBar = style === 'frame' ? '<div class="fbar" aria-hidden="true"><i></i><i></i><i></i></div>' : '';
+  const showMedia = !!img && layout !== 'cover' && layout !== 'minimal';
+  const media = showMedia
+    ? `<div class="hero-media m-${style}${isDoc ? ' is-cover' : ''}"><div class="mi">${frameBar}<img src="${esc(img.src)}" alt="${esc(img.alt)}" fetchpriority="high"></div></div>`
     : '';
+  // the cover layout paints the picture behind everything; without one it falls back to the brand colour
+  const backdrop = img && layout === 'cover' && !isDoc ? `<img class="hero-bg" src="${esc(img.src)}" alt="" fetchpriority="high">` : '';
   const text = `<div class="hero-text">
 ${badge ? `<span class="badge">${badge}</span><br>` : ''}
 ${b.eyebrow ? `<span class="eyebrow">${r.inline(b.eyebrow)}</span>` : ''}
@@ -130,8 +140,8 @@ ${b.eyebrow ? `<span class="eyebrow">${r.inline(b.eyebrow)}</span>` : ''}
 ${b.subheadline ? `<div class="lead">${r.rich(b.subheadline)}</div>` : ''}
 ${buttons(r.button(b.primary, 'primary', 'primary'), r.button(b.secondary, 'secondary', 'secondary'))}
 </div>`;
-  const grid = b.layout === 'centered' ? `<div class="hero-grid">${text}${media}</div>` : `<div class="hero-grid">${text}${media}</div>`;
-  return section(b, 'hero', wrap(grid), align);
+  const cls = `hero l-${layout}${b.flip ? ' flip' : ''}${backdrop ? ' has-img' : ''}${media ? '' : ' no-media'}`;
+  return section(b, cls, `${backdrop}${wrap(`<div class="hero-grid">${text}${media}</div>`)}`, align);
 }
 
 function text(b: BlockOf<'text'>, r: R): string {
@@ -177,7 +187,7 @@ function testimonial(b: BlockOf<'testimonial'>, r: R): string {
   const av = r.img(b.avatar);
   const logo = r.img(b.logo);
   const who = [b.name, b.role, b.company].some(Boolean)
-    ? `<div class="who">${av ? `<img class="av" src="${esc(av.src)}" alt="${esc(av.alt)}" loading="lazy">` : ''}<div><b>${r.inline(b.name)}</b><span>${[
+    ? `<div class="who${av ? '' : ' no-av'}">${av ? `<img class="av" src="${esc(av.src)}" alt="${esc(av.alt)}" loading="lazy">` : ''}<div><b>${r.inline(b.name)}</b><span>${[
         b.role,
         b.company,
       ]
@@ -243,7 +253,8 @@ function form(b: BlockOf<'form'>, r: R): string {
       const label = r.inline(f.label);
       const req = f.required ? ' required' : '';
       const ph = f.placeholder ? ` placeholder="${esc(r.plain(f.placeholder))}"` : '';
-      const pre = f.prefill ? r.plain(f.prefill) : '';
+      // a form box with nothing to prefill it with is simply empty, which is not a problem worth warning about
+      const pre = f.prefill ? r.plain(f.prefill, { report: false }) : '';
       const val = pre ? ` value="${esc(pre)}"` : '';
       const name = `name="${esc(f.key)}"`;
       if (f.type === 'checkbox') {
@@ -399,10 +410,30 @@ function section(b: Block, cls: string, inner: string, forceAlign?: 'left' | 'ce
   const align = b.align ?? forceAlign ?? 'left';
   const bg = b.bg && b.bg !== 'default' ? ` bg-${b.bg}` : '';
   const pad = b.pad ?? forcePad;
-  return `<section class="blk blk-${cls.split(' ')[0]} ${cls}${bg}${pad ? ` pad-${pad}` : ''} align-${align}" id="${esc(blockAnchor(b))}" data-b="${esc(b.id)}">${inner}</section>`;
+  // The section only carries `blk-<type>` plus modifiers. A bare `stats`, `steps`, `note`, `faq`… class would also match the
+  // rules for the elements inside it and style the whole section as if it were one of them (hero is the exception: its
+  // CSS hangs off `.hero` itself).
+  const [type, ...mods] = cls.split(' ');
+  const extra = type === 'hero' ? cls : mods.join(' ');
+  return `<section class="blk blk-${type}${extra ? ` ${extra}` : ''}${bg}${pad ? ` pad-${pad}` : ''} align-${align}" id="${esc(blockAnchor(b))}" data-b="${esc(b.id)}">${inner}</section>`;
 }
 
-export function renderBlock(b: Block, r: R): string {
+/** Sections that read as one run of content when they share a background, so the gap between them should not double up. */
+const FLOWING = new Set<Block['type']>(['text', 'features', 'checklist', 'steps', 'stats', 'faq', 'logos', 'image', 'video', 'html']);
+
+/** True when `b` follows `prev` on the same background, with nobody having asked for particular spacing. */
+export const joinsPrevious = (b: Block, prev: Block | undefined): boolean =>
+  !!prev && FLOWING.has(b.type) && FLOWING.has(prev.type) && (b.bg ?? 'default') === (prev.bg ?? 'default') && !b.pad && !prev.pad;
+
+const SECTION_OPEN = '<section class="blk ';
+
+export function renderBlock(b: Block, r: R, opts: { join?: boolean } = {}): string {
+  const html = renderBlockHtml(b, r);
+  // every block is wrapped by section(), so the opening tag is always where we expect it
+  return opts.join && html.startsWith(SECTION_OPEN) ? `${SECTION_OPEN}join ${html.slice(SECTION_OPEN.length)}` : html;
+}
+
+function renderBlockHtml(b: Block, r: R): string {
   switch (b.type) {
     case 'hero':
       return hero(b, r);

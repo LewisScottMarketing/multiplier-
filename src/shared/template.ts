@@ -215,17 +215,30 @@ export interface RenderOptions {
   onToken?: (r: TokenResult) => void;
 }
 
-/** Substitute tokens, returning a plain string. Template text is left exactly as written. */
+/**
+ * What to print for the template text that follows a substituted value. When the value already ends in a full stop
+ * ("Northwind Traders, Inc.") and the template's own text goes straight on with one ("…{{company}}."), the two would
+ * print as "Inc..", so the template's is dropped. An ellipsis is left alone.
+ */
+export function afterValue(value: string, next: string): string {
+  return /[^.\s]\.$/.test(value) && /^\.(?!\.)/.test(next) ? next.slice(1) : next;
+}
+
+/** Substitute tokens, returning a plain string. Template text is left as written, bar the doubled full stop above. */
 export function renderTemplate(tpl: string, ctx: Ctx, opts: RenderOptions = {}): string {
   if (!tpl) return '';
   const esc = opts.escape ?? ((s: string) => s);
   let out = '';
+  let last = '';
   for (const seg of parseTemplate(tpl)) {
-    if (seg.kind === 'text') out += seg.value;
-    else {
+    if (seg.kind === 'text') {
+      out += afterValue(last, seg.value);
+      last = '';
+    } else {
       const r = evalToken(seg, ctx);
       opts.onToken?.(r);
       out += esc(r.value);
+      last = r.value;
     }
   }
   return out;

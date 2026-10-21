@@ -1,5 +1,6 @@
 import { newBlock, newBlockId } from '@shared/blocks';
-import { PageSchema, type Block, type Page } from '@shared/schema';
+import { applyPreset, presetById, type StylePreset } from '@shared/presets';
+import { PageSchema, ThemeSchema, type Block, type Page } from '@shared/schema';
 import type { ExtractedDoc, PageImage, PageInfo, Run } from './extract';
 import type { Palette } from './raster';
 
@@ -595,13 +596,34 @@ function textBlock(heading: string | undefined, paras: Para[], notes: { shortene
 
 // ── The importer ────────────────────────────────────────────────────────────
 
+/**
+ * The look that suits the document: a dark document stays dark, serif type reads as editorial, anything else is clean.
+ * (A page that is dark only because its cover is the brand colour is not a dark document.)
+ */
+export function lookFor(bodyLines: Line[], palette: Palette): StylePreset {
+  let id = 'clean';
+  if (palette.dark && !palette.brandCover) id = 'midnight';
+  else {
+    let serif = 0;
+    let other = 0;
+    for (const l of bodyLines) {
+      for (const r of l.runs) {
+        if (r.family === 'serif') serif += r.text.length;
+        else other += r.text.length;
+      }
+    }
+    if (serif > other) id = 'editorial';
+  }
+  return presetById(id)!;
+}
+
 export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: ImportOptions): Promise<ImportResult> {
   const report: string[] = [];
   const allLines = buildLines(doc);
   const { kept, footer } = dropFurniture(allLines, doc.pages);
   const lines = kept;
 
-  const theme = { brand: palette.brand, font: 'inter' as const, radius: 'soft' as const };
+  let theme = ThemeSchema.parse({ brand: palette.brand });
   const base = (blocks: Block[], extra: Partial<Page> = {}): Page =>
     PageSchema.parse({
       theme,
@@ -637,6 +659,8 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
 
   const body = modeSize(lines);
   const bodyLines = lines.filter((l) => Math.abs(l.size - body) < 0.6);
+  const look = lookFor(bodyLines, palette);
+  theme = applyPreset(theme, look);
   const xs = new Map<number, number>();
   for (const l of bodyLines) xs.set(Math.round(l.x), (xs.get(Math.round(l.x)) ?? 0) + 1);
   const bodyX = [...xs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 40;
@@ -860,6 +884,7 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
       ? `Brand colour ${palette.brand} was picked from the PDF${palette.brandCover ? ', and the hero uses it as its background' : ''}.`
       : 'The PDF has no distinctive colour, so a default brand colour was used. Change it in Design.',
   );
+  report.push(`Styled “${look.name}”: ${look.blurb.charAt(0).toLowerCase()}${look.blurb.slice(1)} Try the other styles in Design.`);
   if (imagesPlaced)
     report.push(
       `${imagesPlaced} image${imagesPlaced === 1 ? '' : 's'} from the PDF ${imagesPlaced === 1 ? 'was' : 'were'} added to the page.`,

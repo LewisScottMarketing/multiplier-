@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { STANDARD_FIELDS } from '@shared/fields';
 import { lintCampaign } from '@shared/lint';
 import { CAMPAIGN_STATUSES, CampaignUpdateSchema, CampaignSettingsSchema, DocumentSchema, PageSchema } from '@shared/schema';
+import { TEMPLATES, buildTemplate, templateInfo } from '@shared/templates';
 import { randomToken } from '../lib/crypto';
+import { badRequest } from '../lib/errors';
 import { jsonBody, requireUser, type Env } from '../http';
 import {
   createCampaign,
@@ -27,10 +29,15 @@ export function campaignRoutes() {
 
   r.get('/', (c) => c.json({ campaigns: listCampaigns(c.get('app')) }));
 
+  /** The starter pages offered by "new campaign". (Registered before `/:id`, which would otherwise swallow it.) */
+  r.get('/templates', (c) => c.json({ templates: TEMPLATES.map(templateInfo) }));
+
   r.post('/', async (c) => {
     const app = c.get('app');
-    const body = await jsonBody(c, z.object({ name: z.string().trim().min(1).max(120) }));
-    const campaign = createCampaign(app, { name: body.name, page: starterPage(), source: { type: 'scratch' } });
+    const body = await jsonBody(c, z.object({ name: z.string().trim().min(1).max(120), template: z.string().max(40).optional() }));
+    const page = body.template ? buildTemplate(body.template) : starterPage();
+    if (!page) throw badRequest(`There is no template called “${body.template}”.`);
+    const campaign = createCampaign(app, { name: body.name, page, source: { type: 'scratch', template: body.template } });
     return c.json({ campaign }, 201);
   });
 

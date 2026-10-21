@@ -1,19 +1,56 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, FileText, FileUp, LayoutTemplate } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import type { TemplateInfo } from '@shared/templates';
 import { api } from '../api';
 import type { Campaign, SettingsResponse } from '../types';
-import { Alert, Button, Field, Input, Modal, useToast } from '../ui';
+import { Alert, Button, Field, Input, Modal, Spinner, useToast } from '../ui';
 
-type Mode = 'pdf' | 'blank';
+type Mode = 'pdf' | 'template';
+
+/** The width pages are laid out at inside a gallery thumbnail; the frame is then scaled down to fit its card. */
+const THUMB_WIDTH = 1280;
+
+/** A live, scaled-down view of a template's first screen. */
+function Thumb({ id }: { id: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [scale, setScale] = useState(0.25);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const fit = () => setScale(el.clientWidth / THUMB_WIDTH);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <span className="tpl-shot" ref={box} aria-hidden="true">
+      <iframe
+        src={`/preview/template/${id}`}
+        title=""
+        tabIndex={-1}
+        loading="lazy"
+        style={{ width: THUMB_WIDTH, height: THUMB_WIDTH * 0.64, transform: `scale(${scale})` }}
+      />
+    </span>
+  );
+}
 
 export function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const [mode, setMode] = useState<Mode>('pdf');
+  const [template, setTemplate] = useState('personal-pitch');
+  const templates = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => api.get<{ templates: TemplateInfo[] }>('/campaigns/templates'),
+    staleTime: Infinity,
+    enabled: mode === 'template',
+  });
   const [over, setOver] = useState(false);
   const [phase, setPhase] = useState<'choose' | 'working' | 'done'>('choose');
   const [name, setName] = useState('');
@@ -45,10 +82,14 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const createBlank = async () => {
+  const createFromTemplate = async () => {
     setPhase('working');
     try {
-      const r = await api.post<{ campaign: Campaign }>('/campaigns', { name: name.trim() || 'Untitled campaign' });
+      const chosen = templates.data?.templates.find((t) => t.id === template);
+      const r = await api.post<{ campaign: Campaign }>('/campaigns', {
+        name: name.trim() || chosen?.name || 'Untitled campaign',
+        template,
+      });
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       nav(`/campaigns/${r.campaign.id}/page`);
       onClose();
@@ -60,7 +101,7 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
   if (phase === 'working') {
     return (
-      <Modal title={mode === 'pdf' ? 'Building your page…' : 'Creating…'} onClose={() => undefined}>
+      <Modal title={mode === 'pdf' ? 'Building your page…' : 'Creating your campaign…'} onClose={() => undefined}>
         <div className="col" style={{ padding: '18px 0 26px', gap: 16 }}>
           {mode === 'pdf' ? (
             <>
@@ -138,7 +179,30 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="New campaign" onClose={onClose} description="Start from a PDF you already have, or build a page from scratch.">
+    <Modal
+      title="New campaign"
+      onClose={onClose}
+      size={mode === 'template' ? 'xwide' : undefined}
+      description="Start from a PDF you already have, or from a ready-made page."
+      footer={
+        mode === 'template' ? (
+          // the choice is made above, so the name and the button stay in view however far the gallery is scrolled
+          <>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Campaign name (optional)"
+              aria-label="Campaign name"
+              style={{ maxWidth: 340 }}
+              onKeyDown={(e) => e.key === 'Enter' && templates.data && void createFromTemplate()}
+            />
+            <Button variant="primary" onClick={createFromTemplate} disabled={!templates.data}>
+              Use this template <ArrowRight size={15} />
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
       <div className="option-cards">
         <button type="button" className={`option-card ${mode === 'pdf' ? 'on' : ''}`} onClick={() => setMode('pdf')}>
           <b>
@@ -146,11 +210,11 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
           </b>
           <span>We build the landing page from it, and each prospect gets their own edited copy of the PDF.</span>
         </button>
-        <button type="button" className={`option-card ${mode === 'blank' ? 'on' : ''}`} onClick={() => setMode('blank')}>
+        <button type="button" className={`option-card ${mode === 'template' ? 'on' : ''}`} onClick={() => setMode('template')}>
           <b>
-            <LayoutTemplate size={17} /> From scratch
+            <LayoutTemplate size={17} /> From a template
           </b>
-          <span>Start with a ready-made personalised page and edit the blocks.</span>
+          <span>Pick a designed, personalised page, then swap in your own words and numbers.</span>
         </button>
       </div>
       {error ? (
@@ -158,12 +222,39 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
           <Alert tone="bad">{error}</Alert>
         </div>
       ) : null}
-      <Field label="Campaign name" hint={mode === 'pdf' ? 'Optional. We’ll use the PDF’s title.' : undefined}>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Q4 outbound — Playbook" autoFocus />
-      </Field>
-      <div style={{ height: 14 }} />
+      {mode === 'template' ? (
+        <div className="tpl-grid" role="radiogroup" aria-label="Templates">
+          {templates.isLoading ? <Spinner /> : null}
+          {templates.isError ? <Alert tone="bad">The templates could not be loaded.</Alert> : null}
+          {templates.data?.templates.map((t) => (
+            <div
+              key={t.id}
+              className={`tpl ${template === t.id ? 'on' : ''}`}
+              role="radio"
+              aria-checked={template === t.id}
+              tabIndex={0}
+              onClick={() => setTemplate(t.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setTemplate(t.id);
+                }
+              }}
+            >
+              <Thumb id={t.id} />
+              <span className="tpl-name">{t.name}</span>
+              <span className="tpl-blurb">{t.blurb}</span>
+              <span className="tpl-use">{t.use}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {mode === 'pdf' ? (
         <>
+          <Field label="Campaign name" hint="Optional. We’ll use the PDF’s title.">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Q4 outbound — Playbook" autoFocus />
+          </Field>
+          <div style={{ height: 14 }} />
           {aiOn ? (
             <label className="check" style={{ marginBottom: 12 }}>
               <input type="checkbox" checked={polish} onChange={(e) => setPolish(e.target.checked)} />
@@ -211,13 +302,7 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
             />
           </div>
         </>
-      ) : (
-        <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <Button variant="primary" onClick={createBlank}>
-            Create campaign <ArrowRight size={15} />
-          </Button>
-        </div>
-      )}
+      ) : null}
     </Modal>
   );
 }

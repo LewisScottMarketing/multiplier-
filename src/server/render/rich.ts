@@ -1,4 +1,4 @@
-import { escapeHtml, evalToken, parseTemplate, safeUrl, type Ctx, type Segment, type TokenResult } from '@shared/template';
+import { afterValue, escapeHtml, evalToken, parseTemplate, safeUrl, type Ctx, type Segment, type TokenResult } from '@shared/template';
 
 /**
  * "Markdown-lite" + merge tokens → safe HTML.
@@ -50,12 +50,14 @@ function makeExpanders(p: Protected, ctx: Ctx, opts: RichOptions) {
   const leaf = (s: string): string => {
     let out = '';
     let last = 0;
+    let prev = '';
     for (const m of s.matchAll(PLACEHOLDER_RE)) {
-      out += escapeHtml(s.slice(last, m.index));
-      out += escapeHtml(value(Number(m[1])));
+      out += escapeHtml(afterValue(prev, s.slice(last, m.index)));
+      prev = value(Number(m[1]));
+      out += escapeHtml(prev);
       last = (m.index ?? 0) + m[0].length;
     }
-    return out + escapeHtml(s.slice(last));
+    return out + escapeHtml(afterValue(prev, s.slice(last)));
   };
   /** URL part of a link: a lone token is a whole URL, otherwise values are percent-encoded. */
   const url = (s: string): string => {
@@ -132,12 +134,16 @@ export function renderInline(tpl: string | undefined, ctx: Ctx, opts: RichOption
 export function renderPlain(tpl: string | undefined, ctx: Ctx, opts: RichOptions = {}): string {
   if (!tpl) return '';
   let out = '';
+  let prev = '';
   for (const seg of parseTemplate(tpl)) {
-    if (seg.kind === 'text') out += seg.value;
-    else {
+    if (seg.kind === 'text') {
+      out += afterValue(prev, seg.value);
+      prev = '';
+    } else {
       const r = evalToken(seg, ctx);
       opts.onToken?.(r);
       out += r.value;
+      prev = r.value;
     }
   }
   return out.replace(/\s+/g, ' ').trim();
