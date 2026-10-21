@@ -42,6 +42,7 @@ Please don't open a public issue for a security problem. Email the maintainers (
 - **A personalised link is a password for that page.** Anyone who has it can open it, forward it and download the PDF. Don't put anything in personalised content that you wouldn't be willing to have forwarded.
 - **Editing a PDF paints over the original text; it doesn't remove it.** The replaced text is still in the file underneath, so don't use personalisation to hide anything confidential.
 - **What you author is trusted.** Custom CSS, custom HTML (sanitised, but yours), and the workspace's tracking scripts run on every public page and can see everything on it. Only paste scripts you trust.
+- **A button whose link is just a merge field goes wherever that field says.** `{{website}}` as a button link is how you send each person to their own destination, and it means the destination is whatever your data (Clay, a CSV) holds. Links are still limited to http(s), mailto and tel, but only map fields you trust to links.
 - **One owner account.** There are no roles: anyone with the password has full access.
 - **Rate limits are per IP, in memory and per process.** They stop casual abuse, not a distributed flood; put a CDN or WAF in front of the links domain if you expect hostile traffic.
 
