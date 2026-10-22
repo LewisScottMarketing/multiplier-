@@ -52,6 +52,8 @@ export interface AiCall {
   timeoutMs?: number;
   /** Pictures to look at (pages of a document, say). Each is labelled in the request. */
   images?: AiImage[];
+  /** How many times a failed request is tried again (default one). A call that is slow to answer sets 0, so the wait is bounded. */
+  retries?: number;
   /**
    * A person clicked something and is waiting for this (the "Try it" button, "Write a version for…", an import).
    * It skips the circuit breaker, so fixing a key or adding credit can be checked straight away, and a success closes it.
@@ -97,7 +99,7 @@ export class AnthropicBackend implements AiBackend {
             format: { type: 'json_schema', schema: call.schema },
           },
         },
-        { timeout: call.timeoutMs },
+        { timeout: call.timeoutMs, ...(call.retries === undefined ? {} : { maxRetries: call.retries }) },
       );
       if (res.stop_reason === 'refusal') return { ok: false, reason: 'refused', message: 'The model declined this request.' };
       if (res.stop_reason === 'max_tokens') return { ok: false, reason: 'bad_output', message: 'The reply was cut off.' };

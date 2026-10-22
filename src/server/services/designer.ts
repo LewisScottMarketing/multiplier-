@@ -131,6 +131,8 @@ export async function designPageFromPdf(app: AppContext, req: DesignRequest): Pr
     maxTokens: 16_000,
     effort: 'medium',
     timeoutMs: Math.max(app.config.aiTimeoutMs, DESIGN_TIMEOUT_MS),
+    // someone is waiting: one attempt, so a slow answer costs the timeout once, not twice
+    retries: 0,
     interactive: true,
   });
   if (!res.ok) return fail(res.message.replace(/\.$/, ''));

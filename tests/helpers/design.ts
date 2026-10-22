@@ -8,7 +8,6 @@ export const planBlock = (b: Partial<PlanBlock> & Pick<PlanBlock, 'type'>): Plan
   items: null,
   image: null,
   side: null,
-  columns: null,
   rows: null,
   header_row: null,
   name: null,
@@ -88,5 +87,57 @@ export function playbookPlan(over: Partial<DesignPlan> = {}): DesignPlan {
     ],
     notes: ['The reply-rate chart is kept beside the list of what the best teams do.'],
     ...over,
+  };
+}
+
+/**
+ * A plan as the model sends it: the shape the schema asks for, with every field present and the ones a block doesn't use
+ * left empty ("" for text, [] for lists, 0 for numbers) instead of null.
+ */
+export function wire(plan: DesignPlan) {
+  const text = (v: string | null) => v ?? '';
+  const image = (i: PlanBlock['image']) => ({
+    ref: text(i?.ref ?? null),
+    page: i?.page ?? 0,
+    box: i?.box ?? [],
+    alt: text(i?.alt ?? null),
+  });
+  return {
+    style: plan.style,
+    hero: {
+      headline: plan.hero.headline,
+      subheadline: text(plan.hero.subheadline),
+      eyebrow: text(plan.hero.eyebrow),
+      layout: plan.hero.layout,
+      image: image(plan.hero.image),
+      bg: plan.hero.bg ?? 'default',
+    },
+    logo_text: text(plan.logo_text),
+    seo_title: text(plan.seo_title),
+    seo_description: text(plan.seo_description),
+    blocks: plan.blocks.map((b) => ({
+      type: b.type,
+      heading: text(b.heading),
+      eyebrow: text(b.eyebrow),
+      text: text(b.text),
+      items: (b.items ?? []).map((it) => ({
+        title: text(it.title),
+        text: text(it.text),
+        value: text(it.value),
+        label: text(it.label),
+        icon: text(it.icon),
+      })),
+      image: image(b.image),
+      side: b.side ?? 'right',
+      rows: b.rows ?? [],
+      header_row: b.header_row ?? true,
+      name: text(b.name),
+      role: text(b.role),
+      company: text(b.company),
+      attribution: text(b.attribution),
+      button: text(b.button),
+      bg: b.bg ?? 'default',
+    })),
+    notes: plan.notes,
   };
 }

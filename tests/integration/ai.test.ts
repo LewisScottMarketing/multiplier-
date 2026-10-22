@@ -5,7 +5,7 @@ import { newBlock } from '../../src/shared/blocks';
 import { PageSchema } from '../../src/shared/schema';
 import { setAiBackend, type AiBackend, type AiCall, type AiResult } from '../../src/server/services/ai';
 import { createTestApp, type TestApp } from '../helpers/app';
-import { item, planBlock, playbookPlan } from '../helpers/design';
+import { item, planBlock, playbookPlan, wire } from '../helpers/design';
 import { bearer, createApiKey, createLiveCampaign, demoPage, publicHeaders } from '../helpers/fixtures';
 
 type Call = AiCall & { model: string; timeoutMs: number };
@@ -478,7 +478,7 @@ describe('importing a PDF', () => {
 
   describe('when Claude designs the page', () => {
     it('shows it every page with the text, and builds the page from its plan', async () => {
-      const { calls, backend } = scripted({ ok: true, data: playbookPlan() });
+      const { calls, backend } = scripted({ ok: true, data: wire(playbookPlan()) });
       setAiBackend(t.ctx, backend);
       const r = await upload();
       expect(r.status).toBe(201);
@@ -487,6 +487,7 @@ describe('importing a PDF', () => {
       const call = calls[0]!;
       expect(call.label).toBe('pdf-design');
       expect(call.tier).toBe('smart');
+      expect(call.retries).toBe(0); // someone is waiting, so one attempt
       expect(call.model).toBe(t.ctx.config.aiModelSmart);
       expect(call.images).toHaveLength(3);
       expect(call.images!.map((i) => i.label)).toEqual(['Page 1:', 'Page 2:', 'Page 3:']);
@@ -524,7 +525,7 @@ describe('importing a PDF', () => {
           items: [item({ value: '312%', label: 'growth in pipeline' }), item({ value: '47%', label: 'shorter sales cycles' })],
         }),
       );
-      setAiBackend(t.ctx, scripted({ ok: true, data: plan }).backend);
+      setAiBackend(t.ctx, scripted({ ok: true, data: wire(plan) }).backend);
       const r = await upload();
       expect(r.status).toBe(201);
       const rendered = JSON.stringify(r.body.campaign.page);
@@ -563,7 +564,7 @@ describe('importing a PDF', () => {
           }),
         ],
       });
-      setAiBackend(t.ctx, scripted({ ok: true, data: plan }).backend);
+      setAiBackend(t.ctx, scripted({ ok: true, data: wire(plan) }).backend);
       const r = await upload();
       expect(r.status).toBe(201);
       expect(r.body.report.join(' ')).toMatch(/Claude couldn’t design this page \(its wording strayed too far from the document\)/);
@@ -583,7 +584,7 @@ describe('importing a PDF', () => {
     });
 
     it('is not asked at all on request', async () => {
-      const { calls, backend } = scripted({ ok: true, data: playbookPlan() });
+      const { calls, backend } = scripted({ ok: true, data: wire(playbookPlan()) });
       setAiBackend(t.ctx, backend);
       const r = await upload(false);
       expect(r.status).toBe(201);

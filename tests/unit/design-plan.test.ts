@@ -14,11 +14,12 @@ import {
   readPlan,
   type AssembleOptions,
   type DesignInput,
+  type DesignPlan,
   type PlanImage,
 } from '../../src/server/pdf/design-plan';
 import { choosePages, figuresOf, pictureWidth, tokenNames } from '../../src/server/pdf/design-input';
 import type { ExtractedDoc } from '../../src/server/pdf/extract';
-import { item, planBlock, playbookPlan } from '../helpers/design';
+import { item, planBlock, playbookPlan, wire } from '../helpers/design';
 
 // text the playbook plan's words come from, long enough for the document checks to apply
 const SOURCE = {
@@ -79,6 +80,14 @@ describe('the plan the model must return', () => {
     expect(objects).toBeGreaterThan(4);
   });
 
+  it('has no union types and no optional fields, since structured outputs allow only 16 of the first and 24 of the second', () => {
+    let unions = 0;
+    walk(DESIGN_SCHEMA, (n) => {
+      if ('anyOf' in n || Array.isArray(n.type)) unions++;
+    });
+    expect(unions).toBe(0);
+  });
+
   it('offers exactly the blocks and styles we can build', () => {
     const props = (DESIGN_SCHEMA.properties.blocks as { items: { properties: { type: { enum: string[] } } } }).items.properties;
     expect(props.type.enum).toEqual([...PLAN_BLOCK_TYPES]);
@@ -95,6 +104,15 @@ describe('the plan the model must return', () => {
 });
 
 describe('reading the reply', () => {
+  it('reads a reply that leaves unused fields empty, as the schema asks, the same as one that uses null', () => {
+    const plan = readPlan(wire(playbookPlan()))!;
+    expect(plan.blocks[0].image).toBeNull(); // no picture named
+    expect(plan.hero.image).toBeNull();
+    expect(plan.blocks[2].image).toEqual({ ref: 'P2-I1', page: null, box: null, alt: 'A chart of reply rates' });
+    const bare = (p: DesignPlan) => JSON.parse(JSON.stringify(assemblePage(p, options()).page), (k, v) => (k === 'id' ? undefined : v));
+    expect(bare(plan)).toEqual(bare(playbookPlan()));
+  });
+
   it('turns a good reply into a plan', () => {
     const plan = readPlan(JSON.parse(JSON.stringify(playbookPlan())));
     expect(plan?.hero.headline).toBe('The 2026 Outbound Pipeline Playbook');
@@ -121,16 +139,18 @@ describe('reading the reply', () => {
           rows: 'no',
           side: 'up',
           bg: 'neon',
-          image: { box: [0, 0, 100, 100] },
+          image: { page: 2, box: [0, 0, 100, 100] },
         },
+        { type: 'text', text: 'A box with no page is no picture', image: { box: [0, 0, 100, 100] } },
       ],
       notes: ['one', 2, '  '],
     })!;
-    expect(plan.blocks).toHaveLength(1);
+    expect(plan.blocks).toHaveLength(2);
+    expect(plan.blocks[1]!.image).toBeNull();
     expect(plan.blocks[0]).toMatchObject({ type: 'text', heading: null, text: 'Fine', side: null, bg: null, rows: null });
     expect(plan.blocks[0]!.items).toEqual([{ title: 'A', text: null, value: null, label: null, icon: null }]);
-    expect(plan.blocks[0]!.image?.box).toEqual([0, 0, 100, 100]);
-    expect(plan.hero.image).toMatchObject({ ref: null, box: null, page: null });
+    expect(plan.blocks[0]!.image).toMatchObject({ page: 2, box: [0, 0, 100, 100] });
+    expect(plan.hero.image).toBeNull(); // a ref that isn't text, a box of three numbers and a page that isn't a number name nothing
     expect(plan.style).toBe('clean');
     expect(plan.notes).toEqual(['one']);
   });
@@ -195,6 +215,8 @@ describe('building a page from a plan', () => {
     expect(by('split')).toMatchObject({ side: 'right', image: { src: 'ast_chart1', alt: 'A chart of reply rates' } });
     expect(by('split').body).toContain('- Lead with a specific insight');
     expect(by('testimonial')).toMatchObject({ name: 'Jordan Lee', role: 'VP Sales', company: 'Northwind' });
+    // set as a quotation, once, whether or not the plan already had the marks
+    expect(by('testimonial').quote).toMatch(/^“We stopped sending PDFs.*quarter\.”$/);
     expect(by('steps').items).toHaveLength(4);
     expect(by('cta')).toMatchObject({
       anchor: 'contact',

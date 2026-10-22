@@ -101,6 +101,13 @@ describe('talking to Claude', () => {
     expect(none.seen[0].body.messages).toEqual([{ role: 'user', content: 'hello' }]);
   });
 
+  it('tries a failed request once more by default, and not at all when the call says so', async () => {
+    const down = () => network({ status: 500, body: { type: 'error', error: { type: 'api_error', message: 'oops' }, request_id: 'r' } });
+    const none = down();
+    expect(await new AnthropicBackend('k', { fetch: none.fetchImpl }).complete({ ...call(), retries: 0 })).toMatchObject({ ok: false });
+    expect(none.seen).toHaveLength(1);
+  });
+
   it('reads the answer by type, even when thinking comes first', async () => {
     const n = network({
       body: message([

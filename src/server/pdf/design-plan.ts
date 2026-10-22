@@ -60,7 +60,6 @@ export interface PlanBlock {
   items: PlanItem[] | null;
   image: PlanImage | null;
   side: 'left' | 'right' | null;
-  columns: number | null;
   rows: string[][] | null;
   header_row: boolean | null;
   name: string | null;
@@ -90,8 +89,11 @@ export interface DesignPlan {
 
 // ── The JSON schema the reply must follow (structured outputs: every object closed, every property required) ──
 
-const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: 'null' }] });
+// Structured outputs allow only 16 properties that use a union (`anyOf`, or "null" among the types) in a whole schema, and
+// a block has more fields than that which a given type doesn't use. So nothing here is nullable: every field is required,
+// and one a block doesn't use is left empty ("" for text, [] for lists, 0 for a number). `readPlan` reads empty as unset.
 const str = { type: 'string' };
+const int = { type: 'integer' };
 const object = (properties: Record<string, unknown>) => ({
   type: 'object',
   additionalProperties: false,
@@ -100,47 +102,39 @@ const object = (properties: Record<string, unknown>) => ({
 });
 const oneOf = (values: readonly string[]) => ({ type: 'string', enum: [...values] });
 
-const imageSchema = nullable(
-  object({
-    ref: nullable(str),
-    page: nullable({ type: 'integer' }),
-    box: nullable({ type: 'array', items: { type: 'integer' } }),
-    alt: nullable(str),
-  }),
-);
-const itemSchema = object({ title: nullable(str), text: nullable(str), value: nullable(str), label: nullable(str), icon: nullable(str) });
+const imageSchema = object({ ref: str, page: int, box: { type: 'array', items: int }, alt: str });
+const itemSchema = object({ title: str, text: str, value: str, label: str, icon: str });
 const blockSchema = object({
   type: oneOf(PLAN_BLOCK_TYPES),
-  heading: nullable(str),
-  eyebrow: nullable(str),
-  text: nullable(str),
-  items: nullable({ type: 'array', items: itemSchema }),
+  heading: str,
+  eyebrow: str,
+  text: str,
+  items: { type: 'array', items: itemSchema },
   image: imageSchema,
-  side: nullable(oneOf(['left', 'right'])),
-  columns: nullable({ type: 'integer' }),
-  rows: nullable({ type: 'array', items: { type: 'array', items: str } }),
-  header_row: nullable({ type: 'boolean' }),
-  name: nullable(str),
-  role: nullable(str),
-  company: nullable(str),
-  attribution: nullable(str),
-  button: nullable(str),
-  bg: nullable(oneOf(PLAN_BACKGROUNDS)),
+  side: oneOf(['left', 'right']),
+  rows: { type: 'array', items: { type: 'array', items: str } },
+  header_row: { type: 'boolean' },
+  name: str,
+  role: str,
+  company: str,
+  attribution: str,
+  button: str,
+  bg: oneOf(PLAN_BACKGROUNDS),
 });
 
 export const DESIGN_SCHEMA = object({
   style: oneOf(STYLE_PRESETS.map((p) => p.id)),
   hero: object({
     headline: str,
-    subheadline: nullable(str),
-    eyebrow: nullable(str),
+    subheadline: str,
+    eyebrow: str,
     layout: oneOf(HERO_LAYOUTS),
     image: imageSchema,
-    bg: nullable(oneOf(PLAN_BACKGROUNDS)),
+    bg: oneOf(PLAN_BACKGROUNDS),
   }),
-  logo_text: nullable(str),
-  seo_title: nullable(str),
-  seo_description: nullable(str),
+  logo_text: str,
+  seo_title: str,
+  seo_description: str,
   blocks: { type: 'array', items: blockSchema },
   notes: { type: 'array', items: str },
 });
@@ -151,7 +145,7 @@ export const DESIGN_SYSTEM = `You are a senior web designer and conversion copyw
 
 You receive:
 - Pictures of the PDF's pages, in order. They are the truth about what the document says and how it is laid out.
-- <text>: what a machine extracted, page by page, with the font size of each line ([28b] is 28 pt bold). Use it for exact wording and spelling. It can be in the wrong order where there are columns, scrambled inside tables and sidebars, split by hyphens, and missing wherever text is drawn as graphics. When it disagrees with the pictures, trust the pictures.
+- <text>: what a machine extracted, page by page, with the font size of each line ([28b] is 28 pt bold). Use it for exact wording and spelling. It can be in the wrong order where there are columns or sidebars, split by hyphens, and missing wherever text is drawn as graphics. A table the reader recognised appears one row per line, cells separated by " | ". When it disagrees with the pictures, trust the pictures.
 - <figures>: pictures embedded in the PDF, with where each sits on its page.
 
 How to work:
@@ -180,7 +174,7 @@ Rules:
 - Keep merge fields such as {{first_name}} exactly as they appear in the document, and add none of your own.
 - Aim for six to twelve blocks before the cta, with variety. Headings are short, specific and in sentence case. Headlines are at most 90 characters, sub-headlines at most 220.
 - In text and split, text may use paragraphs separated by a blank line, "- " bullet lines and **bold**. Everywhere else it is plain text. No HTML, no markdown headings.
-- Leave bg empty unless one section should stand out; use brand or dark for at most two blocks.
+- Every field of every block is required. Leave one a block doesn't use empty: "" for text, [] for lists, 0 for numbers; for no picture, ref "", page 0, box [] and alt "". side only matters for split blocks. bg is "default" unless one section should stand out; use brand or dark for at most two blocks.
 - For a picture, name an embedded figure by its id in ref, or give the page and a box (left, top, right, bottom on a 0-1000 grid of that page's picture) for something that is drawn rather than embedded, such as a chart or screenshot. Use pictures that add information, at most four, and never crop text.
 - Icons come from: ${ICON_NAMES.join(', ')}.
 - Write in the document's language.
@@ -279,16 +273,18 @@ const asInt = (v: unknown): number | null => (typeof v === 'number' && Number.is
 const oneIn = <T extends string>(v: unknown, allowed: readonly T[]): T | null =>
   typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : null;
 
+/** A picture the plan asks for, or null when it names none (an empty ref, and no page with a box). */
 function readImage(v: unknown): PlanImage | null {
   if (!v || typeof v !== 'object') return null;
   const o = v as Record<string, unknown>;
   const box = Array.isArray(o.box) ? o.box.map(asInt) : null;
-  return {
+  const image: PlanImage = {
     ref: asString(o.ref),
-    page: asInt(o.page),
+    page: asInt(o.page) || null,
     box: box && box.length === 4 && box.every((n) => n !== null) ? (box as number[]) : null,
     alt: asString(o.alt),
   };
+  return image.ref || (image.page && image.box) ? image : null;
 }
 
 /** The model's reply as a plan, or null when it isn't one. Nothing here is trusted yet: see `assemblePage`. */
@@ -321,7 +317,6 @@ export function readPlan(raw: unknown): DesignPlan | null {
         : null,
       image: readImage(x.image),
       side: oneIn(x.side, ['left', 'right'] as const),
-      columns: asInt(x.columns),
       rows: Array.isArray(x.rows)
         ? x.rows.filter(Array.isArray).map((r) => (r as unknown[]).map((c) => (typeof c === 'string' ? c : '')))
         : null,
@@ -449,7 +444,7 @@ const allStrings = (b: Block): string[] => {
     align: _al,
     image: _i,
     side: _s,
-    columns: _c,
+
     ...rest
   } = b as Block & Record<string, unknown>;
   walk(rest);
@@ -566,7 +561,9 @@ export function assemblePage(plan: DesignPlan, opts: AssembleOptions): Assembled
         break;
       }
       case 'testimonial': {
-        const quote = line(pb.text, 800);
+        const said = line(pb.text, 790);
+        // a quotation reads as one with its marks, as the importer and the starter pages set it
+        const quote = said && !/^[“"‘'«]/.test(said) ? `“${said.replace(/[”"]+$/, '')}”` : said;
         if (quote)
           block = newBlock('testimonial', {
             quote,

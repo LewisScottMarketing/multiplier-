@@ -262,8 +262,9 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
               <span>
                 Let Claude design the page{' '}
                 <span className="muted">
-                  (it looks at every page and lays the content out with the best-fitting blocks, which takes up to a minute and uses a
-                  little of your Claude credit. If anything looks off, the standard import is used instead)
+                  (it looks at every page and lays the content out with the best-fitting blocks. This takes up to a minute and uses more of
+                  your Claude credit than the other AI features, since it reads the pages as pictures. If anything looks off, the standard
+                  import is used instead)
                 </span>
               </span>
             </label>
