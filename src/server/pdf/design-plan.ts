@@ -112,7 +112,7 @@ const blockSchema = object({
   items: { type: 'array', items: itemSchema },
   image: imageSchema,
   side: oneOf(['left', 'right']),
-  rows: { type: 'array', items: { type: 'array', items: str } },
+  rows: { type: 'array', items: str },
   header_row: { type: 'boolean' },
   name: str,
   role: str,
@@ -160,7 +160,7 @@ How to work:
    - stats: two to four headline numbers with a short label each. Copy the figure exactly as written.
    - testimonial: a customer quote (text) with name, role and company.
    - callout: one key statement set large: a pull quote, or a slide that is a single sentence.
-   - table: a table from the document, cell for cell. At most 8 columns. The first row is the header.
+   - table: a table from the document, cell for cell, in rows: one string per row, its cells separated by " | ". At most 8 columns. The first row is the header.
    - image: a chart or diagram shown on its own, with a caption in text.
    - faq: questions and answers, in title and text.
    - cta: the closing call to action: a heading, one sentence of text and a button label. End with exactly one.
@@ -317,8 +317,17 @@ export function readPlan(raw: unknown): DesignPlan | null {
         : null,
       image: readImage(x.image),
       side: oneIn(x.side, ['left', 'right'] as const),
+      // one string a row, cells apart by " | " (how the text we send shows a table); a list of cells is accepted too
       rows: Array.isArray(x.rows)
-        ? x.rows.filter(Array.isArray).map((r) => (r as unknown[]).map((c) => (typeof c === 'string' ? c : '')))
+        ? x.rows
+            .map((r) =>
+              Array.isArray(r)
+                ? r.map((c) => (typeof c === 'string' ? c : ''))
+                : typeof r === 'string'
+                  ? r.split('|').map((c) => c.trim())
+                  : null,
+            )
+            .filter((r): r is string[] => !!r && r.some(Boolean))
         : null,
       header_row: typeof x.header_row === 'boolean' ? x.header_row : null,
       name: asString(x.name),

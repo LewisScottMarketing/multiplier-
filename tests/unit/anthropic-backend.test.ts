@@ -115,7 +115,11 @@ describe('talking to Claude', () => {
         { type: 'text', text: '{"opening":"Hi Jane"}' },
       ]),
     });
-    expect(await new AnthropicBackend('k', { fetch: n.fetchImpl }).complete(call())).toEqual({ ok: true, data: { opening: 'Hi Jane' } });
+    expect(await new AnthropicBackend('k', { fetch: n.fetchImpl }).complete(call())).toEqual({
+      ok: true,
+      data: { opening: 'Hi Jane' },
+      usage: { input_tokens: 10, output_tokens: 5 }, // what the API reported, so cost can be seen
+    });
   });
 
   it('treats a refusal, a cut-off and silence as failures with the reason', async () => {

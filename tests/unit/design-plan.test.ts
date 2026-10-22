@@ -234,6 +234,37 @@ describe('building a page from a plan', () => {
     expect(new Set(bgs).size).toBeGreaterThan(1);
   });
 
+  it('builds a table cell for cell, and reads rows sent as "a | b" strings the same as lists of cells', () => {
+    const rows = [
+      ['Measure', 'Result'],
+      ['Replies', '3.4x'],
+      ['Sales cycles', '47%'],
+      ['Pipeline per rep', '$1.2M'],
+    ];
+    const plan = playbookPlan();
+    plan.blocks.splice(2, 0, planBlock({ type: 'table', heading: 'The numbers', rows, header_row: true }));
+    const sent = wire(plan);
+    expect(sent.blocks[2]!.rows).toEqual(['Measure | Result', 'Replies | 3.4x', 'Sales cycles | 47%', 'Pipeline per rep | $1.2M']);
+    for (const made of [assemblePage(readPlan(sent)!, options()), assemblePage(plan, options())]) {
+      expect(made.page.blocks.find((b) => b.type === 'table')).toMatchObject({ heading: 'The numbers', header: true, rows });
+    }
+    // a made-up figure in a cell keeps the table off the page
+    const invented = playbookPlan();
+    invented.blocks.splice(
+      2,
+      0,
+      planBlock({
+        type: 'table',
+        rows: [
+          ['Measure', 'Result'],
+          ['Replies', '9.9x'],
+          ['Cycles', '88%'],
+        ],
+      }),
+    );
+    expect(assemblePage(invented, options()).page.blocks.some((b) => b.type === 'table')).toBe(false);
+  });
+
   it('turns blocks that cannot stand on their own into plain text, or drops them', () => {
     const plan = playbookPlan();
     plan.blocks = [

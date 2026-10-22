@@ -23,7 +23,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"web/src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" \"scripts/**/*.{ts,mjs}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"web/src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" \"scripts/**/*.{ts,mjs}\"",
     "dev:fake-ai": "node --disable-warning=ExperimentalWarning --import tsx scripts/dev-fake-ai.ts",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "try:design": "node --disable-warning=ExperimentalWarning --import tsx scripts/try-design.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.137.0",

@@ -27,7 +27,12 @@ import { getProspect, setAiValues, aiFieldValue, contextFor, type Prospect } fro
 // ── Backend ─────────────────────────────────────────────────────────────────
 
 export type AiFailure = 'refused' | 'timeout' | 'rate_limited' | 'auth' | 'config' | 'unavailable' | 'bad_output';
-export type AiResult = { ok: true; data: unknown } | { ok: false; reason: AiFailure; message: string };
+/** What a request used, as the API reports it. */
+export interface AiUsage {
+  input_tokens: number;
+  output_tokens: number;
+}
+export type AiResult = { ok: true; data: unknown; usage?: AiUsage } | { ok: false; reason: AiFailure; message: string };
 
 /** A picture the model should look at, sent ahead of the text of the request. */
 export interface AiImage {
@@ -106,7 +111,11 @@ export class AnthropicBackend implements AiBackend {
       // thinking blocks may come first: read the answer by type, never by position
       const block = res.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
       if (!block) return { ok: false, reason: 'bad_output', message: 'The reply had no text.' };
-      return { ok: true, data: JSON.parse(block.text) as unknown };
+      return {
+        ok: true,
+        data: JSON.parse(block.text) as unknown,
+        usage: { input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens },
+      };
     } catch (e) {
       return classify(e);
     }
@@ -274,8 +283,12 @@ export async function callAi(ctx: AppContext, call: AiCall): Promise<AiResult> {
   if (!done) return { ok: false, reason: 'unavailable', message: 'AI is busy right now.' };
   try {
     const model = call.tier === 'fast' ? ctx.config.aiModelFast : ctx.config.aiModelSmart;
+    const started = Date.now();
     const res = await r.backend.complete({ ...call, model, timeoutMs: call.timeoutMs ?? ctx.config.aiTimeoutMs });
     record(ctx, r, call.label, res);
+    // page work is occasional, so its cost is worth a line in the log; a line per prospect would only be noise
+    if (res.ok && res.usage)
+      ctx.log[call.tier === 'smart' ? 'info' : 'debug']('ai call', { label: call.label, model, ms: Date.now() - started, ...res.usage });
     return res;
   } catch (err) {
     ctx.log.error('ai backend threw', { err, label: call.label });

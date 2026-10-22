@@ -53,7 +53,7 @@ src/
     lib/               crypto, safe-fetch (SSRF guard), storage, rate limiter, logging
     db/                node:sqlite wrapper and migrations
 web/src/             Dashboard: pages, builder, PDF studio, charts, UI kit (plain CSS, no framework)
-scripts/             seed, smoke test, screenshots, fake-AI dev server
+scripts/             seed, smoke test, screenshots, fake-AI dev server, try-design (the designer against the real API, with its cost)
 tests/               unit + integration (the app is exercised in-process through `app.request`)
 ```
 

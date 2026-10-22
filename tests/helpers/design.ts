@@ -129,7 +129,7 @@ export function wire(plan: DesignPlan) {
       })),
       image: image(b.image),
       side: b.side ?? 'right',
-      rows: b.rows ?? [],
+      rows: (b.rows ?? []).map((r) => r.join(' | ')),
       header_row: b.header_row ?? true,
       name: text(b.name),
       role: text(b.role),
