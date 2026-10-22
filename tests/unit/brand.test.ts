@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyBrand, brandLook, brandNotes, presetOf } from '../../src/shared/brand';
-import { contrast } from '../../src/shared/color';
+import { contrast, isDark, toRgb } from '../../src/shared/color';
 import { presetById, withPreset } from '../../src/shared/presets';
 import { BrandKitSchema, PageSchema } from '../../src/shared/schema';
 import { buildTemplate } from '../../src/shared/templates';
@@ -39,9 +39,64 @@ describe('following a brand', () => {
     const out = applyBrand(page(), kit({ bg: '#fdf2f8', text: '#fbcfe8' })); // pink text on pink: unreadable
     expect(contrast(out.theme.text, out.theme.bg)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(out.theme.muted, out.theme.bg)).toBeGreaterThanOrEqual(4.5);
-    const dark = applyBrand(page(), kit({ bg: '#0b1020', text: '#e2e8f0' }));
-    expect(dark.theme.text).toBe('#e2e8f0');
+    const night = withPreset(PageSchema.parse({}), presetById('midnight')!);
+    const dark = applyBrand(night, kit({ bg: '#0b1020', text: '#e2e8f0' }));
+    expect(dark.theme).toMatchObject({ bg: '#0b1020', text: '#e2e8f0' });
     expect(contrast(dark.theme.muted, dark.theme.bg)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  describe('keeping the page light or dark, whatever the brand’s own pages are like', () => {
+    // what a brand read off a typical website says: a white page with near-black text
+    const lightSite = { bg: '#f9fafb', text: '#111827' };
+    const invite = () => buildTemplate('event-invite')!; // dark by design
+
+    it('does not turn a dark page light', () => {
+      const plain = applyBrand(invite(), kit());
+      const out = applyBrand(invite(), kit(lightSite));
+      expect(isDark(invite().theme.bg)).toBe(true);
+      expect(out.theme).toMatchObject({
+        bg: plain.theme.bg,
+        alt_bg: plain.theme.alt_bg,
+        text: plain.theme.text,
+        muted: plain.theme.muted,
+      });
+      expect(isDark(out.theme.bg)).toBe(true);
+    });
+
+    it('does not turn a light page dark', () => {
+      const plain = applyBrand(page(), kit());
+      const out = applyBrand(page(), kit({ bg: '#0b1020', text: '#e2e8f0' }));
+      expect(isDark(page().theme.bg)).toBe(false);
+      expect(out.theme).toMatchObject({ bg: plain.theme.bg, alt_bg: plain.theme.alt_bg, text: plain.theme.text });
+    });
+
+    it('still takes a background that suits the page, and keeps the bands between sections neutral', () => {
+      const out = applyBrand(page(), kit({ bg: '#ffffff', text: '#111827' }));
+      expect(out.theme).toMatchObject({ bg: '#ffffff', text: '#111827' });
+      const [r, g, b] = toRgb(out.theme.alt_bg);
+      expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(4); // not pink, for a pink brand
+      expect(out.theme.alt_bg).not.toBe('#ffffff');
+    });
+
+    it('lets a dark page take the brand’s dark colour as its own', () => {
+      const out = applyBrand(invite(), kit({ ...lightSite, dark: '#0a2540' }));
+      expect(out.theme).toMatchObject({ bg: '#0a2540', dark_bg: '#0a2540' });
+      expect(isDark(out.theme.alt_bg)).toBe(true);
+      expect(contrast(out.theme.text, out.theme.bg)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('never uses a colour for the dark sections that their light text would struggle on', () => {
+      const plain = applyBrand(page(), kit());
+      expect(applyBrand(page(), kit({ dark: '#fde68a' })).theme.dark_bg).toBe(plain.theme.dark_bg);
+      expect(applyBrand(page(), kit({ dark: '#4b5563' })).theme.dark_bg).toBe(plain.theme.dark_bg); // a mid grey
+      expect(applyBrand(page(), kit({ dark: '#0a2540' })).theme.dark_bg).toBe('#0a2540');
+    });
+
+    it('can still change the mood when the brand names a style', () => {
+      const out = applyBrand(page(), kit({ ...lightSite, style: 'midnight' })); // its white background doesn't undo the style
+      expect(isDark(out.theme.bg)).toBe(true);
+      expect(presetOf(out.theme)?.id).toBe('midnight');
+    });
   });
 
   it('puts the logo in the header, and leaves the header alone when there is none', () => {

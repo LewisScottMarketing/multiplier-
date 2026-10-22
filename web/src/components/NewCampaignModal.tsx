@@ -13,6 +13,8 @@ type Mode = 'pdf' | 'template';
 
 /** The width pages are laid out at inside a gallery thumbnail; the frame is then scaled down to fit its card. */
 const THUMB_WIDTH = 1280;
+/** The card's picture is 1280 by 820 (see .tpl-shot), so the scaled frame fills it to the last pixel. */
+const THUMB_HEIGHT = 820;
 
 /** A live, scaled-down view of a template's first screen. */
 function Thumb({ id }: { id: string }) {
@@ -34,7 +36,7 @@ function Thumb({ id }: { id: string }) {
         title=""
         tabIndex={-1}
         loading="lazy"
-        style={{ width: THUMB_WIDTH, height: THUMB_WIDTH * 0.64, transform: `scale(${scale})` }}
+        style={{ width: THUMB_WIDTH, height: THUMB_HEIGHT, transform: `scale(${scale})` }}
       />
     </span>
   );

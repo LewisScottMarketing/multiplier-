@@ -1,4 +1,4 @@
-import { contrast, inkFor, mix } from './color';
+import { contrast, inkFor, isDark, mix } from './color';
 import { applyPreset, presetById, STYLE_PRESETS, type StylePreset } from './presets';
 import type { BrandKit, Page, Theme } from './schema';
 
@@ -15,6 +15,9 @@ export function presetOf(theme: Theme): StylePreset | undefined {
   });
 }
 
+/** The softer text colour on a dark section, as render/css.ts sets it. */
+const DARK_SECTION_MUTED = '#a8aed0';
+
 /** A secondary text colour that still reads on the background. */
 function mutedFor(text: string, bg: string): string {
   for (const t of [0.38, 0.3, 0.2, 0.1]) {
@@ -27,6 +30,10 @@ function mutedFor(text: string, bg: string): string {
 /**
  * The page with this brand's colours, typefaces and logo. The look stays the page's own unless the brand names a style;
  * either way the tints and shades are worked out again from the brand colour so they sit well with it.
+ *
+ * Whether a page is light or dark is part of its design (an evening invitation is dark), so a brand never flips it: a
+ * website's white background and dark text don't turn a dark page light, and a dark brand doesn't darken a light one.
+ * A brand that wants the other mood says so with a style.
  */
 export function applyBrand(page: Page, kit: BrandKit): Page {
   const wasPreset = presetOf(page.theme);
@@ -34,12 +41,21 @@ export function applyBrand(page: Page, kit: BrandKit): Page {
   const preset = (kit.style ? presetById(kit.style) : undefined) ?? wasPreset;
   if (preset) theme = { ...applyPreset(theme, preset), brand: kit.brand, accent: kit.accent };
 
-  if (kit.bg) theme.bg = kit.bg;
-  if (kit.dark) theme.dark_bg = kit.dark;
-  if (kit.text) theme.text = contrast(kit.text, theme.bg) >= 4.5 ? kit.text : inkFor(theme.bg);
-  // a colour the brand sets changes what the others sit on, so the in-between ones follow
-  if (kit.bg) theme.alt_bg = mix(theme.bg, kit.brand, 0.05);
-  if (kit.bg || kit.text) theme.muted = mutedFor(theme.text, theme.bg);
+  const dark = isDark(theme.bg);
+  // the brand's own background if it suits the page's mood; on a dark page its dark colour is the next best thing
+  const surface = [kit.bg, dark ? kit.dark : undefined].find((c) => c && isDark(c) === dark);
+  if (surface) {
+    theme.bg = surface;
+    // a lift towards the text, so the bands between sections stay neutral rather than taking on the brand's hue
+    theme.alt_bg = dark ? mix(surface, '#ffffff', 0.06) : mix(surface, theme.text, 0.035);
+  }
+  // a dark section is read with light text, and a softer light for the small print (render/css.ts), so the brand's colour
+  // has to be dark enough for both
+  if (kit.dark && contrast(kit.dark, DARK_SECTION_MUTED) >= 4.5) theme.dark_bg = kit.dark;
+  const text = kit.text && contrast(kit.text, theme.bg) >= 4.5 ? kit.text : undefined;
+  if (text) theme.text = text;
+  else if (contrast(theme.text, theme.bg) < 4.5) theme.text = inkFor(theme.bg);
+  if (surface || text) theme.muted = mutedFor(theme.text, theme.bg);
   if (kit.body_font) theme.font = kit.body_font;
   if (kit.heading_font) theme.heading_font = kit.heading_font;
 

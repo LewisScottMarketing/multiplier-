@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { contrast } from '../../src/shared/color';
 import { FONT_CHOICES, PageSchema, ThemeSchema, type Theme } from '../../src/shared/schema';
 import { FONTS, fontFaceCss, fontFilesDir, fontsUsed, preloadPath } from '../../src/server/render/fonts';
-import { themeCss } from '../../src/server/render/css';
+import { BASE_CSS, themeCss } from '../../src/server/render/css';
 
 describe('pages saved before the design system', () => {
   it('still open, with the new settings filled in to match how they always looked', () => {
@@ -116,6 +116,21 @@ describe('the CSS made from a theme', () => {
     expect(dark).toContain('--card-fill:color-mix(in srgb,#ffffff 6%');
     expect(dark).toContain('color-scheme:dark');
     expect(light).toContain('color-scheme:light');
+  });
+
+  it('keeps the glow behind a spotlight headline gentler on a light page, where the brand colour would read as a pink streak', () => {
+    const glow = (css: string) => Number(css.match(/--glow:([\d.]+)/)![1]);
+    const light = glow(themeCss(ThemeSchema.parse({ brand: '#d6336c' })));
+    const dark = glow(themeCss(ThemeSchema.parse({ brand: '#d6336c', bg: '#0a0e1d', text: '#eceffa' })));
+    expect(light).toBeLessThan(dark);
+    expect(light).toBeLessThanOrEqual(0.5);
+  });
+
+  it('fades the spotlight glow in from the top of the hero, so it never ends in a hard line under the header', () => {
+    const rule = BASE_CSS.split('\n').find((l) => l.startsWith('.hero.l-spotlight::before'))!;
+    expect(rule).toContain('opacity:var(--glow)');
+    // the glow starts above the hero (top:-26% of a box 86% tall), so its first 30% is out of sight and the mask has to be clear until there
+    expect(rule).toMatch(/mask-image:linear-gradient\(180deg,transparent 30%,#000 \d+%\)/);
   });
 });
 
