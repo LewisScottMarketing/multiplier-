@@ -29,6 +29,8 @@ export interface Line {
   boldLeadText: string;
   runs: Run[];
   idx: number;
+  /** Text set in aligned columns, found by `gatherTables`. `text` holds the same cells, one row per line. */
+  table?: { rows: string[][]; header: boolean };
 }
 
 export interface ImportOptions {
@@ -49,9 +51,9 @@ export function buildLines(doc: ExtractedDoc): Line[] {
   for (const pg of doc.pages) {
     // PDFs don't paint in reading order (Chromium draws list bullets after the list text), so cluster
     // runs by baseline and horizontal proximity, then restore reading order from the stream position.
-    const sorted = [...pg.runs].sort((a, b) =>
-      Math.abs(a.baseline - b.baseline) < Math.max(a.size, b.size) * 0.3 ? a.x - b.x : a.baseline - b.baseline,
-    );
+    const sorted = pg.runs
+      .filter((r) => !isFootnoteMark(r, pg.runs))
+      .sort((a, b) => (Math.abs(a.baseline - b.baseline) < Math.max(a.size, b.size) * 0.3 ? a.x - b.x : a.baseline - b.baseline));
     const groups: Run[][] = [];
     for (const r of sorted) {
       const g = groups.find((grp) => {
@@ -100,15 +102,208 @@ export function buildLines(doc: ExtractedDoc): Line[] {
         },
       };
     });
-    for (const line of readingOrder(
-      built.map((b) => b.line),
-      pg.width,
-    )) {
+    for (const line of readingOrder(joinBadges(gatherTables(built.map((b) => b.line))), pg.width)) {
       line.idx = lines.length;
       lines.push(line);
     }
   }
   return lines;
+}
+
+/** A small raised number or symbol right after a word ("loses.¹"): a reference mark, which would split the line if kept. */
+function isFootnoteMark(r: Run, runs: Run[]): boolean {
+  if (!/^[\d*†‡§]{1,3}$/.test(r.text.trim())) return false;
+  return runs.some((p) => {
+    if (p === r || p.size < r.size * 1.1) return false;
+    const raised = p.baseline - r.baseline;
+    return raised > p.size * 0.15 && raised < p.size * 0.6 && r.x - (p.x + p.w) > -2 && r.x - (p.x + p.w) < p.size * 0.35;
+  });
+}
+
+// ── Tables and number badges ────────────────────────────────────────────────
+
+interface Row {
+  lines: Line[];
+  baseline: number;
+  size: number;
+}
+
+/** Lines that share a baseline, left to right. */
+function rowsOf(lines: Line[]): Row[] {
+  const rows: Row[] = [];
+  for (const l of [...lines].sort((a, b) => a.baseline - b.baseline || a.x - b.x)) {
+    const row = rows[rows.length - 1];
+    if (row && Math.abs(row.baseline - l.baseline) < Math.min(row.size, l.size) * 0.35) {
+      row.lines.push(l);
+      row.size = Math.max(row.size, l.size);
+    } else rows.push({ lines: [l], baseline: l.baseline, size: l.size });
+  }
+  for (const r of rows) r.lines.sort((a, b) => a.x - b.x);
+  return rows;
+}
+
+const NUMERIC_CELL = /^[\d$£€%.,+\-\s]+[kKmMbB%x×]?$/;
+
+/**
+ * Text set in aligned columns reads as nonsense when taken line by line (a column at a time, or a row's cells run
+ * together), so find it first: three or more rows whose cells line up become one line that carries the table.
+ */
+export function gatherTables(lines: Line[]): Line[] {
+  const rows = rowsOf(lines);
+  const taken = new Set<Line>();
+  const made: Line[] = [];
+  const multi = (r: Row) => r.lines.length >= 2;
+  for (let i = 0; i < rows.length; i++) {
+    if (!multi(rows[i]) || rows[i].lines.some((l) => taken.has(l))) continue;
+    let j = i;
+    while (
+      j + 1 < rows.length &&
+      (multi(rows[j + 1]) || rows[j + 1].lines.length === 1) &&
+      rows[j + 1].baseline - rows[j].baseline < rows[j].size * 4.5
+    )
+      j++;
+    const found = tableFrom(rows.slice(i, j + 1));
+    if (!found) continue;
+    made.push(found.line);
+    found.used.forEach((l) => taken.add(l));
+    i += found.rows - 1;
+  }
+  return made.length ? [...lines.filter((l) => !taken.has(l)), ...made] : lines;
+}
+
+function tableFrom(candidate: Row[]): { line: Line; used: Line[]; rows: number } | null {
+  const sizes = candidate.flatMap((r) => r.lines.map((l) => l.size)).sort((a, b) => a - b);
+  const size = sizes[Math.floor(sizes.length / 2)] ?? 11;
+  // columns: stretches of the page that some cell covers; a gap nothing crosses is a gutter
+  const spans = candidate
+    .filter((r) => r.lines.length >= 2)
+    .flatMap((r) => r.lines.map((l) => [l.x, l.x2] as const))
+    .sort((a, b) => a[0] - b[0]);
+  const cols: Array<[number, number]> = [];
+  for (const [a, b] of spans) {
+    const last = cols[cols.length - 1];
+    if (last && a < last[1] + 1) last[1] = Math.max(last[1], b);
+    else cols.push([a, b]);
+  }
+  if (cols.length < 2 || cols.length > 8) return null;
+  const colOf = (l: Line) => {
+    const mid = (l.x + l.x2) / 2;
+    const k = cols.findIndex(([a, b]) => mid >= a && mid <= b);
+    return k >= 0 ? k : cols.findIndex(([a, b]) => l.x <= b && l.x2 >= a);
+  };
+
+  const grid: string[][] = [];
+  const used: Line[] = [];
+  let lastBottom = 0;
+  let taken = 0;
+  for (const r of candidate) {
+    const cells = new Array<string>(cols.length).fill('');
+    if (r.lines.length >= 2) {
+      for (const l of r.lines) {
+        const k = colOf(l);
+        if (k < 0) return null;
+        cells[k] = cells[k] ? `${cells[k]} ${l.text}` : l.text;
+      }
+      grid.push(cells);
+    } else {
+      // a wrapped cell: the next line down in the same column, tucked under the row before
+      const l = r.lines[0];
+      const k = colOf(l);
+      const prev = grid[grid.length - 1];
+      if (k < 0 || !prev || !prev[k] || l.y - lastBottom > l.size * 0.8) break;
+      prev[k] = `${prev[k]} ${l.text}`;
+    }
+    used.push(...r.lines);
+    lastBottom = Math.max(...r.lines.map((l) => l.y + l.h));
+    taken++;
+  }
+  const body = grid.map((r) => r.map((c) => c.replace(/\s+/g, ' ').trim()));
+  if (body.length < 3 || body.some((r) => r.filter(Boolean).length < 2)) return null;
+
+  const filled = body.flat().filter(Boolean);
+  const cellsTotal = body.length * cols.length;
+  const longest = Math.max(...filled.map((c) => c.length));
+  const average = filled.reduce((n, c) => n + c.length, 0) / filled.length;
+  if (filled.length < cellsTotal * 0.6 || average > 42 || longest > 110) return null;
+  // Columns of running text have rows too, but each line carries on from the one above it
+  for (let k = 0; k < cols.length; k++) {
+    let pairs = 0;
+    let carried = 0;
+    for (let r = 0; r + 1 < body.length; r++) {
+      const [above, below] = [body[r][k], body[r + 1][k]];
+      if (!above || !below) continue;
+      pairs++;
+      if (!/[.!?:;]["”’)]?$/.test(above) && /^\p{Ll}/u.test(below)) carried++;
+    }
+    if (pairs >= 2 && carried / pairs >= 0.5) return null;
+  }
+  if (filled.filter((c) => BULLET_RE.test(c)).length >= filled.length * 0.5) return null;
+  // a number beside each step of a process is a list, not a table
+  const first = body.map((r) => r[0]);
+  if (cols.length === 2 && first.every((c, k) => c === String(k + 1) || c === String(k))) return null;
+  // a row of big figures with their captions is a set of stats
+  const top = candidate[0];
+  if (body.length <= 3 && top.lines.every((l) => STAT_RE.test(l.text.trim()) && l.size >= size * 1.4)) return null;
+
+  const firstRow = body[0];
+  const numberIn = (r: string[]) => r.some((c) => NUMERIC_CELL.test(c));
+  const boldRow = (r: Row) => r.lines.every((l) => l.bold);
+  const header =
+    firstRow.every(Boolean) &&
+    (boldRow(candidate[0]) ? !candidate.slice(1).every(boldRow) : !numberIn(firstRow) && body.slice(1).some(numberIn));
+
+  const x = Math.min(...used.map((l) => l.x));
+  const y = Math.min(...used.map((l) => l.y));
+  const line: Line = {
+    page: used[0].page,
+    text: body.map((r) => r.join(' | ')).join('\n'),
+    x,
+    textX: x,
+    x2: Math.max(...used.map((l) => l.x2)),
+    y,
+    h: Math.max(...used.map((l) => l.y + l.h)) - y,
+    baseline: candidate[0].baseline,
+    size,
+    bold: false,
+    italic: false,
+    boldLead: false,
+    boldLeadText: '',
+    runs: [],
+    idx: 0,
+    table: { rows: body, header },
+  };
+  return { line, used, rows: taken };
+}
+
+const BADGE_RE = /^\d{1,2}$/;
+
+/**
+ * A number in a circle beside its text (a numbered step) is painted as a line of its own, level with the middle of the
+ * text. Put it back in front of the first line, so "1" and "Mapped the journey." read as "1. Mapped the journey."
+ */
+export function joinBadges(lines: Line[]): Line[] {
+  const gone = new Set<Line>();
+  for (const b of lines) {
+    if (b.table || !BADGE_RE.test(b.text.trim())) continue;
+    const mid = b.y + b.h / 2;
+    const beside = lines.filter(
+      (t) =>
+        t !== b &&
+        !t.table &&
+        !gone.has(t) &&
+        !BADGE_RE.test(t.text.trim()) &&
+        t.text.trim().length > 3 &&
+        t.x >= b.x2 + 2 &&
+        t.x - b.x2 <= Math.max(60, b.size * 5) &&
+        t.size <= b.size * 1.3 + 2 &&
+        Math.abs(t.y + t.h / 2 - mid) <= Math.max(t.h, b.h) * 1.3,
+    );
+    if (!beside.length) continue;
+    const first = beside.reduce((a, c) => (c.y < a.y ? c : a));
+    first.text = `${b.text.trim()}. ${first.text}`;
+    gone.add(b);
+  }
+  return gone.size ? lines.filter((l) => !gone.has(l)) : lines;
 }
 
 /**
@@ -120,29 +315,69 @@ export function readingOrder(lines: Line[], pageWidth: number): Line[] {
   const byY = [...lines].sort((a, b) =>
     Math.abs(a.baseline - b.baseline) < Math.max(a.size, b.size) * 0.3 ? a.x - b.x : a.baseline - b.baseline,
   );
-  if (lines.length < 8) return byY;
-  let gutter: number | null = null;
-  for (let g = pageWidth * 0.3; g <= pageWidth * 0.7; g += 4) {
-    const crossing = lines.filter((l) => l.x < g - 2 && l.x2 > g + 2 && l.x2 - l.x < pageWidth * 0.6).length;
-    const left = lines.filter((l) => l.x2 <= g + 2).length;
-    const right = lines.filter((l) => l.x >= g - 2).length;
-    if (crossing === 0 && left >= lines.length * 0.25 && right >= lines.length * 0.25) {
-      gutter = g;
-      break;
+  if (lines.length < 6) return byY;
+  const typical = modeSize(lines);
+  const gutters = findGutters(lines, pageWidth, typical);
+  if (!gutters.length) return byY;
+  const crosses = (l: Line) => gutters.some((g) => l.x < g - 2 && l.x2 > g + 2);
+  const columnOf = (l: Line) => gutters.filter((g) => (l.x + l.x2) / 2 > g).length;
+  // how far down each column goes before the next line across the page
+  const reach = new Map<Line, number[]>();
+  let band: number[] = gutters.map(() => 0).concat([0]);
+  for (const l of byY) {
+    if (crosses(l)) band = band.map(() => 0);
+    else {
+      band[columnOf(l)] = Math.max(band[columnOf(l)], l.y + l.h);
+      reach.set(l, band);
     }
   }
-  if (gutter === null) return byY;
   const out: Line[] = [];
-  let left: Line[] = [];
-  let right: Line[] = [];
+  let cols: Line[][] = Array.from({ length: gutters.length + 1 }, () => []);
+  const flush = () => {
+    for (const c of cols) out.push(...c);
+    cols = cols.map(() => []);
+  };
   for (const l of byY) {
-    if (l.x < gutter - 2 && l.x2 > gutter + 2) {
-      out.push(...left, ...right, l);
-      left = [];
-      right = [];
-    } else (l.x >= gutter - 2 ? right : left).push(l);
+    // a line across the gutters closes the band above it
+    if (crosses(l)) {
+      flush();
+      out.push(l);
+      continue;
+    }
+    const k = columnOf(l);
+    // so does a heading that sits below the end of every other column
+    const others = cols.filter((_, j) => j !== k).flat();
+    const ends = reach.get(l)!;
+    if ((l.bold || l.size > typical * 1.1) && others.length >= 2 && ends.every((end, j) => j === k || end <= l.y + 1)) flush();
+    cols[k].push(l);
   }
-  return [...out, ...left, ...right];
+  flush();
+  return out;
+}
+
+/**
+ * Where the columns of a page split: gaps in the page that no line of body text crosses, with text on both sides.
+ * Headings are left out, since one that runs a little past its column would otherwise hide the gap.
+ */
+function findGutters(lines: Line[], pageWidth: number, typical: number): number[] {
+  const narrow = lines.filter((l) => Math.abs(l.size - typical) <= typical * 0.15 && l.x2 - l.x < pageWidth * 0.6);
+  if (narrow.length < 4) return [];
+  const covered: Array<[number, number]> = [];
+  for (const [a, b] of narrow.map((l) => [l.x, l.x2] as const).sort((p, q) => p[0] - q[0])) {
+    const last = covered[covered.length - 1];
+    if (last && a <= last[1] + 1) last[1] = Math.max(last[1], b);
+    else covered.push([a, b]);
+  }
+  const minGap = Math.max(10, pageWidth * 0.02);
+  const found: number[] = [];
+  for (let k = 0; k + 1 < covered.length; k++) {
+    if (covered[k + 1][0] - covered[k][1] < minGap) continue;
+    const g = (covered[k][1] + covered[k + 1][0]) / 2;
+    const left = narrow.filter((l) => l.x2 <= g).length;
+    const right = narrow.filter((l) => l.x >= g).length;
+    if (left >= 2 && right >= 2 && left >= narrow.length * 0.15 && right >= narrow.length * 0.15) found.push(g);
+  }
+  return found;
 }
 
 function modeSize(lines: Line[]): number {
@@ -215,15 +450,30 @@ export interface Para {
 function cleanText(s: string): string {
   return s
     .replace(/\s+/g, ' ')
+    .replace(/(?:\s?\.){4,}(?:\s*\d{1,3})?\s*$/, '')
     .replace(/(\w)- (\w)/g, (m, a: string, b: string) => (/[a-z]/.test(a) && /[a-z]/.test(b) ? `${a}${b}` : m))
     .trim();
 }
+
+/** Set in from the body text by a list's indent: more than a nudge, and less than a column of its own. */
+const isIndent = (x: number, bodyX: number, body: number) => x >= bodyX + body * 0.8 && x <= bodyX + body * 6;
 
 /** Group lines into paragraphs and list items. */
 export function buildParas(lines: Line[], body: number, bodyX: number, colRight: number): Para[] {
   const paras: Para[] = [];
   let cur: Para | null = null;
   let prev: Line | null = null;
+  // Where a line "reaches the edge" depends on its column: lines of a column on the right end well short of the page's widest
+  const reach = new Map<number, { right: number; n: number }>();
+  for (const l of lines) {
+    const e = reach.get(Math.round(l.x / 3)) ?? { right: 0, n: 0 };
+    reach.set(Math.round(l.x / 3), { right: Math.max(e.right, l.x2), n: e.n + 1 });
+  }
+  const rightOf = (l: Line) => {
+    if (l.x < bodyX + (colRight - bodyX) * 0.4) return colRight;
+    const e = reach.get(Math.round(l.x / 3));
+    return e && e.n >= 2 ? e.right : colRight;
+  };
   const finish = () => {
     if (cur) {
       cur.text = cleanText(cur.text);
@@ -235,7 +485,7 @@ export function buildParas(lines: Line[], body: number, bodyX: number, colRight:
     const bullet = BULLET_RE.test(l.text);
     const numbered = NUMBER_RE.exec(l.text);
     const indentedNoBullet =
-      l.x >= bodyX + body * 0.8 &&
+      isIndent(l.x, bodyX, body) &&
       Math.abs(l.size - body) < body * 0.25 &&
       !!prev &&
       l.page === prev.page &&
@@ -245,20 +495,29 @@ export function buildParas(lines: Line[], body: number, bodyX: number, colRight:
     if (cur && prev) {
       const gap = l.y - (prev.y + prev.h);
       const samePage = l.page === prev.page;
-      const prevWrapped = prev.x2 >= colRight * 0.9;
+      const prevWrapped = prev.x2 >= rightOf(prev) * 0.9;
       const endsSentence = /[.!?:”")]$/.test(prev.text.trim());
       const startsUpper = /^[A-Z“"(0-9]/.test(l.text.trim());
       const indentChange = Math.abs(l.x - prev.x) > body * 0.7 && Math.abs(l.x - prev.textX) > body * 0.7;
+      // a sentence that runs over a page or into the next column carries on in lower case, in the same type
+      const across =
+        (!samePage || gap < -body) &&
+        !endsSentence &&
+        !bullet &&
+        !numbered &&
+        /^\p{Ll}/u.test(l.text.trim()) &&
+        Math.abs(l.size - prev.size) <= 0.8;
       startsNew =
-        !samePage ||
-        bullet ||
-        !!numbered ||
-        gap > body * 0.55 ||
-        Math.abs(l.size - prev.size) > 0.8 ||
-        (l.bold !== prev.bold && !l.boldLead && !prev.boldLead) ||
-        indentChange ||
-        (indentedNoBullet && !prevWrapped) ||
-        (!prevWrapped && endsSentence && startsUpper);
+        !across &&
+        (!samePage ||
+          bullet ||
+          !!numbered ||
+          gap > body * 0.55 ||
+          Math.abs(l.size - prev.size) > 0.8 ||
+          (l.bold !== prev.bold && !l.boldLead && !prev.boldLead) ||
+          indentChange ||
+          (indentedNoBullet && !prevWrapped) ||
+          (!prevWrapped && endsSentence && startsUpper));
     }
     if (startsNew) {
       finish();
@@ -295,7 +554,7 @@ function markIndentedLists(paras: Para[], body: number, bodyX: number) {
   let i = 0;
   while (i < paras.length) {
     const indented = (p: Para) =>
-      p.kind === 'para' && p.x >= bodyX + body * 0.8 && p.lines.length <= 2 && !p.italic && !QUOTE_OPEN.test(p.text);
+      p.kind === 'para' && isIndent(p.x, bodyX, body) && p.lines.length <= 2 && !p.italic && !QUOTE_OPEN.test(p.text);
     if (!indented(paras[i])) {
       i++;
       continue;
@@ -315,13 +574,48 @@ function markIndentedLists(paras: Para[], body: number, bodyX: number) {
 
 // ── Section analysis ────────────────────────────────────────────────────────
 
+/** Line `at` closes a quotation: it ends in a quotation mark, and a few compact lines up one opens it. */
+function endsQuotation(lines: Line[], at: number): boolean {
+  const last = lines[at];
+  if (!last || !/[”"’']\s*$/.test(last.text.trim())) return false;
+  for (let j = at, n = 0; j >= 0 && n < 6; j--, n++) {
+    if (lines[j].page !== last.page) return false;
+    if (QUOTE_OPEN.test(lines[j].text.trim())) return true;
+    const above = lines[j - 1];
+    if (!above || lines[j].y - (above.y + above.h) > lines[j].size * 0.9) return false;
+  }
+  return false;
+}
+
+const bottomOf = (p: Para) => Math.max(...p.lines.map((l) => l.y + l.h));
+/** `b` follows `a` closely enough to belong with it. */
+const tight = (a: Para, b: Para, within = 1.6) => b.page === a.page && b.y - bottomOf(a) < Math.max(a.size, b.size) * within;
+const NAME_RE = /^\p{Lu}[\p{L}'’.-]*(?:\s+(?:\p{Lu}[\p{L}'’.-]*|de|van|von|da|di|la|le|del|der|bin|al|el))*$/u;
+/** "Dana Whitfield": one to four capitalised words and no punctuation to end a sentence. */
+function looksLikeName(p: Para): boolean {
+  const t = p.text.trim();
+  return p.kind === 'para' && t.length >= 3 && t.length <= 40 && t.split(/\s+/).length <= 4 && !/\d/.test(t) && NAME_RE.test(t);
+}
+/** "VP Operations, Globex": a short line that isn't a sentence, a contact detail or a list item. */
+function looksLikeRole(p: Para): boolean {
+  const t = p.text.trim();
+  return p.kind === 'para' && t.length >= 2 && t.length <= 90 && !/[.!?]$/.test(t) && !/[@|]|https?:|www\./i.test(t) && /^\p{L}/u.test(t);
+}
+
 interface Section {
   heading: string;
   page: number;
   lines: Line[];
+  /** Big type that says one thing and nothing else (a slide that is a single sentence). */
+  statement?: boolean;
+  /** Size of the heading's type. */
+  size?: number;
+  /** Several short sections side by side, each a title and a sentence or two: a row of cards. */
+  cards?: Array<{ heading: string; text: string }>;
 }
 
-const STAT_RE = /^[$£€]?\s?\d[\d,.]*\s?(?:%|x|X|×|[kKmMbB]\b|\+|bn|million|billion|hrs?|days?|mins?|pts?|\/\w+)*\+?$/;
+const STAT_RE =
+  /^[$£€]?\s?\d[\d,.]*\s?(?:%|x|X|×|[kKmMbB]\b|\+|bn|million|billion|hrs?|hours?|days?|wks?|weeks?|mos?|months?|yrs?|years?|mins?|minutes?|secs?|seconds?|pts?|\/\w+)*\+?$/;
 
 interface Stat {
   value: string;
@@ -334,8 +628,8 @@ function findStats(lines: Line[], body: number): Stat[] {
   const stats: Stat[] = [];
   for (const l of lines) {
     if (l.size < body * 1.4 || !STAT_RE.test(l.text.trim())) continue;
-    // label: the nearest smaller line just below, roughly aligned
-    const label = lines.find(
+    // label: the nearest smaller line just below, roughly aligned, and any lines that carry it on
+    const first = lines.find(
       (c) =>
         c.page === l.page &&
         c.y > l.y &&
@@ -344,9 +638,65 @@ function findStats(lines: Line[], body: number): Stat[] {
         c.size < l.size * 0.7 &&
         !STAT_RE.test(c.text.trim()),
     );
-    if (label) stats.push({ value: l.text.trim(), label: cleanText(label.text), x: l.x, used: [l, label] });
+    if (!first) continue;
+    const label = [first];
+    for (const c of lines) {
+      const last = label[label.length - 1];
+      if (
+        label.length < 3 &&
+        c.page === last.page &&
+        c.y > last.y &&
+        c.y - (last.y + last.h) < last.size * 0.6 &&
+        Math.abs(c.x - last.x) < 6 &&
+        Math.abs(c.size - last.size) < 0.6 &&
+        !STAT_RE.test(c.text.trim())
+      )
+        label.push(c);
+    }
+    stats.push({ value: l.text.trim(), label: cleanText(label.map((x) => x.text).join(' ')), x: l.x, used: [l, ...label] });
   }
-  return stats.length >= 2 ? stats.sort((a, b) => a.x - b.x).slice(0, 6) : [];
+  // one figure on its own is a statistic only when it is clearly the point of the page
+  const lone = stats.length === 1 && stats[0].used[0].size >= body * 2.2;
+  return stats.length >= 2 || lone ? stats.sort((a, b) => a.x - b.x).slice(0, 6) : [];
+}
+
+/**
+ * Big type with nothing smaller under it is a statement, not a heading: a slide that just says "Generic outreach is
+ * ignored." Returns each statement's lines, keyed by its first line.
+ */
+function findStatements(lines: Line[], body: number, skip: Set<Line>): Map<Line, Line[]> {
+  const out = new Map<Line, Line[]>();
+  for (let i = 0; i < lines.length; i++) {
+    const first = lines[i];
+    if (skip.has(first) || first.table || first.size < Math.max(body * 2.2, 26)) continue;
+    const group = [first];
+    while (i + 1 < lines.length) {
+      const next = lines[i + 1];
+      const last = group[group.length - 1];
+      if (
+        next.page !== first.page ||
+        next.table ||
+        skip.has(next) ||
+        Math.abs(next.size - first.size) > first.size * 0.08 ||
+        next.y - (last.y + last.h) > first.size * 0.9
+      )
+        break;
+      group.push(next);
+      i++;
+    }
+    const last = group[group.length - 1];
+    const after = lines[i + 1];
+    const text = cleanText(group.map((l) => l.text).join(' '));
+    const textBelow =
+      !!after &&
+      after.page === first.page &&
+      !skip.has(after) &&
+      after.size < first.size * 0.75 &&
+      after.y - (last.y + last.h) < first.size * 1.6;
+    if (!textBelow && text.length >= 12 && text.length <= 240 && text.split(/\s+/).length >= 3 && !STAT_RE.test(text))
+      out.set(first, group);
+  }
+  return out;
 }
 
 const ICON_HINTS: Array<[RegExp, string]> = [
@@ -367,6 +717,7 @@ function iconFor(text: string, i: number): string {
   return ICON_HINTS.find(([re]) => re.test(text))?.[1] ?? FALLBACK_ICONS[i % FALLBACK_ICONS.length];
 }
 
+const CONTENTS_HEADING = /^(?:table of )?contents$|^in this (?:guide|report|paper|ebook|document|issue)$|^what(?:’|')?s inside$|^inside$/i;
 const CTA_HEADING = /ready|get started|contact|next step|talk to|talk with|book|let.?s|speak|reach out|demo|questions\??$/i;
 const CTA_TEXT = /contact|book|schedule|call|demo|talk|reach|get in touch|email us|visit|learn more|sign up/i;
 const URL_RE =
@@ -390,17 +741,139 @@ const truncate = (s: string, max: number) => {
   return end > max * 0.5 ? cut.slice(0, end + 1) : cut.replace(/\s+\S*$/, '') + '…';
 };
 
+/**
+ * A label in bold with its value under it, a few times over ("Industry" / "Logistics", "Team size" / "1,200 people"):
+ * a fact box. Takes the pairs out of `paras` and returns them as rows.
+ */
+function takeFacts(paras: Para[]): string[][] {
+  const rows: string[][] = [];
+  const isLabel = (p: Para) => p.kind === 'para' && p.bold && p.lines.length === 1 && p.text.length <= 40 && !/[.!?:]$/.test(p.text.trim());
+  const isValue = (a: Para, b: Para) =>
+    b.kind === 'para' && !b.bold && b.lines.length === 1 && b.text.length <= 70 && tight(a, b, 1.2) && !EMAIL_RE.test(b.text);
+  for (let i = 0; i + 1 < paras.length;) {
+    let n = 0;
+    while (i + 2 * n + 1 < paras.length && isLabel(paras[i + 2 * n]) && isValue(paras[i + 2 * n], paras[i + 2 * n + 1])) n++;
+    if (n >= 2) {
+      for (const [a, b] of paras
+        .slice(i, i + 2 * n)
+        .reduce<Para[][]>((acc, p, k) => (k % 2 ? (acc[acc.length - 1].push(p), acc) : [...acc, [p]]), []))
+        rows.push([a.text.trim(), b.text.trim()]);
+      paras.splice(i, 2 * n);
+    } else i++;
+  }
+  return rows;
+}
+
+const cardText = (sec: Section) =>
+  cleanText(
+    sec.lines
+      .filter((l) => !l.table)
+      .map((l) => l.text)
+      .join(' '),
+  );
+
+function isCard(sec: Section): boolean {
+  if (!sec.heading || sec.statement || sec.cards || !sec.lines.length) return false;
+  if (sec.lines.some((l) => l.table || BULLET_RE.test(l.text) || NUMBER_RE.test(l.text))) return false;
+  const text = cardText(sec);
+  return cleanText(sec.heading).length <= 60 && text.length >= 15 && text.length <= 220 && sec.lines.length <= 6;
+}
+
+/**
+ * Three or more neighbouring sections that are each a short title and a sentence or two are a row of cards (the
+ * "three changes that matter" slide). A title with nothing under it just before them is the row's heading.
+ */
+function gatherCards(sections: Section[]): Section[] {
+  const out: Section[] = [];
+  for (let i = 0; i < sections.length; i++) {
+    let j = i;
+    while (
+      j < sections.length &&
+      isCard(sections[j]) &&
+      sections[j].page === sections[i].page &&
+      Math.abs((sections[j].size ?? 0) - (sections[i].size ?? 0)) < 1
+    )
+      j++;
+    if (j - i >= 3 && j - i <= 8) {
+      const lead = out[out.length - 1];
+      let heading = '';
+      if (lead && lead.page === sections[i].page && lead.heading && !lead.lines.length && !lead.cards) {
+        heading = lead.heading;
+        out.pop();
+      }
+      out.push({
+        heading,
+        page: sections[i].page,
+        lines: [],
+        cards: sections.slice(i, j).map((c) => ({ heading: cleanText(c.heading), text: cardText(c) })),
+      });
+      i = j - 1;
+    } else out.push(sections[i]);
+  }
+  return out;
+}
+
+/** A table the PDF set in columns, as a table block. */
+function tableBlock(l: Line, heading: string | undefined): Block {
+  const rows = (l.table?.rows ?? []).slice(0, 40).map((r) => r.slice(0, 8).map((c) => truncate(cleanText(c), 200)));
+  return newBlock('table', { heading: heading || undefined, rows, header: l.table?.header ?? true } as Partial<Block>);
+}
+
+/** Blocks for one section. Tables inside it become their own blocks, in order, with the text around them split off. */
 function blocksFromSection(
   sec: Section,
   body: number,
   bodyX: number,
   colRight: number,
   urls: string[],
-  notes: { shortened: number },
+  notes: { shortened: number; labels?: number },
+): Block[] {
+  if (sec.cards)
+    return [
+      newBlock('features', {
+        heading: cleanText(sec.heading) || undefined,
+        columns: sec.cards.length === 4 ? 2 : 3,
+        items: sec.cards.map((c, i) => ({
+          icon: iconFor(`${c.heading} ${c.text}`, i),
+          title: titleize(c.heading),
+          text: truncate(c.text, 200),
+        })),
+      } as Partial<Block>),
+    ];
+  if (!sec.lines.some((l) => l.table)) return textBlocksFromSection(sec, body, bodyX, colRight, urls, notes);
+  const out: Block[] = [];
+  let heading = sec.heading;
+  let run: Line[] = [];
+  const flush = () => {
+    if (!run.length) return;
+    out.push(...textBlocksFromSection({ ...sec, heading, lines: run }, body, bodyX, colRight, urls, notes));
+    heading = '';
+    run = [];
+  };
+  for (const l of sec.lines) {
+    if (!l.table) run.push(l);
+    else {
+      flush();
+      out.push(tableBlock(l, cleanText(heading) || undefined));
+      heading = '';
+    }
+  }
+  flush();
+  return out;
+}
+
+function textBlocksFromSection(
+  sec: Section,
+  body: number,
+  bodyX: number,
+  colRight: number,
+  urls: string[],
+  notes: { shortened: number; labels?: number },
 ): Block[] {
   const blocks: Block[] = [];
   const heading = cleanText(sec.heading);
   let lines = sec.lines;
+  if (sec.statement) return [newBlock('callout', { text: cleanText(lines.map((l) => l.text).join(' ')) } as Partial<Block>)];
 
   // stats
   const stats = findStats(lines, body);
@@ -410,6 +883,8 @@ function blocksFromSection(
   }
 
   const paras = buildParas(lines, body, bodyX, colRight);
+  const facts = takeFacts(paras);
+  dropChartLabels(paras, body, notes);
 
   // testimonial
   const qi = paras.findIndex(
@@ -426,11 +901,13 @@ function blocksFromSection(
       who = attribInline[2];
     } else {
       const next = paras[qi + 1];
+      const after = paras[qi + 2];
       const looksLikeAttribution =
         !!next &&
         next.page === q.page &&
         (ATTRIB.test(next.text) ||
           next.italic ||
+          (looksLikeName(next) && tight(q, next, 8) && (next.bold || (!!after && looksLikeRole(after) && tight(next, after)))) ||
           (next.text.length <= 100 &&
             next.size <= q.size + 0.5 &&
             /^[^,]+,[^,]+(,[^,]+)?$/.test(next.text.trim()) &&
@@ -441,6 +918,12 @@ function blocksFromSection(
           .replace(/^[^\p{L}\p{N}]+/u, '')
           .trim();
         paras.splice(qi + 1, 1);
+        // a name on one line and "Role, Company" on the next
+        const role = paras[qi + 1];
+        if (!who.includes(',') && role && role.kind === 'para' && tight(next, role) && looksLikeRole(role)) {
+          who += `, ${role.text.trim()}`;
+          paras.splice(qi + 1, 1);
+        }
       }
     }
     const [name, role, company] = who.split(',').map((x) => x.trim());
@@ -512,16 +995,28 @@ function blocksFromSection(
   const isProcess =
     numbered.length >= 3 || (numbered.length >= 2 && numbered.length >= rest.length - 1 && numbered.every((n, i) => n.num === i + 1));
   if (isProcess) {
+    // "1. Capture" with its description on the line below
+    const described = new Set<Para>();
+    const describe = (n: Para): string | undefined => {
+      const next = rest[rest.indexOf(n) + 1];
+      if (n.lead || !next || next.kind !== 'para' || !tight(n, next, 1.3) || n.text.length > 70 || /[.!?]$/.test(n.text.trim()))
+        return undefined;
+      described.add(next);
+      return next.text;
+    };
     const items = numbered.slice(0, 8).map((n) => {
-      const [title, text] = n.lead
-        ? [
-            n.lead,
-            n.text
-              .slice(n.lead.length)
-              .trim()
-              .replace(/^[.:–—-]\s*/, ''),
-          ]
-        : splitLead(n.text);
+      const detail = describe(n);
+      const [title, text] = detail
+        ? [n.text, detail]
+        : n.lead
+          ? [
+              n.lead,
+              n.text
+                .slice(n.lead.length)
+                .trim()
+                .replace(/^[.:–—-]\s*/, ''),
+            ]
+          : splitLead(n.text);
       return { title: titleize(title), text: text || undefined, hasLead: !!n.lead || !!text };
     });
     if (items.filter((i) => i.hasLead).length >= Math.ceil(items.length * 0.6)) {
@@ -543,7 +1038,8 @@ function blocksFromSection(
         } as Partial<Block>),
       );
     }
-    if (after.length) blocks.push(textBlock(undefined, after, notes));
+    const remaining = after.filter((a) => !described.has(a));
+    if (remaining.length) blocks.push(textBlock(undefined, remaining, notes));
   } else if (bullets.length >= 3 || (bullets.length >= 2 && bullets.length >= rest.length - 1)) {
     const leads = bullets.filter((b) => b.lead || /^[^.]{3,60}(?::|\s[–—-]\s|\.\s)/.test(b.text)).length;
     if (leads >= Math.ceil(bullets.length * 0.6) && bullets.length <= 8) {
@@ -570,8 +1066,29 @@ function blocksFromSection(
     if (startsWithBody) blocks.push(startsWithBody);
   }
 
+  if (facts.length)
+    blocks.push(
+      newBlock('table', { heading: blocks.length ? undefined : heading || undefined, rows: facts, header: false } as Partial<Block>),
+    );
   if (testimonial) blocks.push(testimonial);
   return blocks;
+}
+
+/**
+ * Three or more small, unpunctuated scraps in a row ("Generic", "By title", "By account"...) are the labels of a chart,
+ * which mean nothing without the chart. Takes them out of `paras` and counts them.
+ */
+function dropChartLabels(paras: Para[], body: number, notes: { labels?: number }) {
+  const scrap = (p: Para) =>
+    p.kind === 'para' && p.lines.length === 1 && p.text.length <= 24 && p.size <= body * 0.95 && !/[.!?:;,]$/.test(p.text.trim());
+  for (let i = 0; i < paras.length;) {
+    let n = 0;
+    while (i + n < paras.length && scrap(paras[i + n])) n++;
+    if (n >= 3) {
+      paras.splice(i, n);
+      notes.labels = (notes.labels ?? 0) + n;
+    } else i += Math.max(n, 1);
+  }
 }
 
 function textBlock(heading: string | undefined, paras: Para[], notes: { shortened: number }): Block {
@@ -622,6 +1139,8 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
   const allLines = buildLines(doc);
   const { kept, footer } = dropFurniture(allLines, doc.pages);
   const lines = kept;
+  /** The lines that are prose and headings: tables are handled where their section is built. */
+  const flow = lines.filter((l) => !l.table);
 
   let theme = ThemeSchema.parse({ brand: palette.brand });
   const base = (blocks: Block[], extra: Partial<Page> = {}): Page =>
@@ -632,7 +1151,7 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
       ...extra,
     });
 
-  if (lines.length < 3) {
+  if (lines.reduce((n, l) => n + (l.table ? l.table.rows.length : 1), 0) < 3) {
     report.push(
       'This PDF has little or no selectable text (it may be scanned), so no copy could be extracted. We built a simple page around the PDF itself — add your own headline and sections.',
     );
@@ -657,8 +1176,8 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
     };
   }
 
-  const body = modeSize(lines);
-  const bodyLines = lines.filter((l) => Math.abs(l.size - body) < 0.6);
+  const body = modeSize(flow);
+  const bodyLines = flow.filter((l) => Math.abs(l.size - body) < 0.6);
   const look = lookFor(bodyLines, palette);
   theme = applyPreset(theme, look);
   const xs = new Map<number, number>();
@@ -667,8 +1186,8 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
   const colRight = Math.max(...bodyLines.map((l) => l.x2), 200);
 
   // ── title block on the first page that has text ───────────────────────────
-  const firstPage = lines[0].page;
-  const p1 = lines.filter((l) => l.page === firstPage);
+  const firstPage = (flow[0] ?? lines[0]).page;
+  const p1 = flow.filter((l) => l.page === firstPage);
   const biggest = Math.max(...p1.map((l) => l.size));
   let title = '';
   let titleLines: Line[] = [];
@@ -685,9 +1204,9 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
   const consumed = new Set<Line>(titleLines);
   // A sparse, large-type first page is a cover: whatever is left on it besides the headline block
   // (tag lines, dates, "Prepared for …") is cover chrome, not content.
-  const totalChars = lines.reduce((n, l) => n + l.text.length, 0);
+  const totalChars = flow.reduce((n, l) => n + l.text.length, 0);
   const isCover =
-    lines.some((l) => l.page > firstPage) &&
+    flow.some((l) => l.page > firstPage) &&
     p1.length <= 10 &&
     p1.reduce((n, l) => n + l.text.length, 0) < totalChars * 0.25 &&
     biggest >= body * 1.8;
@@ -717,7 +1236,7 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
 
   // subtitle: larger-than-body lines directly after the title
   const sub: Line[] = [];
-  for (const l of lines) {
+  for (const l of flow) {
     if (l.idx <= titleIdx || l.page !== firstPage || consumed.has(l)) continue;
     const prev = sub[sub.length - 1];
     const tight = !prev || l.y - (prev.y + prev.h) < prev.size * 1.2;
@@ -740,8 +1259,11 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
   const sections: Section[] = [];
   let current: Section = { heading: '', page: firstPage, lines: [] };
   const isHeading = (l: Line, i: number): boolean => {
+    if (l.table) return false;
     const t = l.text.trim();
     if (!/\p{L}{2,}/u.test(t) || QUOTE_OPEN.test(t) || (l.italic && !l.bold) || /[.,;]$/.test(t)) return false;
+    // right under the end of a quotation is who said it
+    if (endsQuotation(lines, i - 1) && l.y - (lines[i - 1].y + lines[i - 1].h) < Math.max(l.size, lines[i - 1].size) * 8) return false;
     if (l.size >= body * 1.2 && t.length <= 110) return true;
     const next = lines[i + 1];
     return (
@@ -756,8 +1278,17 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
       next.size <= l.size + 0.5
     );
   };
+  const statements = findStatements(lines, body, consumed);
   lines.forEach((l, i) => {
     if (consumed.has(l)) return;
+    const statement = statements.get(l);
+    if (statement) {
+      if (current.heading || current.lines.length) sections.push(current);
+      sections.push({ heading: '', page: l.page, lines: statement, statement: true });
+      statement.forEach((x) => consumed.add(x));
+      current = { heading: '', page: l.page, lines: [] };
+      return;
+    }
     // stat figures are big but not headings
     if (l.size >= body * 1.4 && STAT_RE.test(l.text.trim())) {
       current.lines.push(l);
@@ -770,16 +1301,20 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
         return;
       }
       if (current.heading || current.lines.length) sections.push(current);
-      current = { heading: l.text, page: l.page, lines: [] };
+      current = { heading: l.text, page: l.page, lines: [], size: l.size };
       return;
     }
     current.lines.push(l);
   });
   if (current.heading || current.lines.length) sections.push(current);
+  // a table of contents says where things are in the PDF, which means nothing on a page
+  for (let i = sections.length - 1; i >= 0; i--)
+    if (CONTENTS_HEADING.test(cleanText(sections[i].heading).replace(/[:.]+$/, ''))) sections.splice(i, 1);
+  sections.splice(0, sections.length, ...gatherCards(sections));
 
   // ── blocks ────────────────────────────────────────────────────────────────
   const urls = [...new Set(doc.pages.flatMap((p) => p.links.map((l) => l.url)))].filter((u) => /^https?:/i.test(u));
-  const notes = { shortened: 0 };
+  const notes: { shortened: number; labels?: number } = { shortened: 0 };
   const sectionBlocks: Array<{ section: Section; blocks: Block[] }> = sections
     .map((s) => ({ section: s, blocks: blocksFromSection(s, body, bodyX, colRight, urls, notes) }))
     .filter((x) => x.blocks.length > 0);
@@ -891,6 +1426,8 @@ export async function importToPage(doc: ExtractedDoc, palette: Palette, opts: Im
     );
   if (notes.shortened)
     report.push(`${notes.shortened} long section${notes.shortened === 1 ? ' was' : 's were'} shortened — the PDF has the full text.`);
+  if (notes.labels)
+    report.push('Left out some short labels that looked like part of a chart or diagram. Add them back as text if they matter.');
   if (doc.tokens.length)
     report.push(
       `Found ${[...new Set(doc.tokens.map((t) => t.token))].join(', ')} in the PDF and set them up to be replaced for each prospect.`,

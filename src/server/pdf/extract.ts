@@ -92,7 +92,13 @@ const isItalic = (n: string) => /italic|oblique|slanted/i.test(n.replace(/^[A-Z]
 /** "A C M E" → "ACME" (letter-spaced headings come out of PDFs with a space between every glyph). */
 export function detrack(text: string): string {
   const words = text.split(/ {2,}/);
-  const tracked = words.every((w) => w.length <= 1 || /^(?:\S )+\S$/u.test(w)) && words.some((w) => w.length >= 5);
+  const spaced = (w: string) => /^(?:\S )+\S$/u.test(w);
+  // Long pieces were already joined (detrackItem), and sit beside pieces too short to tell on their own ("Q 4")
+  const joined = (w: string) => w.length >= 2 && /^[\p{Lu}\d&]+$/u.test(w);
+  const tracked =
+    words.some((w) => w.length >= 3 && spaced(w)) &&
+    words.every((w) => w.length <= 1 || spaced(w) || joined(w)) &&
+    words.some((w) => w.length >= 5);
   return tracked ? words.map((w) => w.replace(/ /g, '')).join(' ') : text;
 }
 
@@ -110,13 +116,14 @@ interface RawItem {
 function buildRuns(items: RawItem[], page: number): Run[] {
   const runs: Array<RawItem & { str: string }> = [];
   let cur: (RawItem & { str: string }) | null = null;
-  for (const it of items) {
+  const texts = trackedTexts(items);
+  for (const [i, it] of items.entries()) {
     if (!it.str.trim()) {
       // a lone space between two items on one line
       if (cur && Math.abs(it.baseline - cur.baseline) < cur.size * 0.3 && !cur.str.endsWith(' ')) cur.str += ' ';
       continue;
     }
-    const text = detrackItem(it.str);
+    const text = texts[i];
     if (cur) {
       const gap = it.x - (cur.x + cur.w);
       const sameLine = Math.abs(it.baseline - cur.baseline) < cur.size * 0.3;
@@ -169,6 +176,24 @@ const fixChars = (s: string): string =>
 function detrackItem(s: string): string {
   const t = fixChars(s);
   return /^(?:\S ){3,}\S$/u.test(t) ? t.replace(/ /g, '') : t;
+}
+
+/**
+ * The text of each item with letter-spacing taken out. A tracked word of two or three glyphs ("Q 4") can't be told from
+ * ordinary text on its own, but beside a longer tracked word on the same line it is part of the same heading.
+ */
+function trackedTexts(items: RawItem[]): string[] {
+  const texts = items.map((it) => detrackItem(it.str));
+  const was = items.map((it, i) => texts[i] !== fixChars(it.str));
+  const near = (from: number, step: 1 | -1): number => {
+    for (let j = from + step; j >= 0 && j < items.length; j += step) if (items[j].str.trim()) return j;
+    return -1;
+  };
+  return texts.map((t, i) => {
+    if (was[i] || !/^\S(?: \S){1,2}$/u.test(t)) return t;
+    const sameLine = (j: number) => j >= 0 && was[j] && Math.abs(items[j].baseline - items[i].baseline) < items[i].size * 0.3;
+    return sameLine(near(i, -1)) || sameLine(near(i, 1)) ? t.replace(/ /g, '') : t;
+  });
 }
 
 const TOKEN_RE = /\{\{[^{}]{1,80}\}\}/g;

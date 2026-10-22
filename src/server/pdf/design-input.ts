@@ -22,7 +22,8 @@ export function pageTexts(doc: ExtractedDoc): PageText[] {
     page: pg.page,
     width: pg.width,
     height: pg.height,
-    lines: kept.filter((l) => l.page === pg.page).map((l) => ({ size: l.size, bold: l.bold, text: l.text })),
+    // a table is one line to the importer; the model reads it a row at a time
+    lines: kept.filter((l) => l.page === pg.page).flatMap((l) => l.text.split('\n').map((text) => ({ size: l.size, bold: l.bold, text }))),
   }));
 }
 
