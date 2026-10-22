@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import type { TemplateInfo } from '@shared/templates';
 import { api } from '../api';
 import type { Campaign, SettingsResponse } from '../types';
+import { BrandField } from './BrandSelect';
 import { Alert, Button, Field, Input, Modal, Spinner, useToast } from '../ui';
 
 type Mode = 'pdf' | 'template';
@@ -61,6 +62,8 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => api.get<SettingsResponse>('/settings'), staleTime: 60_000 });
   const aiOn = !!settings.data?.ai.available;
   const [polish, setPolish] = useState(true);
+  /** The brand to follow: "" is the default brand, "none" is none. */
+  const [brand, setBrand] = useState('');
 
   const upload = async (file: File) => {
     if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') return setError('Please choose a PDF file.');
@@ -72,6 +75,7 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
       form.set('file', file);
       if (name.trim()) form.set('name', name.trim());
       if (aiOn && !polish) form.set('ai', '0');
+      if (brand) form.set('brand_id', brand);
       const r = await api.upload<{ campaign: Campaign; report: string[] }>('/campaigns/import-pdf', form);
       setResult(r);
       setPhase('done');
@@ -89,6 +93,7 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
       const r = await api.post<{ campaign: Campaign }>('/campaigns', {
         name: name.trim() || chosen?.name || 'Untitled campaign',
         template,
+        brand_id: brand || undefined,
       });
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       nav(`/campaigns/${r.campaign.id}/page`);
@@ -224,6 +229,16 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
         </div>
       ) : null}
       {mode === 'template' ? (
+        <div style={{ marginBottom: 14 }}>
+          <BrandField
+            value={brand}
+            onChange={setBrand}
+            noneLabel="No brand (each template’s own look)"
+            hint="Its colours, typefaces and logo go on the page, and its voice guides the AI."
+          />
+        </div>
+      ) : null}
+      {mode === 'template' ? (
         <div className="tpl-grid" role="radiogroup" aria-label="Templates">
           {templates.isLoading ? <Spinner /> : null}
           {templates.isError ? <Alert tone="bad">The templates could not be loaded.</Alert> : null}
@@ -255,6 +270,13 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
           <Field label="Campaign name" hint="Optional. We’ll use the PDF’s title.">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Q4 outbound — Playbook" autoFocus />
           </Field>
+          <div style={{ height: 14 }} />
+          <BrandField
+            value={brand}
+            onChange={setBrand}
+            noneLabel="No brand (match the PDF’s own look)"
+            hint="Its colours, typefaces and logo go on the page, and its voice guides Claude."
+          />
           <div style={{ height: 14 }} />
           {aiOn ? (
             <label className="check" style={{ marginBottom: 12 }}>

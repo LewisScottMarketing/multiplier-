@@ -1,12 +1,19 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { applyBrand } from '@shared/brand';
 import { contrast, shiftHue } from '@shared/color';
 import { withPreset } from '@shared/presets';
+import { api } from '../../api';
 import { useCampaign } from '../../campaign';
+import { BrandField } from '../../components/BrandSelect';
 import { ImagePicker } from '../../components/ImagePicker';
 import { TokenField } from '../../components/TokenField';
+import { useBrands } from '../../lib/brands';
 import { FONT_OPTIONS } from '../../lib/fonts';
-import { Button, ColorField, Field, Input, Segmented, Select, SwitchRow } from '../../ui';
+import type { Campaign } from '../../types';
+import { Button, ColorField, Field, Input, Modal, Segmented, Select, SwitchRow, useToast } from '../../ui';
 import { ButtonEditor } from './blockForms';
 import { StyleGallery } from './StyleGallery';
 
@@ -37,6 +44,111 @@ function Group({ title, children, open: initial = false }: { title: string; chil
   );
 }
 
+/** Follow a brand: its colours, typefaces and logo go onto this page, and its voice guides the AI. */
+function BrandGroup() {
+  const c = useCampaign();
+  const toast = useToast();
+  const brands = useBrands().data?.brands ?? [];
+  const [choice, setChoice] = useState(c.draft.settings.brand_id ?? '');
+  if (!brands.length) return null;
+  const chosen = choice === 'none' ? null : (brands.find((b) => b.id === choice) ?? brands.find((b) => b.is_default) ?? brands[0]!);
+
+  const apply = () => {
+    if (chosen) c.setPage((p) => applyBrand(p, chosen));
+    c.setSettings((s) => ({ ...s, brand_id: chosen ? chosen.id : 'none' }));
+    toast.ok(chosen ? `“${chosen.name}” is on this page` : 'This campaign follows no brand');
+  };
+  return (
+    <Group title="Brand" open>
+      <BrandField
+        value={choice}
+        onChange={setChoice}
+        noneLabel="No brand"
+        hint="Its colours, typefaces and logo go onto this page, and its voice guides the AI."
+      />
+      <div>
+        <Button onClick={apply}>{chosen ? 'Apply to this page' : 'Follow no brand'}</Button>
+      </div>
+    </Group>
+  );
+}
+
+/** Build the page again from this campaign's own PDF, as a copy, so the two can be compared. */
+function RedesignGroup() {
+  const c = useCampaign();
+  const toast = useToast();
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [brand, setBrand] = useState(c.draft.settings.brand_id ?? '');
+  const [ai, setAi] = useState(true);
+  const [name, setName] = useState(`${c.campaign.name} (redesign)`);
+  const [busy, setBusy] = useState(false);
+  if (!c.draft.document) return null;
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post<{ campaign: Campaign }>(`/campaigns/${c.id}/redesign`, {
+        brand_id: brand || undefined,
+        ai: c.detail.ai_available ? ai : undefined,
+        name: name.trim() || undefined,
+      });
+      qc.invalidateQueries({ queryKey: ['campaigns'] });
+      toast.ok('Your new page is ready');
+      nav(`/campaigns/${r.campaign.id}/page`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Couldn’t build the new page');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Group title="Redesign from the PDF">
+      <div className="hint" style={{ marginTop: -4 }}>
+        Not happy with how this page looks? Build a fresh one from the same PDF, with a brand and (with AI on) Claude’s design. This page
+        isn’t touched: you get a copy to compare.
+      </div>
+      <div>
+        <Button onClick={() => setOpen(true)}>Redesign…</Button>
+      </div>
+      {open ? (
+        <Modal
+          title="Redesign this page"
+          description="We build a new campaign from the same PDF and keep this one as it is."
+          onClose={() => (busy ? undefined : setOpen(false))}
+          footer={
+            <>
+              <Button onClick={() => setOpen(false)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={run} loading={busy}>
+                Build the new page
+              </Button>
+            </>
+          }
+        >
+          <div className="col" style={{ gap: 14 }}>
+            <Field label="Name of the copy">
+              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
+            </Field>
+            <BrandField value={brand} onChange={setBrand} noneLabel="No brand (match the PDF’s own look)" />
+            {c.detail.ai_available ? (
+              <label className="check">
+                <input type="checkbox" checked={ai} onChange={(e) => setAi(e.target.checked)} />
+                <span>
+                  Let Claude design the page <span className="muted">(takes up to a minute and uses Claude credit)</span>
+                </span>
+              </label>
+            ) : null}
+            {busy ? <p className="muted small">Building the new page. This can take up to a minute.</p> : null}
+          </div>
+        </Modal>
+      ) : null}
+    </Group>
+  );
+}
+
 export function DesignPanel() {
   const c = useCampaign();
   const { theme, header, footer, seo } = c.draft.page;
@@ -47,6 +159,7 @@ export function DesignPanel() {
 
   return (
     <div>
+      <BrandGroup />
       <Group title="Style" open>
         <div className="hint" style={{ marginTop: -4 }}>
           One click changes the type, colours, corners and spacing together. Your brand colour stays.
@@ -297,6 +410,8 @@ export function DesignPanel() {
           />
         </Field>
       </Group>
+
+      <RedesignGroup />
     </div>
   );
 }

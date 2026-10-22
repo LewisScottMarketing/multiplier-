@@ -1,8 +1,8 @@
-import type { Campaign } from '@shared/schema';
+import type { Brand, BrandKit, Campaign } from '@shared/schema';
 import type { FieldInfo } from '@shared/fields';
 import type { LintIssue } from '@shared/lint';
 
-export type { Campaign, LintIssue, FieldInfo };
+export type { Brand, BrandKit, Campaign, LintIssue, FieldInfo };
 
 export interface User {
   id: string;

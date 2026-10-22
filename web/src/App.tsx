@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderKanban, LayoutDashboard, LogOut, Plug, Settings as SettingsIcon } from 'lucide-react';
+import { FolderKanban, LayoutDashboard, LogOut, Palette, Plug, Settings as SettingsIcon } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { Navigate, NavLink, Route, Routes, useMatch } from 'react-router-dom';
 import { api, ApiError } from './api';
 import { Audience } from './pages/Audience';
+import { BrandPage } from './pages/Brand';
 import { CampaignLayout } from './pages/CampaignLayout';
 import { CampaignSettings } from './pages/CampaignSettings';
 import { Campaigns } from './pages/Campaigns';
@@ -40,6 +41,9 @@ function Shell({ user }: { user: User }) {
         </NavLink>
         <NavLink to="/campaigns" className="nav-link" title="Campaigns">
           <FolderKanban size={17} /> <span className="label">Campaigns</span>
+        </NavLink>
+        <NavLink to="/brand" className="nav-link" title="Brand">
+          <Palette size={17} /> <span className="label">Brand</span>
         </NavLink>
         <div className="nav-section">Connect</div>
         <NavLink to="/integrations" className="nav-link" title="Clay & integrations">
@@ -83,6 +87,7 @@ function Shell({ user }: { user: User }) {
           <Routes>
             <Route index element={<Overview />} />
             <Route path="campaigns" element={<Campaigns />} />
+            <Route path="brand" element={<BrandPage />} />
             <Route path="integrations" element={<Integrations />} />
             <Route path="settings" element={<SettingsPage user={user} />} />
             <Route path="campaigns/:id" element={<CampaignLayout />}>

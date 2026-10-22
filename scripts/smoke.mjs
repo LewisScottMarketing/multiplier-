@@ -203,5 +203,18 @@ await step('analytics, audience export and cleanup work', async () => {
   must(gone.status === 404 || gone.status === 410, `deleted campaign's link still answers ${gone.status}`);
 });
 
+await step('a brand can be saved, and a new page follows it', async () => {
+  const b = await api('POST', '/api/brands', { name: 'Smoke Co', brand: '#d6336c', voice: 'Warm and direct.' });
+  must(b.res.status === 201 && b.json.brand.is_default, `saving a brand returned ${b.res.status}: ${b.text.slice(0, 200)}`);
+  const c = await api('POST', '/api/campaigns', { name: 'Smoke brand check', template: 'free-audit' });
+  must(
+    c.res.status === 201 && c.json.campaign.page.theme.brand === '#d6336c',
+    `the page doesn’t follow the brand: ${c.text.slice(0, 200)}`,
+  );
+  must(c.json.campaign.settings.brand_id === b.json.brand.id, 'the campaign doesn’t remember its brand');
+  await api('DELETE', `/api/campaigns/${c.json.campaign.id}`);
+  await api('DELETE', `/api/brands/${b.json.brand.id}`);
+});
+
 console.log(failed ? `\n${failed} check(s) failed` : '\nAll checks passed');
 process.exit(failed ? 1 : 0);

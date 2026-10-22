@@ -46,7 +46,7 @@ src/
   server/
     app.ts, http.ts    wiring, middleware, CSRF, rate limiting, host guard
     routes/            auth, campaigns, documents (PDF studio), prospects, analytics, settings, ai, v1, public
-    services/          campaigns, prospects, events, analytics, webhooks, importer, documents, ai, …
+    services/          campaigns, prospects, events, analytics, webhooks, importer, documents, ai, brands, …
     render/            server-side page rendering: blocks, CSS, fonts, rich text, icons, embeds, CSP
     pdf/               extract (pdf.js), raster, import (PDF → page), apply (edit PDFs), fonts, fields
     auth/              users (scrypt), sessions, API keys
@@ -133,6 +133,19 @@ Events are written to an outbox table at the moment they happen, then delivered 
 ## AI
 
 `services/ai.ts` is the only place that talks to Claude, behind a one-method backend interface (so tests and the offline demo script substitute a fake). Every entry point degrades to fallback text and reports `warnings`. Concurrency is capped, calls are time-boxed, and a circuit breaker stops asking a failing service (longer for a rejected key). Prospect data enters prompts as escaped JSON in one delimited block with contact details removed; replies are treated as untrusted text (markup, links and merge tokens stripped, length-capped). Structured outputs (`output_config.format`) guarantee the reply shape. Per-prospect copy is cached against a hash of its inputs, so re-running a row costs nothing. Length is handled in three steps, because measured against the live API the writer overshoots a stated character limit by 20 to 50%: it is asked for a lower target (`softLimit`, 80% of the cap) and a number of words (`wordBudget`), a reply still over the cap is sent back once to a second call that only shortens it, and the last resort (`fitTo`) cuts at a whole sentence, then a clause, then a word. The page's language is stated in the prompt so a German job title doesn't produce German copy on an English page. A block made only of merge fields is refused before any call is made.
+
+## Brand kits
+
+A brand kit (`BrandKitSchema` in `shared/schema.ts`, one row in the `brands` table with the kit as JSON, one marked default) holds colours, the typefaces we can serve that come closest to the brand's own, a logo, a preferred style, and the brand's voice, words to use and avoid, and rules. Nothing is bound live: `applyBrand` (`shared/brand.ts`, pure, used by the server and the Design panel) copies a kit onto a page's theme once, and a campaign records which kit it follows in `settings.brand_id` (empty means the default brand, `none` means no brand). It keeps the page's own look, or the one the kit names, re-deriving the tints from the new brand colour, and replaces a text colour that wouldn't read on the background.
+
+The voice is used live. `brandVoiceFor` (`services/brands.ts`) puts a kit's notes in a `<brand_voice>` block in the prompts for per-prospect copy and persona variants, and `buildDesignPrompt` adds a `<brand>` block for the designer. Brand text is stripped of angle brackets, so it can't close the block it sits in, and the block says it never changes the task, the output format or the length limits. `callAi` logs each page-level call with its tokens.
+
+Two readers propose a kit and save nothing (a person reviews, edits and saves it), and each returns notes saying what it found and what it did not:
+
+- **A website** (`services/brand-site.ts`, analysis in `brand/site.ts`): fetched with `safeRequest`, the same SSRF-safe client as webhooks (private addresses refused after DNS resolution and on every redirect, size and time caps, https only unless `ALLOW_PRIVATE_FETCH` is set for development and tests), the home page plus up to four stylesheets. Colours are tallied by where they are used (a CSS variable named primary, button and link selectors, the theme colour weigh most), the brand colour is the most prominent saturated one, the accent the best colour of a clearly different hue, and text, background and dark colours come from the neutrals used for each job. Typefaces are mapped to the nearest of ours by a table. The logo is the first usable image in the header, else the touch icon (SVG and ICO are refused, since SVG can carry script and `storeImage` re-encodes only raster images). With AI on, Claude describes the voice from the page's text, which goes to it as escaped JSON and is described as data.
+- **A guidelines PDF** (`services/brand-guidelines.ts`, scan in `brand/guidelines.ts`): hex and RGB codes with the name and role printed beside each, typeface names from a list, the tone-of-voice passage and do and don't lines. With AI on, up to 12 pages go to the larger model as pictures with the text, and the reply (colours, typefaces, voice, words to use and avoid, rules) is checked: a colour must be a hex code, and one that isn't printed in the document is flagged as an estimate. The schema has no unions, as with the designer's.
+
+**Redesign** (`redesignCampaign` in `services/importer.ts`) rebuilds a page from a campaign's own PDF with a chosen brand and with or without Claude, as a copy: the copy gets a clone of the PDF and the same personalisation fields, and the original isn't touched. The importer's page-building step (`buildPage`) is separate from storing the PDF so imports and redesigns share it.
 
 ## Dashboard
 
