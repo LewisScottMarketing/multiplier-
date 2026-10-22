@@ -1,3 +1,4 @@
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { unprocessable } from '../lib/errors';
 import type { Run } from './extract';
 import { hexToRgb, MAX_PAGE_POINTS, openPdf, rgbToHex } from './runtime';
@@ -205,4 +206,38 @@ export function extractPalette(rasters: Raster | Raster[]): Palette {
     brandCover: !!best && dist(dominant, brandRgb) < 60,
     found: !!best,
   };
+}
+
+// ── Pictures made from a rendered page ──────────────────────────────────────
+
+/** The page as a JPEG, for showing it to a model: smaller than the PNG, and flattened onto white. */
+export async function rasterToJpeg(r: Raster, quality = 72): Promise<Buffer> {
+  const canvas = createCanvas(r.width, r.height);
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, r.width, r.height);
+  g.drawImage(await loadImage(r.png), 0, 0);
+  return canvas.toBuffer('image/jpeg', quality);
+}
+
+/**
+ * A region of a rendered page as a PNG. `box` is left, top, right, bottom on a 0-1000 grid of the page. Returns null for a
+ * region that is too small to be a picture, or so large it is the page itself.
+ */
+export async function cropRaster(r: Raster, box: number[], pad = 12): Promise<Buffer | null> {
+  const [x0, y0, x1, y1] = box.map((n) => Math.max(0, Math.min(1000, n)));
+  if ([x0, y0, x1, y1].some((n) => n === undefined) || x1! - x0! < 40 || y1! - y0! < 40) return null;
+  const area = ((x1! - x0!) * (y1! - y0!)) / 1_000_000;
+  if (area < 0.02 || area > 0.92) return null;
+  const sx = Math.max(0, Math.round(((x0! - pad) / 1000) * r.width));
+  const sy = Math.max(0, Math.round(((y0! - pad) / 1000) * r.height));
+  const ex = Math.min(r.width, Math.round(((x1! + pad) / 1000) * r.width));
+  const ey = Math.min(r.height, Math.round(((y1! + pad) / 1000) * r.height));
+  const w = ex - sx;
+  const h = ey - sy;
+  if (w < 24 || h < 24) return null;
+  const canvas = createCanvas(w, h);
+  const g = canvas.getContext('2d');
+  g.drawImage(await loadImage(r.png), sx, sy, w, h, 0, 0, w, h);
+  return canvas.toBuffer('image/png');
 }

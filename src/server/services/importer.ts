@@ -12,6 +12,7 @@ import { isPdf, pdfGate, withTimeout } from '../pdf/runtime';
 import { getAsset, storeImage, type AssetRow } from './assets';
 import { createCampaign, requireCampaign, updateCampaign } from './campaigns';
 import { aiEnabled, polishImport } from './ai';
+import { designPageFromPdf } from './designer';
 import { forgetSource } from './documents';
 
 export interface StoredPdf {
@@ -111,22 +112,51 @@ export async function importPdfCampaign(
   const first = stored.rasters.slice(0, 3);
   const palette = extractPalette(first);
 
-  const result = await importToPage(extracted, palette, {
-    filename: input.filename,
-    saveImage: async (img) => {
-      const out = await pdfGate.run(() => withTimeout(extractImagePng(input.data, img.ref), 15_000, 'Reading an image'));
-      if (!out) return null;
-      const saved = await storeImage(app, { data: out.png, filename: `${input.filename}-${img.ref}.png` });
-      return saved.id;
-    },
-  });
-  const report = [...result.report];
-  let importedPage = result.page as Page;
-  // optional: let Claude tidy weak copy (never overrides text that already reads well; skipped silently without a key)
-  if (input.ai !== false && aiEnabled(app)) {
-    const polished = await polishImport(app, { page: importedPage, filename: input.filename });
-    importedPage = polished.page;
-    report.push(...polished.notes);
+  const embedded = async (ref: string): Promise<string | null> => {
+    const out = await pdfGate.run(() => withTimeout(extractImagePng(input.data, ref), 15_000, 'Reading an image'));
+    if (!out) return null;
+    return (await storeImage(app, { data: out.png, filename: `${input.filename}-${ref}.png` })).id;
+  };
+
+  const wantAi = input.ai !== false && aiEnabled(app);
+  let importedPage: Page | null = null;
+  let report: string[] = [];
+
+  // First choice, when AI is on: Claude looks at every page and designs the page. Whatever goes wrong, the rule-based
+  // import below still produces a page.
+  if (wantAi) {
+    const designed = await designPageFromPdf(app, {
+      data: input.data,
+      filename: input.filename,
+      extracted,
+      palette,
+      saveEmbedded: embedded,
+      savePicture: async (png, name) => (await storeImage(app, { data: png, filename: name })).id,
+    }).catch((e): { ok: false; reason: string } => {
+      app.log.warn('pdf design failed', { err: e });
+      return { ok: false, reason: 'something went wrong' };
+    });
+    if (designed.ok) {
+      importedPage = designed.page;
+      report = designed.report;
+    } else {
+      report.push(`Claude couldn’t design this page (${designed.reason}), so the standard import was used.`);
+    }
+  }
+
+  if (!importedPage) {
+    const result = await importToPage(extracted, palette, {
+      filename: input.filename,
+      saveImage: (img) => embedded(img.ref),
+    });
+    report.push(...result.report);
+    importedPage = result.page as Page;
+    // optional: let Claude tidy weak copy (never overrides text that already reads well)
+    if (wantAi) {
+      const polished = await polishImport(app, { page: importedPage, filename: input.filename });
+      importedPage = polished.page;
+      report.push(...polished.notes);
+    }
   }
 
   const headline = importedPage.blocks.find((b) => b.type === 'hero');

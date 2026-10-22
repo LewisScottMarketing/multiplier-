@@ -14,7 +14,7 @@ export interface TextLeaf {
   label: string;
 }
 
-export const VARIANT_BLOCK_TYPES = ['hero', 'text', 'features', 'checklist', 'steps', 'cta', 'note'] as const;
+export const VARIANT_BLOCK_TYPES = ['hero', 'text', 'split', 'callout', 'features', 'checklist', 'steps', 'cta', 'note'] as const;
 export const canVary = (b: Block): boolean => (VARIANT_BLOCK_TYPES as readonly string[]).includes(b.type);
 
 export function textLeaves(b: Block): TextLeaf[] {
@@ -31,6 +31,15 @@ export function textLeaves(b: Block): TextLeaf[] {
     case 'text':
       add('heading', b.heading, 240, 'Heading');
       add('body', b.body, 6000, 'Text');
+      break;
+    case 'split':
+      add('eyebrow', b.eyebrow, 120, 'Eyebrow');
+      add('heading', b.heading, 240, 'Heading');
+      add('body', b.body, 3000, 'Text');
+      break;
+    case 'callout':
+      add('eyebrow', b.eyebrow, 120, 'Eyebrow');
+      add('text', b.text, 600, 'Statement');
       break;
     case 'features':
       add('heading', b.heading, 240, 'Heading');

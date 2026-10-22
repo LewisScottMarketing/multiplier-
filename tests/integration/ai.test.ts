@@ -5,6 +5,7 @@ import { newBlock } from '../../src/shared/blocks';
 import { PageSchema } from '../../src/shared/schema';
 import { setAiBackend, type AiBackend, type AiCall, type AiResult } from '../../src/server/services/ai';
 import { createTestApp, type TestApp } from '../helpers/app';
+import { item, planBlock, playbookPlan } from '../helpers/design';
 import { bearer, createApiKey, createLiveCampaign, demoPage, publicHeaders } from '../helpers/fixtures';
 
 type Call = AiCall & { model: string; timeoutMs: number };
@@ -454,55 +455,177 @@ describe('POST /campaigns/:id/ai/variant', () => {
   });
 });
 
-describe('polishing an imported PDF', () => {
+describe('importing a PDF', () => {
   const upload = (ai?: boolean) => {
     const form = new FormData();
     form.set('file', new File([fs.readFileSync(path.resolve('tests/fixtures/playbook.pdf'))], 'playbook.pdf', { type: 'application/pdf' }));
     if (ai === false) form.set('ai', '0');
     return t.json('POST', '/api/campaigns/import-pdf', form);
   };
+  const types = (r: { body: { campaign: { page: { blocks: Array<{ type: string }> } } } }) =>
+    r.body.campaign.page.blocks.map((b) => b.type);
+  const polishReply = writes({
+    headline: 'Something else entirely',
+    subheadline: 'Another line.',
+    cta_heading: 'Get your copy',
+    cta_text: 'Free.',
+    cta_button: 'Download',
+    seo_title: 'T',
+    seo_description: 'D',
+  });
+  /** Answers the design request with `design`, and any later request (the polish) with `polish`. */
+  const scripted = (design: AiResult, polish: AiResult = polishReply) => fake((call) => (call.label === 'pdf-design' ? design : polish));
 
-  it('asks the smart model, and leaves a page that already reads well exactly as the importer made it', async () => {
-    const { calls, backend } = fake(() =>
-      writes({
-        headline: 'Something else entirely',
-        subheadline: 'Another line.',
-        cta_heading: 'Get your copy',
-        cta_text: 'Free.',
-        cta_button: 'Download',
-        seo_title: 'T',
-        seo_description: 'D',
-      }),
-    );
-    setAiBackend(t.ctx, backend);
-    const withAi = await upload();
-    expect(withAi.status).toBe(201);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.tier).toBe('smart');
-    expect(calls[0]!.model).toBe(t.ctx.config.aiModelSmart);
-    expect(calls[0]!.user).toContain('The 2026 Outbound Pipeline Playbook');
-    const plain = await upload(false);
-    // the document's own headline, sub-headline, SEO and call to action are all fine, so nothing is overridden
-    expect(withAi.body.campaign.page.blocks.map((b: { type: string }) => b.type)).toEqual(
-      plain.body.campaign.page.blocks.map((b: { type: string }) => b.type),
-    );
-    expect(withAi.body.campaign.page.blocks[0].headline).toBe('The 2026 Outbound Pipeline Playbook');
-    expect(withAi.body.campaign.page.seo.description).toBe(plain.body.campaign.page.seo.description);
-    expect(withAi.body.report.join(' ')).not.toMatch(/AI (wrote|shortened|added)/);
+  describe('when Claude designs the page', () => {
+    it('shows it every page with the text, and builds the page from its plan', async () => {
+      const { calls, backend } = scripted({ ok: true, data: playbookPlan() });
+      setAiBackend(t.ctx, backend);
+      const r = await upload();
+      expect(r.status).toBe(201);
+
+      expect(calls).toHaveLength(1); // a designed page is not polished on top
+      const call = calls[0]!;
+      expect(call.label).toBe('pdf-design');
+      expect(call.tier).toBe('smart');
+      expect(call.model).toBe(t.ctx.config.aiModelSmart);
+      expect(call.images).toHaveLength(3);
+      expect(call.images!.map((i) => i.label)).toEqual(['Page 1:', 'Page 2:', 'Page 3:']);
+      for (const im of call.images!) {
+        expect(im.media_type).toBe('image/jpeg');
+        expect(Buffer.from(im.data, 'base64').subarray(0, 3).toString('hex')).toBe('ffd8ff');
+      }
+      expect(call.user).toContain('Pipeline Playbook'); // the title wraps over lines on the cover, so the words are what's sent
+      expect(call.user).toContain('P2-I1'); // the one picture inside the PDF is on offer by name
+      expect(call.system).toMatch(/never invent/i);
+
+      const page = r.body.campaign.page;
+      expect(types(r)).toEqual(['hero', 'callout', 'stats', 'split', 'testimonial', 'steps', 'cta', 'form']);
+      expect(page.blocks[0].headline).toBe('The 2026 Outbound Pipeline Playbook');
+      const split = page.blocks.find((b: { type: string }) => b.type === 'split');
+      expect(split.image?.src).toMatch(/^ast_/); // the embedded picture was stored and placed
+      expect(split.image?.alt).toBe('A chart of reply rates');
+      expect(page.blocks.find((b: { type: string }) => b.type === 'stats').items.map((i: { value: string }) => i.value)).toEqual([
+        '3.4x',
+        '47%',
+        '$1.2M',
+      ]);
+      expect(r.body.report.join(' ')).toMatch(/Claude read 3 pages and designed the page/);
+      expect(r.body.report.join(' ')).not.toMatch(/couldn’t design/);
+    });
+
+    it('keeps a figure that is not in the PDF off the page, and says so', async () => {
+      const plan = playbookPlan();
+      plan.blocks.splice(
+        2,
+        0,
+        planBlock({
+          type: 'stats',
+          heading: 'Results',
+          items: [item({ value: '312%', label: 'growth in pipeline' }), item({ value: '47%', label: 'shorter sales cycles' })],
+        }),
+      );
+      setAiBackend(t.ctx, scripted({ ok: true, data: plan }).backend);
+      const r = await upload();
+      expect(r.status).toBe(201);
+      const rendered = JSON.stringify(r.body.campaign.page);
+      expect(rendered).not.toContain('312%');
+      expect(r.body.report.join(' ')).toMatch(/Left out .*figures that are not in the PDF/);
+      expect(types(r)).toContain('stats'); // the sourced stats block stays
+    });
+
+    it('uses the standard import, and says why, when its reply is not a page plan', async () => {
+      const { calls, backend } = scripted({ ok: true, data: { headline: 'Not a plan' } });
+      setAiBackend(t.ctx, backend);
+      const r = await upload();
+      expect(r.status).toBe(201);
+      expect(r.body.report.join(' ')).toMatch(
+        /Claude couldn’t design this page \(its reply wasn’t a page plan\), so the standard import was used\./,
+      );
+      const plain = await upload(false);
+      expect(types(r)).toEqual(types(plain));
+      expect(calls.map((c) => c.label)).toContain('pdf-design');
+      expect(calls.some((c) => c.label !== 'pdf-design')).toBe(true); // the polish still gets its turn
+    });
+
+    it('uses the standard import when the plan is mostly made up', async () => {
+      const plan = playbookPlan({
+        hero: { ...playbookPlan().hero, headline: 'Revolutionary quantum blockchain synergy platform for galactic enterprises' },
+        blocks: [
+          planBlock({
+            type: 'text',
+            heading: 'Cosmic scale',
+            text: 'Our spaceships orbit distant planets delivering unparalleled intergalactic value propositions every single day.',
+          }),
+          planBlock({
+            type: 'text',
+            heading: 'More cosmos',
+            text: 'Nebula based machine learning powers all of our extraterrestrial customer success programmes worldwide.',
+          }),
+        ],
+      });
+      setAiBackend(t.ctx, scripted({ ok: true, data: plan }).backend);
+      const r = await upload();
+      expect(r.status).toBe(201);
+      expect(r.body.report.join(' ')).toMatch(/Claude couldn’t design this page \(its wording strayed too far from the document\)/);
+      expect(JSON.stringify(r.body.campaign.page)).not.toMatch(/quantum|blockchain|spaceships/);
+    });
+
+    it('uses the standard import, and says why, when the AI fails', async () => {
+      const { calls, backend } = fake(() => ({ ok: false, reason: 'timeout', message: 'The AI took too long to answer.' }));
+      setAiBackend(t.ctx, backend);
+      const r = await upload();
+      expect(r.status).toBe(201);
+      expect(r.body.report.join(' ')).toMatch(
+        /Claude couldn’t design this page \(The AI took too long to answer\), so the standard import was used\./,
+      );
+      expect(types(r)).toEqual(types(await upload(false)));
+      expect(calls[0]!.label).toBe('pdf-design');
+    });
+
+    it('is not asked at all on request', async () => {
+      const { calls, backend } = scripted({ ok: true, data: playbookPlan() });
+      setAiBackend(t.ctx, backend);
+      const r = await upload(false);
+      expect(r.status).toBe(201);
+      expect(calls).toHaveLength(0);
+      expect(r.body.report.join(' ')).not.toMatch(/Claude/);
+    });
+
+    it('is not asked when AI is not configured', async () => {
+      const r = await upload();
+      expect(r.status).toBe(201);
+      expect(r.body.report.join(' ')).not.toMatch(/Claude couldn’t design/);
+    });
   });
 
-  it('still imports when the AI fails, and notes that it was skipped', async () => {
-    setAiBackend(t.ctx, fake(() => ({ ok: false, reason: 'timeout', message: 'The AI took too long to answer.' })).backend);
-    const r = await upload();
-    expect(r.status).toBe(201);
-    expect(r.body.report.join(' ')).toMatch(/AI polish skipped/);
-  });
+  describe('polishing the standard import', () => {
+    // Designing fails in these (the scripted reply is not a plan), so the standard import runs and is polished.
+    const designFails: AiResult = { ok: false, reason: 'unavailable', message: 'Couldn’t reach the AI service.' };
 
-  it('is skipped on request', async () => {
-    const { calls, backend } = fake(() => writes({}));
-    setAiBackend(t.ctx, backend);
-    await upload(false);
-    expect(calls).toHaveLength(0);
+    it('asks the smart model, and leaves a page that already reads well exactly as the importer made it', async () => {
+      const { calls, backend } = scripted(designFails);
+      setAiBackend(t.ctx, backend);
+      const withAi = await upload();
+      expect(withAi.status).toBe(201);
+      const polish = calls.filter((c) => c.label !== 'pdf-design');
+      expect(polish).toHaveLength(1);
+      expect(polish[0]!.tier).toBe('smart');
+      expect(polish[0]!.model).toBe(t.ctx.config.aiModelSmart);
+      expect(polish[0]!.user).toContain('The 2026 Outbound Pipeline Playbook');
+      const plain = await upload(false);
+      // the document's own headline, sub-headline, SEO and call to action are all fine, so nothing is overridden
+      expect(types(withAi)).toEqual(types(plain));
+      expect(withAi.body.campaign.page.blocks[0].headline).toBe('The 2026 Outbound Pipeline Playbook');
+      expect(withAi.body.campaign.page.seo.description).toBe(plain.body.campaign.page.seo.description);
+      expect(withAi.body.report.join(' ')).not.toMatch(/AI (wrote|shortened|added)/);
+    });
+
+    it('still imports when the polish fails too, and notes that it was skipped', async () => {
+      setAiBackend(t.ctx, fake(() => ({ ok: false, reason: 'timeout', message: 'The AI took too long to answer.' })).backend);
+      const r = await upload();
+      expect(r.status).toBe(201);
+      expect(r.body.report.join(' ')).toMatch(/AI polish skipped/);
+    });
   });
 });
 

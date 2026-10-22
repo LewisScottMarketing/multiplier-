@@ -160,7 +160,7 @@ const norm = (s: string) => s.toLowerCase().replace(/\d+/g, '#').replace(/\s+/g,
  * Running headers/footers and page numbers: text near the top or bottom edge that is a page number,
  * legal boilerplate, or repeated on several pages. The legal line is kept as the page footer.
  */
-function dropFurniture(lines: Line[], pages: PageInfo[]): { kept: Line[]; footer: string } {
+export function dropFurniture(lines: Line[], pages: PageInfo[]): { kept: Line[]; footer: string } {
   const edge = (l: Line) => {
     const pg = pages[l.page - 1];
     return l.y < pg.height * 0.075 || l.y + l.h > pg.height * 0.925;

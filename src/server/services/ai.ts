@@ -29,6 +29,15 @@ import { getProspect, setAiValues, aiFieldValue, contextFor, type Prospect } fro
 export type AiFailure = 'refused' | 'timeout' | 'rate_limited' | 'auth' | 'config' | 'unavailable' | 'bad_output';
 export type AiResult = { ok: true; data: unknown } | { ok: false; reason: AiFailure; message: string };
 
+/** A picture the model should look at, sent ahead of the text of the request. */
+export interface AiImage {
+  media_type: 'image/jpeg' | 'image/png';
+  /** Base64, no data-URL prefix. */
+  data: string;
+  /** Said just before the picture ("Page 3"), so the model can refer to it. */
+  label?: string;
+}
+
 export interface AiCall {
   /** `fast` for per-prospect copy, `smart` for work done once per campaign. */
   tier: 'fast' | 'smart';
@@ -41,6 +50,8 @@ export interface AiCall {
   maxTokens: number;
   effort?: 'low' | 'medium' | 'high';
   timeoutMs?: number;
+  /** Pictures to look at (pages of a document, say). Each is labelled in the request. */
+  images?: AiImage[];
   /**
    * A person clicked something and is waiting for this (the "Try it" button, "Write a version for…", an import).
    * It skips the circuit breaker, so fixing a key or adding credit can be checked straight away, and a success closes it.
@@ -80,7 +91,7 @@ export class AnthropicBackend implements AiBackend {
           model: call.model,
           max_tokens: call.maxTokens,
           system: call.system,
-          messages: [{ role: 'user', content: call.user }],
+          messages: [{ role: 'user', content: userContent(call) }],
           output_config: {
             ...(supportsEffort(call.model) ? { effort: call.effort ?? 'low' } : {}),
             format: { type: 'json_schema', schema: call.schema },
@@ -98,6 +109,18 @@ export class AnthropicBackend implements AiBackend {
       return classify(e);
     }
   }
+}
+
+/** Plain text for an ordinary call; for one with pictures, each picture after a line saying what it is, then the text. */
+export function userContent(call: Pick<AiCall, 'user' | 'images'>): string | Anthropic.ContentBlockParam[] {
+  if (!call.images?.length) return call.user;
+  const parts: Anthropic.ContentBlockParam[] = [];
+  for (const im of call.images) {
+    if (im.label) parts.push({ type: 'text', text: im.label });
+    parts.push({ type: 'image', source: { type: 'base64', media_type: im.media_type, data: im.data } });
+  }
+  parts.push({ type: 'text', text: call.user });
+  return parts;
 }
 
 function classify(e: unknown): AiResult {

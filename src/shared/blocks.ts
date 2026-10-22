@@ -34,6 +34,9 @@ export const BLOCK_TYPES: BlockMeta[] = [
   { type: 'checklist', label: 'Checklist', description: 'Bulleted or numbered list', icon: 'list-checks', group: 'Content' },
   { type: 'steps', label: 'Steps', description: 'A numbered process', icon: 'list-ordered', group: 'Content' },
   { type: 'image', label: 'Image', description: 'A single picture or chart', icon: 'image', group: 'Content' },
+  { type: 'split', label: 'Picture and text', description: 'A picture beside a heading and text', icon: 'columns-2', group: 'Content' },
+  { type: 'callout', label: 'Highlight', description: 'One key message, set large', icon: 'message-square-quote', group: 'Content' },
+  { type: 'table', label: 'Table', description: 'Rows and columns, for comparisons and prices', icon: 'table', group: 'Content' },
   { type: 'video', label: 'Video', description: 'YouTube, Vimeo, Loom or Wistia', icon: 'play-circle', group: 'Content' },
   { type: 'stats', label: 'Stats', description: 'Big numbers with labels', icon: 'bar-chart-3', group: 'Proof' },
   { type: 'testimonial', label: 'Testimonial', description: 'A customer quote', icon: 'quote', group: 'Proof' },
@@ -128,6 +131,28 @@ export function newBlock(type: BlockType, overrides: Partial<Block> = {}): Block
         return { type, id, heading: 'Trusted by teams at', grayscale: true, items: [] };
       case 'image':
         return { type, id, image: { src: '', alt: '' }, width: 'content' as const };
+      case 'split':
+        return {
+          type,
+          id,
+          heading: 'A heading that sits beside the picture',
+          body: 'Explain the point in a few plain sentences. A short list works well too:\n\n- The first thing\n- The second thing',
+          side: 'right' as const,
+        };
+      case 'callout':
+        return { type, id, text: 'The one thing you want them to remember, in a sentence.' };
+      case 'table':
+        return {
+          type,
+          id,
+          heading: 'How the options compare',
+          rows: [
+            ['', 'Starter', 'Growth'],
+            ['Price', '$99', '$399'],
+            ['Prospects a month', '500', '5,000'],
+          ],
+          header: true,
+        };
       case 'video':
         return { type, id, heading: 'Watch a short walkthrough', url: '' };
       case 'cta':

@@ -9,6 +9,7 @@ import {
   CalendarDays,
   CircleHelp,
   Code,
+  Columns2,
   Copy,
   Eye,
   EyeOff,
@@ -19,6 +20,7 @@ import {
   ListChecks,
   ListOrdered,
   MessageSquareHeart,
+  MessageSquareQuote,
   Minus,
   MousePointerClick,
   PanelTop,
@@ -26,6 +28,7 @@ import {
   Plus,
   Quote,
   Square,
+  Table,
   TextCursorInput,
   Trash2,
   Users,
@@ -58,6 +61,9 @@ const BLOCK_ICONS: Record<string, LucideIcon> = {
   'calendar-days': CalendarDays,
   'file-down': FileDown,
   'circle-help': CircleHelp,
+  'columns-2': Columns2,
+  'message-square-quote': MessageSquareQuote,
+  table: Table,
   code: Code,
   minus: Minus,
 };
@@ -88,6 +94,12 @@ export function blockSummary(b: Block): string {
       return `${b.items.length} logos`;
     case 'image':
       return s(b.caption || b.image.alt) || 'Picture';
+    case 'split':
+      return s(b.heading || b.body);
+    case 'callout':
+      return s(b.text);
+    case 'table':
+      return s(b.heading) || `${b.rows.length} rows`;
     case 'video':
       return s(b.heading) || 'Video';
     case 'cta':

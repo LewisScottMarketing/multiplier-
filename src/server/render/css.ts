@@ -223,6 +223,31 @@ strong{font-weight:650}
 .logos.gray img{filter:grayscale(1);opacity:.6}
 .logos-head{text-align:center;color:var(--muted);font-size:.92rem;margin-bottom:1.6rem;letter-spacing:.02em}
 
+/* picture beside text */
+.split-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(28px,5vw,64px);align-items:center}
+.split.flip .split-media{order:-1}
+.split.no-media .split-grid{grid-template-columns:minmax(0,46rem)}
+.split-media img{width:100%;border-radius:var(--radius);box-shadow:0 24px 50px -22px rgba(15,23,42,.35),0 0 0 1px var(--ring)}
+.bg-brand .split-media img,.bg-dark .split-media img{box-shadow:0 30px 60px -24px rgba(0,0,0,.6),0 0 0 1px var(--ring)}
+.split-text .prose>:last-child{margin-bottom:0}
+.split-text .btn-row{margin-top:1.4rem}
+
+/* one statement, set large */
+.callout{max-width:54rem;margin:0 auto}
+.callout-text{font-family:var(--font-head);font-weight:calc(var(--hw) - 60);font-size:clamp(1.6rem,3.6vw,2.6rem);line-height:1.2;letter-spacing:var(--track);text-wrap:balance;margin:0}
+.callout-by{margin-top:1.2rem;color:var(--muted);font-size:1rem}
+.callout .eyebrow{margin-bottom:1rem}
+
+/* table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
+.table-wrap:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:2px}
+.table-wrap table{border-collapse:collapse;width:100%;min-width:460px;font-size:.98rem}
+.table-wrap th,.table-wrap td{padding:.85em 1.1em;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+.table-wrap thead th{background:color-mix(in srgb,var(--text) 5%,transparent);font-weight:650;font-size:.9rem}
+.table-wrap tbody th{font-weight:620}
+.table-wrap tr:last-child>*{border-bottom:0}
+.table-cap{color:var(--muted);font-size:.9rem;margin:.8rem 0 0}
+
 /* media */
 .figure{margin:0}.figure img{width:100%;border-radius:var(--radius)}
 .figure figcaption{color:var(--muted);font-size:.92rem;margin-top:.8rem;text-align:center}
@@ -292,7 +317,8 @@ strong{font-weight:650}
 @media (max-width:860px){
   body{font-size:16.5px}
   .blk{padding:calc(var(--pad) * .74) 0}.blk.pad-lg{padding:calc(var(--pad) * .95) 0}.blk.pad-sm{padding:calc(var(--pad) * .42) 0}
-  .hero-grid,.doc{grid-template-columns:1fr;gap:36px}
+  .hero-grid,.doc,.split-grid{grid-template-columns:1fr;gap:36px}
+  .split.flip .split-media{order:0}
   .hero.flip .hero-media{order:0}
   .cols-3,.cols-4{grid-template-columns:repeat(2,1fr)}
   .m-tilt .mi{transform:none}

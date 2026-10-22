@@ -75,6 +75,32 @@ describe('talking to Claude', () => {
     }
   });
 
+  it('shows pictures ahead of the question, each after a line saying what it is', async () => {
+    const n = network({ body: message([{ type: 'text', text: '{"opening":"Hi"}' }]) });
+    await new AnthropicBackend('k', { fetch: n.fetchImpl }).complete({
+      ...call(),
+      images: [
+        { media_type: 'image/jpeg', data: 'AAAA', label: 'Page 1:' },
+        { media_type: 'image/png', data: 'BBBB' },
+      ],
+    });
+    expect(n.seen[0].body.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Page 1:' },
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } },
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'BBBB' } },
+          { type: 'text', text: 'hello' },
+        ],
+      },
+    ]);
+
+    const none = network({ body: message([{ type: 'text', text: '{"opening":"Hi"}' }]) });
+    await new AnthropicBackend('k', { fetch: none.fetchImpl }).complete({ ...call(), images: [] });
+    expect(none.seen[0].body.messages).toEqual([{ role: 'user', content: 'hello' }]);
+  });
+
   it('reads the answer by type, even when thinking comes first', async () => {
     const n = network({
       body: message([

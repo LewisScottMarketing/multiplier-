@@ -112,8 +112,9 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
                 <i />
               </div>
               <p className="muted small">
-                Reading the text and layout, picking your brand colour and drafting the page. This usually takes a few seconds
-                {aiOn && polish ? ', a little longer with AI polish' : ''}.
+                {aiOn && polish
+                  ? 'Claude is looking at every page and designing the page from it. This takes up to a minute.'
+                  : 'Reading the text and layout, picking your brand colour and drafting the page. This usually takes a few seconds.'}
               </p>
             </>
           ) : (
@@ -259,8 +260,11 @@ export function NewCampaignModal({ onClose }: { onClose: () => void }) {
             <label className="check" style={{ marginBottom: 12 }}>
               <input type="checkbox" checked={polish} onChange={(e) => setPolish(e.target.checked)} />
               <span>
-                Let Claude tidy the copy where the PDF’s wording is weak{' '}
-                <span className="muted">(optional; it never rewrites text that already reads well)</span>
+                Let Claude design the page{' '}
+                <span className="muted">
+                  (it looks at every page and lays the content out with the best-fitting blocks, which takes up to a minute and uses a
+                  little of your Claude credit. If anything looks off, the standard import is used instead)
+                </span>
               </span>
             </label>
           ) : null}

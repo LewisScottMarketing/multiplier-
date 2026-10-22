@@ -226,6 +226,64 @@ function image(b: BlockOf<'image'>, r: R): string {
   );
 }
 
+function split(b: BlockOf<'split'>, r: R): string {
+  const img = r.img(b.image);
+  const media = img ? `<div class="split-media"><img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="lazy"></div>` : '';
+  const eyebrow = b.eyebrow ? `<span class="eyebrow">${r.inline(b.eyebrow)}</span>` : '';
+  const text = `<div class="split-text">${eyebrow}${heading(r, b.heading)}<div class="prose">${r.rich(b.body)}</div>${buttons(r.button(b.button, 'button', 'primary'))}</div>`;
+  return section(
+    b,
+    `split${b.side === 'left' ? ' flip' : ''}${img ? '' : ' no-media'}`,
+    wrap(`<div class="split-grid">${text}${media}</div>`),
+    'left',
+  );
+}
+
+function callout(b: BlockOf<'callout'>, r: R): string {
+  const text = r.inline(b.text).trim();
+  if (!text) return '';
+  const eyebrow = b.eyebrow ? `<span class="eyebrow">${r.inline(b.eyebrow)}</span>` : '';
+  const by = b.attribution ? `<div class="callout-by">${r.inline(b.attribution)}</div>` : '';
+  return section(b, 'callout', wrap(`<div class="callout">${eyebrow}<p class="callout-text">${text}</p>${by}</div>`), 'center');
+}
+
+function table(b: BlockOf<'table'>, r: R): string {
+  const rows = b.rows.filter((row) => row.some((c) => c.trim()));
+  if (!rows.length) return '';
+  const cols = Math.max(...rows.map((row) => row.length));
+  const cell = (c: string | undefined, tag: 'th' | 'td', scope?: string) =>
+    `<${tag}${scope ? ` scope="${scope}"` : ''}>${r.inline(c ?? '')}</${tag}>`;
+  const across = (row: string[], tag: (i: number) => 'th' | 'td', scope: (i: number) => string | undefined) =>
+    `<tr>${Array.from({ length: cols }, (_, i) => cell(row[i], tag(i), scope(i))).join('')}</tr>`;
+  const [first, ...rest] = rows;
+  const head =
+    b.header && first
+      ? `<thead>${across(
+          first,
+          () => 'th',
+          () => 'col',
+        )}</thead>`
+      : '';
+  const body = (b.header ? rest : rows)
+    .map((row) =>
+      across(
+        row,
+        (i) => (i === 0 ? 'th' : 'td'),
+        (i) => (i === 0 ? 'row' : undefined),
+      ),
+    )
+    .join('');
+  const label = esc(r.plain(b.heading) || 'Table');
+  const cap = b.caption ? `<p class="table-cap">${r.inline(b.caption)}</p>` : '';
+  return section(
+    b,
+    'table',
+    wrap(
+      `${sectionHead(r, b.heading, b.intro)}<div class="table-wrap" role="region" aria-label="${label}" tabindex="0"><table>${head}<tbody>${body}</tbody></table></div>${cap}`,
+    ),
+  );
+}
+
 function video(b: BlockOf<'video'>, r: R): string {
   const e = videoEmbed(r.url(b.url));
   if (!e) return '';
@@ -419,7 +477,20 @@ function section(b: Block, cls: string, inner: string, forceAlign?: 'left' | 'ce
 }
 
 /** Sections that read as one run of content when they share a background, so the gap between them should not double up. */
-const FLOWING = new Set<Block['type']>(['text', 'features', 'checklist', 'steps', 'stats', 'faq', 'logos', 'image', 'video', 'html']);
+const FLOWING = new Set<Block['type']>([
+  'text',
+  'split',
+  'table',
+  'features',
+  'checklist',
+  'steps',
+  'stats',
+  'faq',
+  'logos',
+  'image',
+  'video',
+  'html',
+]);
 
 /** True when `b` follows `prev` on the same background, with nobody having asked for particular spacing. */
 export const joinsPrevious = (b: Block, prev: Block | undefined): boolean =>
@@ -453,6 +524,12 @@ function renderBlockHtml(b: Block, r: R): string {
       return logos(b, r);
     case 'image':
       return image(b, r);
+    case 'split':
+      return split(b, r);
+    case 'callout':
+      return callout(b, r);
+    case 'table':
+      return table(b, r);
     case 'video':
       return video(b, r);
     case 'cta':

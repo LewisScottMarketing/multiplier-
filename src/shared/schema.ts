@@ -234,6 +234,43 @@ export const ImageBlock = z.object({
   width: z.enum(['content', 'wide', 'full']).default('content'),
 });
 
+/** A picture beside a heading and text: the staple landing-page layout. */
+export const SplitBlock = z.object({
+  ...blockBase,
+  type: z.literal('split'),
+  eyebrow: text(120).optional(),
+  heading: text(240).optional(),
+  body: text(3000).default(''),
+  image: ImageSchema.optional(),
+  /** Which side the picture sits on, on a wide screen. */
+  side: z.enum(['right', 'left']).default('right'),
+  button: ButtonSchema.optional(),
+});
+
+/** One statement set large: a key message, a pull quote or a one-line slide. */
+export const CalloutBlock = z.object({
+  ...blockBase,
+  type: z.literal('callout'),
+  eyebrow: text(120).optional(),
+  text: text(600).default(''),
+  /** Who said it, or where it comes from. */
+  attribution: text(160).optional(),
+});
+
+/** A grid of short cells, for comparisons, prices and results. The first row is the header unless `header` is off. */
+export const TableBlock = z.object({
+  ...blockBase,
+  type: z.literal('table'),
+  heading: text(240).optional(),
+  intro: text(600).optional(),
+  rows: z
+    .array(z.array(text(200)).max(8))
+    .max(40)
+    .default([]),
+  header: z.boolean().default(true),
+  caption: text(300).optional(),
+});
+
 export const VideoBlock = z.object({
   ...blockBase,
   type: z.literal('video'),
@@ -324,6 +361,9 @@ export const BlockSchema = z.discriminatedUnion('type', [
   TestimonialBlock,
   LogosBlock,
   ImageBlock,
+  SplitBlock,
+  CalloutBlock,
+  TableBlock,
   VideoBlock,
   CtaBlock,
   FormBlock,

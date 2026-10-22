@@ -33,7 +33,8 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { tableToText, textToTable } from '@shared/table-text';
 import { ICON_NAMES, type Block, type BlockType, type Button as ButtonT, type FormField, type ImageRef } from '@shared/schema';
 import { useCampaign } from '../../campaign';
 import { ImagePicker } from '../../components/ImagePicker';
@@ -100,6 +101,7 @@ export type FieldDef =
       summary?: (item: Record<string, unknown>) => string;
     }
   | { kind: 'strings'; key: string; label: string; placeholder?: string; max?: number; hint?: string }
+  | { kind: 'table'; key: string; label: string; hint?: string }
   | { kind: 'formfields'; key: string };
 
 const t = (key: string, label: string, extra: Partial<Extract<FieldDef, { kind: 'text' }>> = {}): FieldDef => ({
@@ -165,6 +167,34 @@ export const FORMS: Record<BlockType, FieldDef[]> = {
       showIf: (b) => !b.layout || b.layout === 'split',
     },
     t('eyebrow', 'Small label above the headline'),
+  ],
+  split: [
+    t('eyebrow', 'Small label above the heading'),
+    t('heading', 'Heading'),
+    t('body', 'Text', { multiline: true, rows: 8, hint: 'Supports **bold**, *italic*, [links](https://…) and “- ” bullet lists.' }),
+    { kind: 'image', key: 'image', label: 'Picture', optional: true },
+    {
+      kind: 'select',
+      key: 'side',
+      label: 'Picture on the',
+      options: [
+        ['right', 'Right'],
+        ['left', 'Left'],
+      ],
+    },
+    { kind: 'button', key: 'button', label: 'Button', optional: true },
+  ],
+  callout: [
+    t('eyebrow', 'Small label above'),
+    t('text', 'Statement', { multiline: true, rows: 3 }),
+    t('attribution', 'Who or where from', { hint: 'Shown small underneath. Leave empty for none.' }),
+  ],
+  table: [
+    t('heading', 'Heading'),
+    t('intro', 'Intro', { multiline: true, rows: 2 }),
+    { kind: 'table', key: 'rows', label: 'Table', hint: 'One row per line, with the cells separated by “ | ”.' },
+    { kind: 'switch', key: 'header', label: 'The first row is a header' },
+    t('caption', 'Note under the table'),
   ],
   note: [
     t('from_name', 'From'),
@@ -730,6 +760,43 @@ function StringsEditor({
   );
 }
 
+function TableEditor({
+  def,
+  rows,
+  onChange,
+}: {
+  def: Extract<FieldDef, { kind: 'table' }>;
+  rows: string[][];
+  onChange: (v: string[][]) => void;
+}) {
+  // keep what is being typed as typed; only take the stored rows back when they changed from somewhere else (undo, say)
+  const [text, setText] = useState(() => tableToText(rows));
+  const mine = useRef(tableToText(rows));
+  useEffect(() => {
+    const incoming = tableToText(rows);
+    if (incoming !== mine.current) {
+      mine.current = incoming;
+      setText(incoming);
+    }
+  }, [rows]);
+  return (
+    <TokenField
+      label={def.label}
+      hint={def.hint}
+      multiline
+      rows={9}
+      mono
+      value={text}
+      onChange={(v) => {
+        setText(v);
+        const parsed = textToTable(v);
+        mine.current = tableToText(parsed);
+        onChange(parsed);
+      }}
+    />
+  );
+}
+
 export function FieldRenderer({
   def,
   value,
@@ -795,6 +862,8 @@ export function FieldRenderer({
       return <ListEditor def={def} items={(value as Array<Record<string, unknown>>) ?? []} onChange={onChange} />;
     case 'strings':
       return <StringsEditor def={def} items={(value as string[]) ?? []} onChange={onChange} />;
+    case 'table':
+      return <TableEditor def={def} rows={(value as string[][]) ?? []} onChange={onChange} />;
     case 'formfields':
       return <FormFieldsEditor value={(value as FormField[]) ?? []} onChange={onChange} />;
   }
