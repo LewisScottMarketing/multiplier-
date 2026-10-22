@@ -167,6 +167,17 @@ const MIGRATIONS: string[] = [
   CREATE INDEX deliveries_campaign ON webhook_deliveries(campaign_id);
   CREATE INDEX deliveries_created ON webhook_deliveries(created_at);
   `,
+
+  /* 3 — brand kits: a company's colours, typefaces, logo and voice, for pages and the AI to follow */ `
+  CREATE TABLE brands (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    data       TEXT NOT NULL,                       -- JSON: the BrandKit
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export function migrate(db: Db): void {

@@ -6,6 +6,7 @@ import type { AiField, Block, Campaign, Page } from '@shared/schema';
 import { newBlockId } from '@shared/blocks';
 import { parseTemplate, renderTemplate, toStr, type Ctx } from '@shared/template';
 import type { AppContext } from '../context';
+import { brandVoiceFor } from './brands';
 import { getProspect, setAiValues, aiFieldValue, contextFor, type Prospect } from './prospects';
 
 /**
@@ -352,7 +353,7 @@ export function fitTo(s: string, max: number): string {
 
 const LT = `\\u${'003c'}`;
 /** JSON for a prompt: valid JSON, but with `<` escaped so data can never fake a closing tag. */
-const safeJson = (v: unknown) => JSON.stringify(v, null, 1).replace(/</g, LT);
+export const safeJson = (v: unknown) => JSON.stringify(v, null, 1).replace(/</g, LT);
 
 // ── What the writer is told about a prospect ────────────────────────────────
 
@@ -484,7 +485,7 @@ const failureWarning = (res: Extract<AiResult, { ok: false }>): AiWarning => {
 /** One call that writes every requested field for one set of facts. Empty or unusable output is simply absent. */
 export async function writeFields(
   ctx: AppContext,
-  campaign: Pick<Campaign, 'name' | 'page'>,
+  campaign: Pick<Campaign, 'name' | 'page' | 'settings'>,
   fields: AiField[],
   facts: Record<string, string>,
   opts: { interactive?: boolean } = {},
@@ -495,7 +496,7 @@ export async function writeFields(
 ${campaignBrief(campaign)}
 </campaign>
 
-<prospect_data>
+${brandVoiceFor(ctx, campaign)}<prospect_data>
 ${safeJson(facts)}
 </prospect_data>
 
@@ -674,7 +675,7 @@ export async function suggestVariant(
 ${campaignBrief(campaign)}
 </campaign>
 
-<audience>
+${brandVoiceFor(ctx, campaign)}<audience>
 ${persona.label}: ${persona.description}
 </audience>
 

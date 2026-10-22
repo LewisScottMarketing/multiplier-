@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { STANDARD_FIELDS } from '@shared/fields';
+import { applyBrand } from '@shared/brand';
 import { lintCampaign } from '@shared/lint';
 import { CAMPAIGN_STATUSES, CampaignUpdateSchema, CampaignSettingsSchema, DocumentSchema, PageSchema } from '@shared/schema';
 import { TEMPLATES, buildTemplate, templateInfo } from '@shared/templates';
@@ -22,6 +23,7 @@ import { customFieldNames } from '../services/prospects';
 import { parsePreviewSource, previewSourceString, PreviewSourceSchema, renderPreview } from '../services/render';
 import { pageUrl } from '../services/links';
 import { aiEnabled } from '../services/ai';
+import { chooseBrand, NO_BRAND } from '../services/brands';
 
 export function campaignRoutes() {
   const r = new Hono<Env>();
@@ -34,10 +36,24 @@ export function campaignRoutes() {
 
   r.post('/', async (c) => {
     const app = c.get('app');
-    const body = await jsonBody(c, z.object({ name: z.string().trim().min(1).max(120), template: z.string().max(40).optional() }));
-    const page = body.template ? buildTemplate(body.template) : starterPage();
-    if (!page) throw badRequest(`There is no template called “${body.template}”.`);
-    const campaign = createCampaign(app, { name: body.name, page, source: { type: 'scratch', template: body.template } });
+    const body = await jsonBody(
+      c,
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        template: z.string().max(40).optional(),
+        /** A brand kit's id, "none" for no brand, or nothing for the default brand. */
+        brand_id: z.string().max(40).optional(),
+      }),
+    );
+    const base = body.template ? buildTemplate(body.template) : starterPage();
+    if (!base) throw badRequest(`There is no template called “${body.template}”.`);
+    const brand = chooseBrand(app, body.brand_id);
+    const campaign = createCampaign(app, {
+      name: body.name,
+      page: brand ? applyBrand(base, brand) : base,
+      settings: body.brand_id === NO_BRAND ? { brand_id: NO_BRAND } : brand ? { brand_id: brand.id } : {},
+      source: { type: 'scratch', template: body.template },
+    });
     return c.json({ campaign }, 201);
   });
 

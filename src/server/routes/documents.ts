@@ -10,7 +10,7 @@ import { attachPdf, importPdfCampaign, removeAsset } from '../services/importer'
 import { getAsset } from '../services/assets';
 import { parsePreviewSource, previewContext, previewSourceString, PreviewSourceSchema, type PreviewSource } from '../services/render';
 
-async function readPdfUpload(c: C): Promise<{ data: Buffer; filename: string; name?: string; ai?: boolean }> {
+async function readPdfUpload(c: C): Promise<{ data: Buffer; filename: string; name?: string; ai?: boolean; brandId?: string }> {
   const form = await c.req.parseBody();
   const file = form.file;
   if (!(file instanceof File)) throw badRequest('Attach a PDF as "file".');
@@ -21,6 +21,7 @@ async function readPdfUpload(c: C): Promise<{ data: Buffer; filename: string; na
     filename: file.name || 'document.pdf',
     name: typeof form.name === 'string' ? form.name : undefined,
     ai: form.ai === '0' ? false : undefined,
+    brandId: typeof form.brand_id === 'string' && form.brand_id.trim() ? form.brand_id.trim().slice(0, 40) : undefined,
   };
 }
 

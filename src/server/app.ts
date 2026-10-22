@@ -7,6 +7,7 @@ import { baseMiddleware, dashboardHeaders, errorHandler, requestHost, type Env }
 import { safeJoin, sendFile } from './lib/static';
 import { analyticsRoutes } from './routes/analytics';
 import { authRoutes } from './routes/auth';
+import { brandRoutes } from './routes/brands';
 import { campaignRoutes } from './routes/campaigns';
 import { aiRoutes } from './routes/ai';
 import { documentRoutes } from './routes/documents';
@@ -108,6 +109,7 @@ export function createApp(ctx: AppContext) {
     }),
   );
   api.route('/auth', authRoutes());
+  api.route('/brands', brandRoutes());
   api.route('/campaigns', documentRoutes()); // /import-pdf must be matched before /:id
   api.route('/campaigns', aiRoutes());
   api.route('/campaigns', campaignRoutes());

@@ -1,4 +1,5 @@
-import type { Page } from '@shared/schema';
+import { brandLook, brandNotes } from '@shared/brand';
+import type { Brand, Page } from '@shared/schema';
 import { STYLE_PRESETS } from '@shared/presets';
 import type { AppContext } from '../context';
 import { choosePages, figuresOf, pageTexts, pictureWidth, sourceOf, tokenNames } from '../pdf/design-input';
@@ -33,6 +34,8 @@ export interface DesignRequest {
   saveEmbedded(ref: string): Promise<string | null>;
   /** Stores a PNG made from the PDF (a region of a page) and returns its asset id. */
   savePicture(png: Buffer, name: string): Promise<string | null>;
+  /** The brand the page should follow, if any: its voice and look go to the model. */
+  brand?: Brand | null;
 }
 
 export type DesignOutcome = { ok: true; page: Page; report: string[] } | { ok: false; reason: string };
@@ -119,6 +122,7 @@ export async function designPageFromPdf(app: AppContext, req: DesignRequest): Pr
     figures: figureRefs,
     palette,
     tokens: tokenNames(extracted),
+    brand: req.brand ? { name: req.brand.name, look: brandLook(req.brand), notes: brandNotes(req.brand) } : undefined,
   });
 
   const res = await callAi(app, {

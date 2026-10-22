@@ -11,7 +11,7 @@ export function randomString(length: number, alphabet: string): string {
   return out;
 }
 
-export type IdPrefix = 'usr' | 'cmp' | 'prs' | 'ast' | 'key' | 'whk' | 'sub' | 'dlv' | 'pvw';
+export type IdPrefix = 'usr' | 'cmp' | 'prs' | 'ast' | 'key' | 'whk' | 'sub' | 'dlv' | 'pvw' | 'brd';
 
 export function newId(prefix: IdPrefix): string {
   return `${prefix}_${randomString(16, ID_ALPHABET)}`;

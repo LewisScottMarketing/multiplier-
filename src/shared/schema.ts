@@ -552,6 +552,8 @@ export const CampaignSettingsSchema = z.object({
   ai_fields: z.array(AiFieldSchema).max(8).default([]),
   /** Tidy ALL-CAPS / lowercase names coming from enrichment. */
   clean_names: z.boolean().default(true),
+  /** The brand kit this campaign follows (its voice guides the AI). Empty: the default brand. "none": no brand. */
+  brand_id: text(40).optional(),
 });
 export type CampaignSettings = z.infer<typeof CampaignSettingsSchema>;
 
@@ -598,3 +600,50 @@ export const CampaignUpdateSchema = z.object({
   base_version: z.number().int().optional(),
 });
 export type CampaignUpdate = z.infer<typeof CampaignUpdateSchema>;
+
+// ── Brand kits ──────────────────────────────────────────────────────────────
+
+/**
+ * A company's brand, as far as this app can follow it: colours, the typefaces we can serve that come closest to its own,
+ * a logo, and how it sounds. It is applied to a page's theme (`applyBrand`) and its voice is given to the AI.
+ */
+export const BrandKitSchema = z.object({
+  name: text(80).min(1).default('My brand'),
+  brand: hex.default('#4f46e5'),
+  accent: hex.optional(),
+  /** Page background, body text and the dark-section colour. Left out, the style decides. */
+  bg: hex.optional(),
+  text: hex.optional(),
+  dark: hex.optional(),
+  heading_font: z.enum(FONT_CHOICES).optional(),
+  body_font: z.enum(FONT_CHOICES).optional(),
+  /** The brand's real typefaces as its guidelines name them. We can only serve the ones above, so this is for reference. */
+  font_names: text(160).default(''),
+  /** The look (a style preset id) the brand prefers. */
+  style: text(40).optional(),
+  logo: ImageSchema.optional(),
+  /** How the brand sounds. */
+  voice: text(800).default(''),
+  use: z.array(text(60)).max(20).default([]),
+  avoid: z.array(text(60)).max(30).default([]),
+  /** Anything else a writer must follow. */
+  rules: text(2000).default(''),
+  source: z
+    .object({
+      type: z.enum(['manual', 'website', 'guidelines']).default('manual'),
+      url: text(500).optional(),
+      filename: text(200).optional(),
+      read_at: z.number().optional(),
+      /** What was found, and what was not. */
+      notes: z.array(text(300)).max(12).default([]),
+    })
+    .prefault({}),
+});
+export type BrandKit = z.infer<typeof BrandKitSchema>;
+
+export interface Brand extends BrandKit {
+  id: string;
+  is_default: boolean;
+  created_at: number;
+  updated_at: number;
+}

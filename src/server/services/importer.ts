@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { PDFDocument } from 'pdf-lib';
+import { applyBrand } from '@shared/brand';
 import type { Campaign, DocumentConfig, Page } from '@shared/schema';
 import type { AppContext } from '../context';
 import { badRequest, tooLarge } from '../lib/errors';
@@ -11,6 +12,7 @@ import { extractPalette, renderPageRaster, sampleRunColors, type Raster } from '
 import { isPdf, pdfGate, withTimeout } from '../pdf/runtime';
 import { getAsset, storeImage, type AssetRow } from './assets';
 import { createCampaign, requireCampaign, updateCampaign } from './campaigns';
+import { chooseBrand, NO_BRAND } from './brands';
 import { aiEnabled, polishImport } from './ai';
 import { designPageFromPdf } from './designer';
 import { forgetSource } from './documents';
@@ -105,9 +107,11 @@ export interface ImportOutcome {
 /** Upload a PDF → a campaign with a landing page built from it and the PDF ready to personalise. */
 export async function importPdfCampaign(
   app: AppContext,
-  input: { data: Buffer; filename: string; name?: string; ai?: boolean },
+  input: { data: Buffer; filename: string; name?: string; ai?: boolean; brandId?: string },
 ): Promise<ImportOutcome> {
   const stored = await storePdf(app, input);
+  /** The brand to follow: the one asked for, the default, or none (then the page keeps the PDF's own look). */
+  const brand = chooseBrand(app, input.brandId);
   const { extracted, asset } = stored;
   const first = stored.rasters.slice(0, 3);
   const palette = extractPalette(first);
@@ -131,6 +135,7 @@ export async function importPdfCampaign(
       extracted,
       palette,
       saveEmbedded: embedded,
+      brand,
       savePicture: async (png, name) => (await storeImage(app, { data: png, filename: name })).id,
     }).catch((e): { ok: false; reason: string } => {
       app.log.warn('pdf design failed', { err: e });
@@ -159,6 +164,11 @@ export async function importPdfCampaign(
     }
   }
 
+  if (brand) {
+    importedPage = applyBrand(importedPage, brand);
+    report.push(`Followed your brand “${brand.name}”: its colours${brand.logo?.src ? ', logo' : ''} and typefaces are on the page.`);
+  }
+
   const headline = importedPage.blocks.find((b) => b.type === 'hero');
   const title = headline?.type === 'hero' && headline.headline ? headline.headline : input.filename.replace(/\.pdf$/i, '');
   if (!stored.editable)
@@ -178,6 +188,7 @@ export async function importPdfCampaign(
     name: (input.name?.trim() || title).slice(0, 120),
     page: importedPage,
     document,
+    settings: brand ? { brand_id: brand.id } : input.brandId === NO_BRAND ? { brand_id: NO_BRAND } : {},
     source: { type: 'pdf', asset_id: asset.id, filename: input.filename, imported_at: Date.now(), report },
   });
   app.db.run('UPDATE assets SET campaign_id = ? WHERE id = ?', campaign.id, asset.id);
