@@ -6,7 +6,7 @@ import { jsonBody, rateLimit, requireUser, type C, type Env } from '../http';
 import { fieldFromRun, stampField } from '../pdf/fields';
 import { requireCampaign, updateCampaign } from '../services/campaigns';
 import { buildPdf, previewPage, studioPage } from '../services/documents';
-import { attachPdf, importPdfCampaign, removeAsset } from '../services/importer';
+import { attachPdf, importPdfCampaign, redesignCampaign, removeAsset } from '../services/importer';
 import { getAsset } from '../services/assets';
 import { parsePreviewSource, previewContext, previewSourceString, PreviewSourceSchema, type PreviewSource } from '../services/render';
 
@@ -42,6 +42,24 @@ export function documentRoutes() {
       const app = c.get('app');
       const upload = await readPdfUpload(c);
       const { campaign, report } = await importPdfCampaign(app, upload);
+      return c.json({ campaign, report }, 201);
+    },
+  );
+
+  /** Build the page again from this campaign's own PDF, as a copy: with a brand (or none), with or without Claude. */
+  r.post(
+    '/:id/redesign',
+    rateLimit('import-pdf', 20, 3600_000, (c) => c.get('user').id),
+    async (c) => {
+      const body = await jsonBody(
+        c,
+        z.object({ brand_id: z.string().max(40).optional(), ai: z.boolean().optional(), name: z.string().trim().max(120).optional() }),
+      );
+      const { campaign, report } = await redesignCampaign(c.get('app'), c.req.param('id'), {
+        brandId: body.brand_id,
+        ai: body.ai,
+        name: body.name,
+      });
       return c.json({ campaign, report }, 201);
     },
   );

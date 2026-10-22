@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { BrandKitSchema } from '@shared/schema';
 import { z } from 'zod';
 import { jsonBody, rateLimit, requireUser, type Env } from '../http';
+import { badRequest } from '../lib/errors';
+import { readBrandFromGuidelines } from '../services/brand-guidelines';
 import { readBrandFromWebsite } from '../services/brand-site';
 import { createBrand, deleteBrand, listBrands, requireBrand, setDefaultBrand, updateBrand } from '../services/brands';
 
@@ -24,6 +26,21 @@ export function brandRoutes() {
     async (c) => {
       const { url } = await jsonBody(c, z.object({ url: z.string().trim().min(1).max(500) }));
       return c.json({ kit: await readBrandFromWebsite(c.get('app'), url) });
+    },
+  );
+
+  /** Read a brand off an uploaded guidelines PDF. Nothing is stored: the person looks it over and saves it. */
+  r.post(
+    '/read-guidelines',
+    rateLimit('brand-guidelines', 8, 3600_000, (c) => c.get('user').id),
+    async (c) => {
+      const file = (await c.req.parseBody()).file;
+      if (!(file instanceof File)) throw badRequest('Attach the guidelines as a PDF, in "file".');
+      const kit = await readBrandFromGuidelines(c.get('app'), {
+        data: Buffer.from(await file.arrayBuffer()),
+        filename: file.name || 'guidelines.pdf',
+      });
+      return c.json({ kit });
     },
   );
 

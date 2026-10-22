@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 import { PDFDocument } from 'pdf-lib';
 import { applyBrand } from '@shared/brand';
-import type { Campaign, DocumentConfig, Page } from '@shared/schema';
+import type { Brand, Campaign, DocumentConfig, Page } from '@shared/schema';
 import type { AppContext } from '../context';
-import { badRequest, tooLarge } from '../lib/errors';
+import { badRequest, notFound, tooLarge } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { extractDocument, extractImagePng, type ExtractedDoc } from '../pdf/extract';
 import { fieldsForTokenRuns } from '../pdf/fields';
 import { importToPage } from '../pdf/import';
 import { extractPalette, renderPageRaster, sampleRunColors, type Raster } from '../pdf/raster';
 import { isPdf, pdfGate, withTimeout } from '../pdf/runtime';
-import { getAsset, storeImage, type AssetRow } from './assets';
+import { cloneAsset, getAsset, storeImage, type AssetRow } from './assets';
 import { createCampaign, requireCampaign, updateCampaign } from './campaigns';
 import { chooseBrand, NO_BRAND } from './brands';
 import { aiEnabled, polishImport } from './ai';
@@ -24,28 +24,31 @@ export interface StoredPdf {
   editable: boolean;
 }
 
-/** Validate, store and analyse an uploaded PDF. */
-export async function storePdf(app: AppContext, input: { data: Buffer; filename: string; campaignId?: string | null }): Promise<StoredPdf> {
-  if (input.data.length > app.config.maxUploadBytes)
-    throw tooLarge(`PDFs can be up to ${Math.round(app.config.maxUploadBytes / 1024 / 1024)} MB.`);
-  if (!isPdf(input.data)) throw badRequest('That file doesn’t look like a PDF.');
-
-  const { extracted, rasters } = await pdfGate.run(() =>
+/** Read a PDF's text and draw the pages we need colours from (the first three, and any with a {{token}} on them). */
+async function analysePdf(data: Buffer): Promise<{ extracted: ExtractedDoc; rasters: Raster[] }> {
+  return pdfGate.run(() =>
     withTimeout(
       (async () => {
-        const extracted = await extractDocument(input.data);
-        // the first pages give us the brand palette, and colours for any {{token}} placeholders
+        const extracted = await extractDocument(data);
         const wanted = new Set<number>([1, 2, 3].filter((n) => n <= extracted.page_count));
         for (const t of extracted.tokens) wanted.add(t.page);
         const rasters: Raster[] = [];
-        for (const n of [...wanted].sort((a, b) => a - b))
-          rasters.push(Object.assign(await renderPageRaster(input.data, n, 1.5), { page: n }));
+        for (const n of [...wanted].sort((a, b) => a - b)) rasters.push(Object.assign(await renderPageRaster(data, n, 1.5), { page: n }));
         return { extracted, rasters };
       })(),
       90_000,
       'Reading the PDF',
     ),
   );
+}
+
+/** Validate, store and analyse an uploaded PDF. */
+export async function storePdf(app: AppContext, input: { data: Buffer; filename: string; campaignId?: string | null }): Promise<StoredPdf> {
+  if (input.data.length > app.config.maxUploadBytes)
+    throw tooLarge(`PDFs can be up to ${Math.round(app.config.maxUploadBytes / 1024 / 1024)} MB.`);
+  if (!isPdf(input.data)) throw badRequest('That file doesn’t look like a PDF.');
+
+  const { extracted, rasters } = await analysePdf(input.data);
 
   // pdf-lib must be able to open it for us to edit it later
   let editable = true;
@@ -104,17 +107,16 @@ export interface ImportOutcome {
   report: string[];
 }
 
-/** Upload a PDF → a campaign with a landing page built from it and the PDF ready to personalise. */
-export async function importPdfCampaign(
+/**
+ * The landing page for a PDF: designed by Claude when AI is on (falling back to the standard import when it can't), with
+ * the brand's colours, typefaces and logo on it when there is one. Returns the page and what to tell the person.
+ */
+async function buildPage(
   app: AppContext,
-  input: { data: Buffer; filename: string; name?: string; ai?: boolean; brandId?: string },
-): Promise<ImportOutcome> {
-  const stored = await storePdf(app, input);
-  /** The brand to follow: the one asked for, the default, or none (then the page keeps the PDF's own look). */
-  const brand = chooseBrand(app, input.brandId);
-  const { extracted, asset } = stored;
-  const first = stored.rasters.slice(0, 3);
-  const palette = extractPalette(first);
+  input: { data: Buffer; filename: string; extracted: ExtractedDoc; rasters: Raster[]; ai?: boolean; brand: Brand | null },
+): Promise<{ page: Page; report: string[] }> {
+  const { extracted, brand } = input;
+  const palette = extractPalette(input.rasters.slice(0, 3));
 
   const embedded = async (ref: string): Promise<string | null> => {
     const out = await pdfGate.run(() => withTimeout(extractImagePng(input.data, ref), 15_000, 'Reading an image'));
@@ -123,7 +125,7 @@ export async function importPdfCampaign(
   };
 
   const wantAi = input.ai !== false && aiEnabled(app);
-  let importedPage: Page | null = null;
+  let page: Page | null = null;
   let report: string[] = [];
 
   // First choice, when AI is on: Claude looks at every page and designs the page. Whatever goes wrong, the rule-based
@@ -142,34 +144,55 @@ export async function importPdfCampaign(
       return { ok: false, reason: 'something went wrong' };
     });
     if (designed.ok) {
-      importedPage = designed.page;
+      page = designed.page;
       report = designed.report;
     } else {
       report.push(`Claude couldn’t design this page (${designed.reason}), so the standard import was used.`);
     }
   }
 
-  if (!importedPage) {
-    const result = await importToPage(extracted, palette, {
-      filename: input.filename,
-      saveImage: (img) => embedded(img.ref),
-    });
+  if (!page) {
+    const result = await importToPage(extracted, palette, { filename: input.filename, saveImage: (img) => embedded(img.ref) });
     report.push(...result.report);
-    importedPage = result.page as Page;
+    page = result.page as Page;
     // optional: let Claude tidy weak copy (never overrides text that already reads well)
     if (wantAi) {
-      const polished = await polishImport(app, { page: importedPage, filename: input.filename });
-      importedPage = polished.page;
+      const polished = await polishImport(app, { page, filename: input.filename });
+      page = polished.page;
       report.push(...polished.notes);
     }
   }
 
   if (brand) {
-    importedPage = applyBrand(importedPage, brand);
+    page = applyBrand(page, brand);
     report.push(`Followed your brand “${brand.name}”: its colours${brand.logo?.src ? ', logo' : ''} and typefaces are on the page.`);
   }
+  return { page, report };
+}
 
-  const headline = importedPage.blocks.find((b) => b.type === 'hero');
+/** The brand a new campaign records: the one it follows, "none" when that was chosen, nothing otherwise. */
+const brandSetting = (brand: Brand | null, asked: string | undefined): { brand_id?: string } =>
+  brand ? { brand_id: brand.id } : asked === NO_BRAND ? { brand_id: NO_BRAND } : {};
+
+/** Upload a PDF → a campaign with a landing page built from it and the PDF ready to personalise. */
+export async function importPdfCampaign(
+  app: AppContext,
+  input: { data: Buffer; filename: string; name?: string; ai?: boolean; brandId?: string },
+): Promise<ImportOutcome> {
+  const stored = await storePdf(app, input);
+  /** The brand to follow: the one asked for, the default, or none (then the page keeps the PDF's own look). */
+  const brand = chooseBrand(app, input.brandId);
+  const { extracted, asset } = stored;
+  const { page, report } = await buildPage(app, {
+    data: input.data,
+    filename: input.filename,
+    extracted,
+    rasters: stored.rasters,
+    ai: input.ai,
+    brand,
+  });
+
+  const headline = page.blocks.find((b) => b.type === 'hero');
   const title = headline?.type === 'hero' && headline.headline ? headline.headline : input.filename.replace(/\.pdf$/i, '');
   if (!stored.editable)
     report.push(
@@ -186,12 +209,45 @@ export async function importPdfCampaign(
 
   const campaign = createCampaign(app, {
     name: (input.name?.trim() || title).slice(0, 120),
-    page: importedPage,
+    page,
     document,
-    settings: brand ? { brand_id: brand.id } : input.brandId === NO_BRAND ? { brand_id: NO_BRAND } : {},
+    settings: brandSetting(brand, input.brandId),
     source: { type: 'pdf', asset_id: asset.id, filename: input.filename, imported_at: Date.now(), report },
   });
   app.db.run('UPDATE assets SET campaign_id = ? WHERE id = ?', campaign.id, asset.id);
+  return { campaign, report };
+}
+
+/**
+ * Build the page again from a campaign's own PDF, with a brand (or none) and with or without Claude, as a copy. The
+ * original keeps its page, its personalisation fields and its prospects; the copy has the same PDF fields on a fresh page.
+ */
+export async function redesignCampaign(
+  app: AppContext,
+  id: string,
+  opts: { brandId?: string; ai?: boolean; name?: string },
+): Promise<ImportOutcome> {
+  const src = requireCampaign(app, id);
+  if (!src.document) throw badRequest('This campaign has no PDF to build a new page from.');
+  const asset = getAsset(app, src.document.asset_id);
+  const data = asset ? await app.storage.get(asset.storage_key) : null;
+  if (!asset || !data) throw notFound('The PDF');
+
+  const filename = src.source?.filename ?? asset.filename;
+  const { extracted, rasters } = await analysePdf(data);
+  const brand = chooseBrand(app, opts.brandId);
+  const { page, report } = await buildPage(app, { data, filename, extracted, rasters, ai: opts.ai, brand });
+
+  const copy = createCampaign(app, {
+    name: (opts.name?.trim() || `${src.name} (redesign)`).slice(0, 120),
+    page,
+    document: null,
+    settings: { ...src.settings, brand_id: undefined, ...brandSetting(brand, opts.brandId) },
+    source: { type: 'pdf', filename, imported_at: Date.now(), report },
+  });
+  const cloned = await cloneAsset(app, asset.id, copy.id);
+  app.db.run('UPDATE campaigns SET source = ? WHERE id = ?', JSON.stringify({ ...copy.source, asset_id: cloned.id }), copy.id);
+  const campaign = updateCampaign(app, copy.id, { document: { ...src.document, asset_id: cloned.id } });
   return { campaign, report };
 }
 

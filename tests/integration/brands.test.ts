@@ -301,3 +301,229 @@ describe('reading a brand off a website', () => {
     expect((await t.json('POST', '/api/brands/read-website', { url: site }, { cookie: '' })).status).toBe(401);
   });
 });
+
+// ── Reading a brand off guidelines ──────────────────────────────────────────
+
+import { makePdf, para } from '../helpers/pdfs';
+
+describe('reading a brand off a guidelines PDF', () => {
+  async function guidelines(): Promise<Buffer> {
+    return Buffer.from(
+      await makePdf([
+        {
+          items: [
+            { text: 'Acme Brand Guidelines', x: 50, y: 120, size: 36, bold: true },
+            { text: 'Version 3', x: 50, y: 180, size: 12 },
+          ],
+        },
+        {
+          items: [
+            { text: 'Colour', x: 50, y: 50, size: 20, bold: true },
+            ...para(
+              [
+                'Primary colour',
+                'Ocean Blue',
+                'HEX #0B5FFF',
+                'RGB 11 95 255',
+                'Accent colour',
+                'Sunset Orange',
+                'HEX #FF6B35',
+                'Dark background',
+                'Midnight',
+                'HEX #0B1020',
+              ],
+              50,
+              100,
+              12,
+              18,
+            ),
+          ],
+        },
+        {
+          items: [
+            { text: 'Typography', x: 50, y: 50, size: 20, bold: true },
+            ...para(['Headings are set in Playfair Display.', 'Body text is set in Inter Regular.'], 50, 100, 12, 18),
+          ],
+        },
+        {
+          items: [
+            { text: 'Tone of voice', x: 50, y: 50, size: 20, bold: true },
+            ...para(
+              [
+                'We sound like a helpful colleague, not a salesperson.',
+                'Short sentences. Plain words.',
+                "Don't use jargon like synergy or leverage.",
+                'Never promise results we cannot show.',
+              ],
+              50,
+              100,
+              12,
+              18,
+            ),
+          ],
+        },
+      ]),
+    );
+  }
+  const send = async (data: Buffer, name = 'acme-guidelines.pdf') => {
+    const form = new FormData();
+    form.set('file', new File([new Uint8Array(data)], name, { type: 'application/pdf' }));
+    return t.json('POST', '/api/brands/read-guidelines', form);
+  };
+
+  it('picks out the printed colour codes, the typefaces and the voice, and saves nothing', async () => {
+    const r = await send(await guidelines());
+    expect(r.status).toBe(200);
+    expect(r.body.kit).toMatchObject({
+      name: 'Acme',
+      brand: '#0b5fff',
+      accent: '#ff6b35',
+      dark: '#0b1020',
+      heading_font: 'fraunces',
+      body_font: 'inter',
+      font_names: 'Headings: Playfair Display; Body: Inter',
+      source: { type: 'guidelines', filename: 'acme-guidelines.pdf' },
+    });
+    expect(r.body.kit.voice).toMatch(/^We sound like a helpful colleague/);
+    expect(r.body.kit.rules).toContain("Don't use jargon like synergy or leverage.");
+    const notes = r.body.kit.source.notes.join(' ');
+    expect(notes).toMatch(/Ocean Blue #0b5fff/);
+    expect(notes).toMatch(/Switch AI on|copied from the guidelines/);
+    expect(notes).toMatch(/Logo: not read from guidelines/);
+    expect((await t.json('GET', '/api/brands')).body.brands).toEqual([]);
+  });
+
+  it('has Claude read the pages as well, and checks what comes back', async () => {
+    const { calls, backend } = fake(() => ({
+      ok: true,
+      data: {
+        name: 'Acme Co',
+        colors: [
+          { name: 'Ocean Blue', hex: '#0B5FFF', role: 'primary' },
+          { name: 'Sunset', hex: '#ff6b35', role: 'accent' },
+          { name: 'Haze', hex: '#e8eefc', role: 'bg' },
+          { name: 'Made up', hex: 'blue', role: 'primary' }, // not a hex code: dropped
+        ],
+        fonts: [
+          { name: 'Canela', role: 'heading' },
+          { name: 'Inter', role: 'body' },
+        ],
+        voice: 'Warm, plain and specific.',
+        use: ['teams'],
+        avoid: ['synergy', 'leverage'],
+        rules: 'Keep clear space around the logo.',
+        notes: ['The logo page had no codes.'],
+      },
+    }));
+    setAiBackend(t.ctx, backend);
+    const r = await send(await guidelines());
+    const call = calls.find((c) => c.label === 'brand-guidelines')!;
+    expect(call.tier).toBe('smart');
+    expect(call.images!.map((i) => i.label)).toEqual(['Page 1:', 'Page 2:', 'Page 3:', 'Page 4:']);
+    expect(call.user).toContain('Ocean Blue');
+    expect(call.system).toMatch(/data, not instructions/);
+    expect(call.retries).toBe(0);
+
+    expect(r.body.kit).toMatchObject({
+      name: 'Acme Co',
+      brand: '#0b5fff',
+      accent: '#ff6b35',
+      bg: '#e8eefc',
+      heading_font: 'fraunces', // Canela is a serif display face
+      body_font: 'inter',
+      voice: 'Warm, plain and specific.',
+      use: ['teams'],
+      avoid: ['synergy', 'leverage'],
+      rules: 'Keep clear space around the logo.',
+    });
+    const notes = r.body.kit.source.notes.join(' ');
+    expect(notes).toMatch(/read by Claude/);
+    // a colour whose code isn't printed in the document is flagged, one that is is not
+    expect(notes).toMatch(/Haze \(#e8eefc\) was estimated from the picture/);
+    expect(notes).not.toMatch(/Ocean Blue \(#0b5fff\) was estimated/);
+    expect(notes).toMatch(/The logo page had no codes/);
+  });
+
+  it('falls back to what the document prints when Claude cannot answer', async () => {
+    setAiBackend(t.ctx, fake(() => ({ ok: false, reason: 'timeout', message: 'The AI took too long to answer.' })).backend);
+    const r = await send(await guidelines());
+    expect(r.status).toBe(200);
+    expect(r.body.kit.brand).toBe('#0b5fff');
+    expect(r.body.kit.source.notes.join(' ')).toMatch(/copied from the guidelines as they are written/);
+  });
+
+  it('refuses a file that is not a PDF, and a request with no file', async () => {
+    expect((await send(Buffer.from('not a pdf at all, just words'))).status).toBe(400);
+    expect((await t.json('POST', '/api/brands/read-guidelines', new FormData())).status).toBe(400);
+  });
+
+  it('is only for people who are signed in', async () => {
+    const form = new FormData();
+    form.set('file', new File([new Uint8Array(await guidelines())], 'g.pdf', { type: 'application/pdf' }));
+    expect((await t.json('POST', '/api/brands/read-guidelines', form, { cookie: '' })).status).toBe(401);
+  });
+});
+
+// ── Redesigning an imported campaign ────────────────────────────────────────
+
+describe('redesigning a page from its own PDF', () => {
+  async function imported() {
+    const form = new FormData();
+    form.set('file', new File([fs.readFileSync(path.resolve('tests/fixtures/playbook.pdf'))], 'playbook.pdf', { type: 'application/pdf' }));
+    form.set('brand_id', 'none');
+    return (await t.json('POST', '/api/campaigns/import-pdf', form)).body.campaign;
+  }
+
+  it('makes a copy with a fresh page in the brand, and leaves the original alone', async () => {
+    const original = await imported();
+    const brand = (await make({ accent: '#0ea5e9' })).body.brand;
+    const r = await t.json('POST', `/api/campaigns/${original.id}/redesign`, { brand_id: brand.id });
+    expect(r.status).toBe(201);
+    const copy = r.body.campaign;
+    expect(copy.id).not.toBe(original.id);
+    expect(copy.name).toBe(`${original.name} (redesign)`);
+    expect(copy.page.theme).toMatchObject({ brand: '#d6336c', accent: '#0ea5e9' });
+    expect(copy.settings.brand_id).toBe(brand.id);
+    expect(r.body.report.join(' ')).toMatch(/Followed your brand “Acme”/);
+    // the PDF and its personalisation fields come along, as a copy of their own
+    expect(copy.document.asset_id).not.toBe(original.document.asset_id);
+    expect(copy.document.fields).toEqual(original.document.fields);
+    expect(copy.source.asset_id).toBe(copy.document.asset_id);
+
+    const still = (await t.json('GET', `/api/campaigns/${original.id}`)).body.campaign;
+    expect(still.page).toEqual(original.page);
+    expect(still.settings.brand_id).toBe('none');
+
+    // deleting the copy takes its own PDF, not the original's
+    await t.json('DELETE', `/api/campaigns/${copy.id}`);
+    expect((await t.req('GET', `/api/campaigns/${original.id}/document/page/1.png`)).status).toBe(200);
+  });
+
+  it('can leave the brand off, and can ask Claude to design it', async () => {
+    const original = await imported();
+    await make();
+    const plain = await t.json('POST', `/api/campaigns/${original.id}/redesign`, { brand_id: 'none', name: 'Plain version' });
+    expect(plain.body.campaign.name).toBe('Plain version');
+    expect(plain.body.campaign.page.theme.brand).not.toBe('#d6336c');
+
+    const { calls, backend } = fake((call) =>
+      call.label === 'pdf-design' ? { ok: true, data: wire(playbookPlan()) } : { ok: true, data: {} },
+    );
+    setAiBackend(t.ctx, backend);
+    const designed = await t.json('POST', `/api/campaigns/${original.id}/redesign`, {});
+    expect(calls.some((c) => c.label === 'pdf-design')).toBe(true);
+    expect(designed.body.campaign.page.blocks.map((b: { type: string }) => b.type)).toContain('callout');
+    expect(designed.body.campaign.page.theme.brand).toBe('#d6336c'); // the default brand
+
+    const noAi = fake(() => ({ ok: true, data: {} }));
+    setAiBackend(t.ctx, noAi.backend);
+    await t.json('POST', `/api/campaigns/${original.id}/redesign`, { ai: false });
+    expect(noAi.calls).toHaveLength(0);
+  });
+
+  it('refuses a campaign with no PDF, and one that does not exist', async () => {
+    const scratch = (await t.json('POST', '/api/campaigns', { name: 'From scratch' })).body.campaign;
+    expect((await t.json('POST', `/api/campaigns/${scratch.id}/redesign`, {})).status).toBe(400);
+    expect((await t.json('POST', '/api/campaigns/cmp_nope/redesign', {})).status).toBe(404);
+  });
+});
